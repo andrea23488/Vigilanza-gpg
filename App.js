@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 
 import {
   SafeAreaView,
@@ -9,20 +9,21 @@ import {
   TouchableOpacity,
   TextInput,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
+
+const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL;
+const SUPABASE_KEY = process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 
 const COLORS = {
   bg: '#07111F',
   card: '#101C2D',
-  card2: '#112238',
   border: '#203550',
   white: '#FFFFFF',
   muted: '#91A3BA',
   blue: '#168BFF',
   lightBlue: '#55B8FF',
-  green: '#50D89F',
   red: '#FF6B6B',
-  orange: '#FFAE57',
 };
 
 const MESI = [
@@ -40,405 +41,757 @@ const MESI = [
   'Dicembre',
 ];
 
-const PAY = {
-  base: 1468.88,
-  straordinario: 11.03783,
-  piantonamentoDiurno: 0.65,
-  compensativa: 1.86,
-  piantonamentoNotturno: 4.18,
-  riposoLavorato: 11.88689,
-  coefficienteNetto: 1992 / 2577.16,
-};
-
-const DATI_INIZIALI = [
-  {
-    id: '1',
-    giorno: 12,
-    tipo: 'turno',
-    inizio: '14:00',
-    fine: '22:00',
-    luogo: 'Fiumicino',
-    ore: 8,
-    extra: 1,
-    fascia: 'Pomeriggio',
-    riposoLavorato: false,
-  },
-  {
-    id: '2',
-    giorno: 13,
-    tipo: 'turno',
-    inizio: '22:00',
-    fine: '06:00',
-    luogo: 'Fiumicino',
-    ore: 8,
-    extra: 1,
-    fascia: 'Notte',
-    riposoLavorato: false,
-  },
-  {
-    id: '3',
-    giorno: 14,
-    tipo: 'riposo',
-  },
-];
-
-const COLLEGHI = [
-  {
-    id: '1',
-    nome: 'Marco Rossi',
-    iniziali: 'MR',
-    servizio: true,
-    turno: '14:00–22:00',
-    sede: 'Fiumicino',
-  },
-  {
-    id: '2',
-    nome: 'Luca Bianchi',
-    iniziali: 'LB',
-    servizio: true,
-    turno: '22:00–06:00',
-    sede: 'Fiumicino',
-  },
-  {
-    id: '3',
-    nome: 'Fabio Conti',
-    iniziali: 'FC',
-    servizio: false,
-    turno: 'Riposo',
-    sede: '',
-  },
-];
-
 export default function App() {
   const [screen, setScreen] = useState('home');
+
   const [mese, setMese] = useState(7);
   const [anno, setAnno] = useState(2026);
-  const [records, setRecords] = useState(DATI_INIZIALI);
+
+  const [turni, setTurni] = useState([]);
+
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
 
   const [editingId, setEditingId] = useState(null);
+
   const [giorno, setGiorno] = useState(1);
   const [tipo, setTipo] = useState('turno');
+
   const [inizio, setInizio] = useState('06:00');
   const [fine, setFine] = useState('14:00');
+
   const [luogo, setLuogo] = useState('Fiumicino');
   const [extra, setExtra] = useState('1');
+
   const [riposoLavorato, setRiposoLavorato] = useState(false);
 
-  const [profilo, setProfilo] = useState({
-    nome: 'Andrea',
-    cognome: 'Ischiboni',
-    azienda: 'Italpol',
-    qualifica: 'Guardia Particolare Giurata',
-    sede: 'Roma',
-  });
+  useEffect(() => {
+    caricaTurni();
+  }, []);
 
-  const turni = useMemo(
-    () => records.filter((r) => r.tipo === 'turno'),
-    [records]
-  );
+  function headersJSON() {
+    return {
+      apikey: SUPABASE_KEY,
+      'Content-Type': 'application/json',
+    };
+  }
 
-  const stipendio = useMemo(() => {
+  async function caricaTurni() {
+    try {
+      setLoading(true);
+
+      const response = await fetch(
+        `${SUPABASE_URL}/rest/v1/turni?select=*&order=anno.asc,mese.asc,giorno.asc`,
+        {
+          method: 'GET',
+          headers: {
+            apikey: SUPABASE_KEY,
+          },
+        }
+      );
+
+      const testo = await response.text();
+
+      console.log('GET STATUS:', response.status);
+      console.log('GET RESPONSE:', testo);
+
+      if (!response.ok) {
+        throw new Error(
+          `HTTP ${response.status}: ${testo}`
+        );
+      }
+
+      const dati = testo ? JSON.parse(testo) : [];
+
+      setTurni(Array.isArray(dati) ? dati : []);
+
+      return Array.isArray(dati) ? dati : [];
+    } catch (error) {
+      console.log('ERRORE LETTURA:', error);
+
+      Alert.alert(
+        'Errore database',
+        error.message || 'Impossibile leggere i turni.'
+      );
+
+      return [];
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const turniMese = useMemo(() => {
+    return turni.filter(
+      (t) =>
+        Number(t.mese) === mese + 1 &&
+        Number(t.anno) === anno
+    );
+  }, [turni, mese, anno]);
+
+  const statistiche = useMemo(() => {
     let ore = 0;
     let extraOre = 0;
-    let notturni = 0;
-    let diurni = 0;
-    let oreRiposo = 0;
+    let notti = 0;
+    let giorniLavorati = 0;
 
-    turni.forEach((t) => {
-      ore += Number(t.ore || 0);
-      extraOre += Number(t.extra || 0);
+    turniMese.forEach((t) => {
+      if (t.tipo === 'turno') {
+        ore += Number(t.ore || 0);
+        extraOre += Number(t.extra || 0);
+        giorniLavorati += 1;
 
-      if (t.fascia === 'Notte') notturni += 1;
-      else diurni += 1;
-
-      if (t.riposoLavorato) {
-        oreRiposo += Number(t.ore || 0);
+        if (t.fascia === 'Notte') {
+          notti += 1;
+        }
       }
     });
-
-    const ordinarie = Math.max(0, ore - extraOre);
-
-    const valoreExtra = extraOre * PAY.straordinario;
-    const valoreDiurno = diurni * PAY.piantonamentoDiurno;
-    const valoreComp = diurni * PAY.compensativa;
-    const valoreNotte = notturni * PAY.piantonamentoNotturno;
-    const valoreRiposo = oreRiposo * PAY.riposoLavorato;
-
-    const maggiorazioni =
-      valoreExtra +
-      valoreDiurno +
-      valoreComp +
-      valoreNotte +
-      valoreRiposo;
-
-    const lordo = PAY.base + maggiorazioni;
-    const netto = lordo * PAY.coefficienteNetto;
 
     return {
       ore,
       extraOre,
-      ordinarie,
-      notturni,
-      diurni,
-      oreRiposo,
-      valoreExtra,
-      valoreDiurno,
-      valoreComp,
-      valoreNotte,
-      valoreRiposo,
-      maggiorazioni,
-      lordo,
-      netto,
+      notti,
+      giorni: giorniLavorati,
     };
-  }, [turni]);
+  }, [turniMese]);
 
   function calcolaOre(start, end) {
+    if (!start || !end) {
+      return 0;
+    }
+
     const [h1, m1] = start.split(':').map(Number);
     const [h2, m2] = end.split(':').map(Number);
+
+    if ([h1, m1, h2, m2].some(Number.isNaN)) {
+      return 0;
+    }
 
     let a = h1 * 60 + m1;
     let b = h2 * 60 + m2;
 
-    if (b <= a) b += 1440;
+    if (b <= a) {
+      b += 1440;
+    }
 
     return (b - a) / 60;
   }
 
   function fasciaTurno(orario) {
+    if (!orario) {
+      return null;
+    }
+
     const h = Number(orario.split(':')[0]);
 
-    if (h >= 21 || h < 5) return 'Notte';
-    if (h >= 5 && h < 13) return 'Mattina';
+    if (h >= 21 || h < 5) {
+      return 'Notte';
+    }
+
+    if (h >= 5 && h < 13) {
+      return 'Mattina';
+    }
 
     return 'Pomeriggio';
   }
 
-  function selezionaRapido(start, end) {
+  function turnoRapido(start, end) {
     setInizio(start);
     setFine(end);
 
     const ore = calcolaOre(start, end);
-    setExtra(String(Math.max(0, ore - 7)));
+
+    setExtra(
+      String(Math.max(0, ore - 7))
+    );
   }
 
   function nuovoGiorno(g) {
+    console.log('APERTURA NUOVO GIORNO:', g);
+
     setEditingId(null);
-    setGiorno(g);
+
+    setGiorno(Number(g));
     setTipo('turno');
+
     setInizio('06:00');
     setFine('14:00');
+
     setLuogo('Fiumicino');
     setExtra('1');
+
     setRiposoLavorato(false);
+
     setScreen('edit');
   }
 
   function modificaGiorno(record) {
+    console.log('APERTURA MODIFICA:', record);
+
+    if (!record || record.id === undefined || record.id === null) {
+      return;
+    }
+
     setEditingId(record.id);
-    setGiorno(record.giorno);
-    setTipo(record.tipo);
+
+    setGiorno(Number(record.giorno));
+
+    setTipo(record.tipo || 'turno');
+
     setInizio(record.inizio || '06:00');
     setFine(record.fine || '14:00');
+
     setLuogo(record.luogo || '');
-    setExtra(String(record.extra || 0));
-    setRiposoLavorato(record.riposoLavorato || false);
+
+    setExtra(
+      String(record.extra || 0)
+    );
+
+    setRiposoLavorato(
+      record.riposo_lavorato === true
+    );
+
     setScreen('edit');
   }
 
-  function salvaGiorno() {
-    let nuovo;
+  function creaPayload() {
+    const ore =
+      tipo === 'turno'
+        ? calcolaOre(inizio, fine)
+        : 0;
 
-    if (tipo === 'turno') {
-      const ore = calcolaOre(inizio, fine);
-      const extraNumero = Number(String(extra).replace(',', '.'));
+    const extraNumero = Number(
+      String(extra).replace(',', '.')
+    );
 
-      nuovo = {
-        id: editingId || Date.now().toString(),
-        giorno,
-        tipo: 'turno',
-        inizio,
-        fine,
-        luogo: luogo || 'Servizio',
-        ore,
-        extra: Number.isNaN(extraNumero) ? 0 : extraNumero,
-        fascia: fasciaTurno(inizio),
-        riposoLavorato,
-      };
-    } else {
-      nuovo = {
-        id: editingId || Date.now().toString(),
-        giorno,
-        tipo,
-      };
+    return {
+      giorno: Number(giorno),
+      mese: mese + 1,
+      anno: Number(anno),
+
+      tipo,
+
+      inizio:
+        tipo === 'turno'
+          ? inizio
+          : null,
+
+      fine:
+        tipo === 'turno'
+          ? fine
+          : null,
+
+      luogo:
+        tipo === 'turno'
+          ? luogo || 'Servizio'
+          : null,
+
+      ore,
+
+      extra:
+        tipo === 'turno' &&
+        !Number.isNaN(extraNumero)
+          ? extraNumero
+          : 0,
+
+      fascia:
+        tipo === 'turno'
+          ? fasciaTurno(inizio)
+          : null,
+
+      riposo_lavorato:
+        tipo === 'turno'
+          ? riposoLavorato
+          : false,
+    };
+  }
+
+  async function inserisciTurno(payload) {
+    console.log('INVIO POST:', payload);
+
+    const response = await fetch(
+      `${SUPABASE_URL}/rest/v1/turni`,
+      {
+        method: 'POST',
+
+        headers: {
+          ...headersJSON(),
+          Prefer: 'return=representation',
+        },
+
+        body: JSON.stringify(payload),
+      }
+    );
+
+    const testo = await response.text();
+
+    console.log('POST STATUS:', response.status);
+    console.log('POST RESPONSE:', testo);
+
+    if (!response.ok) {
+      throw new Error(
+        `HTTP ${response.status}: ${testo || 'Errore POST'}`
+      );
     }
 
-    setRecords((precedenti) => {
-      if (editingId) {
-        return precedenti.map((r) => (r.id === editingId ? nuovo : r));
+    const righe = testo ? JSON.parse(testo) : [];
+
+    if (!Array.isArray(righe) || righe.length === 0) {
+      throw new Error(
+        'Supabase non ha restituito la nuova giornata.'
+      );
+    }
+
+    return righe[0];
+  }
+
+  async function aggiornaTurno(id, payload) {
+    console.log('INVIO PATCH ID:', id);
+    console.log('PAYLOAD PATCH:', payload);
+
+    const response = await fetch(
+      `${SUPABASE_URL}/rest/v1/turni?id=eq.${id}`,
+      {
+        method: 'PATCH',
+
+        headers: {
+          ...headersJSON(),
+          Prefer: 'return=representation',
+        },
+
+        body: JSON.stringify(payload),
+      }
+    );
+
+    const testo = await response.text();
+
+    console.log('PATCH STATUS:', response.status);
+    console.log('PATCH RESPONSE:', testo);
+
+    if (!response.ok) {
+      throw new Error(
+        `HTTP ${response.status}: ${testo || 'Errore PATCH'}`
+      );
+    }
+
+    const righe = testo ? JSON.parse(testo) : [];
+
+    if (!Array.isArray(righe) || righe.length === 0) {
+      throw new Error(
+        'Supabase non ha restituito la giornata modificata.'
+      );
+    }
+
+    return righe[0];
+  }
+
+  async function salvaGiornata() {
+    if (saving) {
+      return;
+    }
+
+    try {
+      setSaving(true);
+
+      const payload = creaPayload();
+
+      if (
+        tipo === 'turno' &&
+        Number(payload.ore) <= 0
+      ) {
+        Alert.alert(
+          'Controlla il turno',
+          'Gli orari inseriti non sono validi.'
+        );
+
+        return;
       }
 
-      const stessoGiorno = precedenti.find((r) => r.giorno === giorno);
+      let salvato = null;
 
-      if (stessoGiorno) {
-        return precedenti.map((r) =>
-          r.id === stessoGiorno.id
-            ? { ...nuovo, id: stessoGiorno.id }
-            : r
+      /*
+        REGOLA FONDAMENTALE:
+
+        editingId NULL = POST
+        editingId presente = PATCH
+
+        Non cerchiamo più automaticamente un turno
+        dello stesso giorno durante il salvataggio.
+      */
+
+      if (
+        editingId === null ||
+        editingId === undefined
+      ) {
+        console.log('MODALITA SALVATAGGIO: NUOVO / POST');
+
+        salvato = await inserisciTurno(payload);
+      } else {
+        console.log(
+          'MODALITA SALVATAGGIO: MODIFICA / PATCH',
+          editingId
+        );
+
+        salvato = await aggiornaTurno(
+          editingId,
+          payload
         );
       }
 
-      return [...precedenti, nuovo];
-    });
+      if (!salvato || salvato.id === undefined) {
+        throw new Error(
+          'La giornata non è stata restituita correttamente dal database.'
+        );
+      }
 
+      /*
+        Aggiornamento immediato locale.
+        Serve per mostrare subito il turno.
+      */
+
+      setTurni((precedenti) => {
+        const senzaRiga = precedenti.filter(
+          (t) =>
+            Number(t.id) !==
+            Number(salvato.id)
+        );
+
+        return [
+          ...senzaRiga,
+          salvato,
+        ];
+      });
+
+      /*
+        Ora facciamo anche una lettura REALE del database.
+      */
+
+      const aggiornati = await caricaTurni();
+
+      const trovato = aggiornati.find(
+        (t) =>
+          Number(t.giorno) ===
+            Number(payload.giorno) &&
+          Number(t.mese) ===
+            Number(payload.mese) &&
+          Number(t.anno) ===
+            Number(payload.anno)
+      );
+
+      console.log(
+        'VERIFICA DOPO SALVATAGGIO:',
+        trovato
+      );
+
+      if (!trovato) {
+        throw new Error(
+          `Il ${payload.giorno}/${payload.mese}/${payload.anno} non risulta nel database dopo il salvataggio.`
+        );
+      }
+
+      /*
+        Importantissimo:
+        azzeriamo editingId PRIMA di tornare al calendario.
+      */
+
+      setEditingId(null);
+
+      Alert.alert(
+        'Salvato ✅',
+        'La giornata è stata salvata nel database.',
+        [
+          {
+            text: 'OK',
+            onPress: () => {
+              setScreen('calendar');
+            },
+          },
+        ]
+      );
+    } catch (error) {
+      console.log(
+        'ERRORE SALVATAGGIO:',
+        error
+      );
+
+      Alert.alert(
+        'Errore database',
+        error.message ||
+          'Salvataggio non riuscito.'
+      );
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function confermaEliminazione() {
+    if (
+      editingId === null ||
+      editingId === undefined
+    ) {
+      return;
+    }
+
+    Alert.alert(
+      'Elimina giornata',
+      'Vuoi davvero eliminare questa giornata?',
+      [
+        {
+          text: 'Annulla',
+          style: 'cancel',
+        },
+        {
+          text: 'Elimina',
+          style: 'destructive',
+          onPress: eliminaGiornata,
+        },
+      ]
+    );
+  }
+
+  async function eliminaGiornata() {
+    if (
+      editingId === null ||
+      editingId === undefined
+    ) {
+      return;
+    }
+
+    try {
+      setSaving(true);
+
+      const idDaEliminare = editingId;
+
+      const response = await fetch(
+        `${SUPABASE_URL}/rest/v1/turni?id=eq.${idDaEliminare}`,
+        {
+          method: 'DELETE',
+
+          headers: {
+            apikey: SUPABASE_KEY,
+          },
+        }
+      );
+
+      const testo = await response.text();
+
+      console.log(
+        'DELETE STATUS:',
+        response.status
+      );
+
+      console.log(
+        'DELETE RESPONSE:',
+        testo
+      );
+
+      if (!response.ok) {
+        throw new Error(
+          `HTTP ${response.status}: ${testo || 'Errore DELETE'}`
+        );
+      }
+
+      setTurni((precedenti) =>
+        precedenti.filter(
+          (t) =>
+            Number(t.id) !==
+            Number(idDaEliminare)
+        )
+      );
+
+      setEditingId(null);
+
+      await caricaTurni();
+
+      setScreen('calendar');
+    } catch (error) {
+      console.log(
+        'ERRORE ELIMINAZIONE:',
+        error
+      );
+
+      Alert.alert(
+        'Errore',
+        error.message ||
+          'Eliminazione non riuscita.'
+      );
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function mesePrecedente() {
+    setEditingId(null);
+
+    if (mese === 0) {
+      setMese(11);
+      setAnno((a) => a - 1);
+    } else {
+      setMese((m) => m - 1);
+    }
+  }
+
+  function meseSuccessivo() {
+    setEditingId(null);
+
+    if (mese === 11) {
+      setMese(0);
+      setAnno((a) => a + 1);
+    } else {
+      setMese((m) => m + 1);
+    }
+  }
+
+  function tornaHome() {
+    setEditingId(null);
+    setScreen('home');
+  }
+
+  function tornaCalendario() {
+    setEditingId(null);
     setScreen('calendar');
   }
 
-  function eliminaGiorno() {
-    Alert.alert('Elimina giornata', 'Vuoi eliminare questa giornata?', [
-      {
-        text: 'Annulla',
-      },
-      {
-        text: 'Elimina',
-        style: 'destructive',
-        onPress: () => {
-          setRecords((prev) => prev.filter((r) => r.id !== editingId));
-          setScreen('calendar');
-        },
-      },
-    ]);
-  }
-
-  if (screen === 'turni') {
+  if (loading) {
     return (
-      <Screen>
-        <Back onPress={() => setScreen('home')} />
+      <SafeAreaView style={styles.loading}>
+        <ActivityIndicator
+          size="large"
+          color={COLORS.blue}
+        />
 
-        <Text style={styles.pageTitle}>I miei turni</Text>
-        <Text style={styles.pageSubtitle}>
-          {MESI[mese]} {anno}
+        <Text style={styles.loadingText}>
+          Collegamento al database...
         </Text>
-
-        <TouchableOpacity
-          style={styles.blueButton}
-          onPress={() => setScreen('calendar')}
-        >
-          <Text style={styles.blueButtonText}>📅 APRI CALENDARIO</Text>
-        </TouchableOpacity>
-
-        {[...records]
-          .sort((a, b) => a.giorno - b.giorno)
-          .map((r) => (
-            <TouchableOpacity
-              key={r.id}
-              style={styles.recordCard}
-              onPress={() => modificaGiorno(r)}
-            >
-              <View style={styles.recordDate}>
-                <Text style={styles.recordDay}>{r.giorno}</Text>
-                <Text style={styles.recordMonth}>
-                  {MESI[mese].slice(0, 3).toUpperCase()}
-                </Text>
-              </View>
-
-              <View style={{ flex: 1 }}>
-                <Text style={styles.recordTitle}>
-                  {r.tipo === 'turno'
-                    ? `${r.inizio} — ${r.fine}`
-                    : labelTipo(r.tipo)}
-                </Text>
-
-                <Text style={styles.recordSubtitle}>
-                  {r.tipo === 'turno'
-                    ? `${r.fascia} • ${r.luogo}`
-                    : 'Giornata non lavorata'}
-                </Text>
-              </View>
-
-              {r.tipo === 'turno' && (
-                <Text style={styles.hoursBadge}>{r.ore}h</Text>
-              )}
-            </TouchableOpacity>
-          ))}
-      </Screen>
+      </SafeAreaView>
     );
   }
 
   if (screen === 'calendar') {
     return (
       <Screen>
-        <Back onPress={() => setScreen('home')} />
+        <Back onPress={tornaHome} />
 
-        <Text style={styles.pageTitle}>Calendario</Text>
-        <Text style={styles.pageSubtitle}>Tocca un giorno</Text>
+        <Text style={styles.title}>
+          Calendario
+        </Text>
 
-        <View style={styles.monthSelector}>
+        <Text style={styles.subtitle}>
+          Tocca un giorno per inserire il servizio
+        </Text>
+
+        <View style={styles.monthBox}>
           <TouchableOpacity
-            onPress={() => {
-              if (mese === 0) {
-                setMese(11);
-                setAnno(anno - 1);
-              } else {
-                setMese(mese - 1);
-              }
-            }}
+            onPress={mesePrecedente}
           >
-            <Text style={styles.monthArrow}>‹</Text>
+            <Text style={styles.arrow}>
+              ‹
+            </Text>
           </TouchableOpacity>
 
           <View>
-            <Text style={styles.monthTitle}>{MESI[mese]}</Text>
-            <Text style={styles.monthYear}>{anno}</Text>
+            <Text style={styles.month}>
+              {MESI[mese]}
+            </Text>
+
+            <Text style={styles.year}>
+              {anno}
+            </Text>
           </View>
 
           <TouchableOpacity
-            onPress={() => {
-              if (mese === 11) {
-                setMese(0);
-                setAnno(anno + 1);
-              } else {
-                setMese(mese + 1);
-              }
-            }}
+            onPress={meseSuccessivo}
           >
-            <Text style={styles.monthArrow}>›</Text>
+            <Text style={styles.arrow}>
+              ›
+            </Text>
           </TouchableOpacity>
         </View>
 
         <Calendar
           anno={anno}
           mese={mese}
-          records={records}
-          onPress={(g, record) =>
-            record ? modificaGiorno(record) : nuovoGiorno(g)
-          }
+          records={turniMese}
+          onPress={(g, record) => {
+            if (
+              record &&
+              record.id !== undefined &&
+              record.id !== null
+            ) {
+              modificaGiorno(record);
+            } else {
+              nuovoGiorno(g);
+            }
+          }}
         />
 
-        <View style={styles.statsRow}>
-          <MiniStat label="ORE" value={`${numero(stipendio.ore)} h`} />
-          <MiniStat label="EXTRA" value={`${numero(stipendio.extraOre)} h`} />
-          <MiniStat label="NOTTI" value={`${stipendio.notturni}`} />
+        <View style={styles.stats}>
+          <Stat
+            label="ORE"
+            value={`${statistiche.ore}h`}
+          />
+
+          <Stat
+            label="EXTRA"
+            value={`${statistiche.extraOre}h`}
+          />
+
+          <Stat
+            label="NOTTI"
+            value={`${statistiche.notti}`}
+          />
         </View>
+
+        <TouchableOpacity
+          style={styles.syncButton}
+          onPress={caricaTurni}
+        >
+          <Text style={styles.syncText}>
+            ↻ Aggiorna calendario
+          </Text>
+        </TouchableOpacity>
       </Screen>
     );
   }
 
   if (screen === 'edit') {
+    const modalitaModifica =
+      editingId !== null &&
+      editingId !== undefined;
+
     return (
       <Screen>
-        <Back onPress={() => setScreen('calendar')} />
+        <Back onPress={tornaCalendario} />
 
-        <Text style={styles.pageTitle}>
-          {editingId ? 'Modifica giornata' : 'Nuova giornata'}
+        <Text style={styles.title}>
+          {modalitaModifica
+            ? 'Modifica giornata'
+            : 'Nuova giornata'}
         </Text>
 
-        <Text style={styles.pageSubtitle}>
+        <Text style={styles.subtitle}>
           {giorno} {MESI[mese]} {anno}
         </Text>
 
-        <Text style={styles.inputLabel}>TIPO GIORNATA</Text>
+        <View
+          style={[
+            styles.modeBadge,
+            modalitaModifica
+              ? styles.modeBadgeEdit
+              : styles.modeBadgeNew,
+          ]}
+        >
+          <Text style={styles.modeBadgeText}>
+            {modalitaModifica
+              ? 'MODIFICA TURNO ESISTENTE'
+              : 'NUOVO TURNO'}
+          </Text>
+        </View>
 
-        <View style={styles.typeWrap}>
+        <Text style={styles.label}>
+          TIPO GIORNATA
+        </Text>
+
+        <View style={styles.types}>
           {[
             ['turno', 'Turno'],
             ['riposo', 'Riposo'],
@@ -449,15 +802,19 @@ export default function App() {
             <TouchableOpacity
               key={id}
               style={[
-                styles.typeButton,
-                tipo === id && styles.typeButtonOn,
+                styles.type,
+                tipo === id &&
+                  styles.typeSelected,
               ]}
-              onPress={() => setTipo(id)}
+              onPress={() =>
+                setTipo(id)
+              }
             >
               <Text
                 style={[
                   styles.typeText,
-                  tipo === id && styles.typeTextOn,
+                  tipo === id &&
+                    styles.typeTextSelected,
                 ]}
               >
                 {nome}
@@ -468,234 +825,205 @@ export default function App() {
 
         {tipo === 'turno' && (
           <>
-            <Text style={styles.inputLabel}>TURNO RAPIDO</Text>
+            <Text style={styles.label}>
+              TURNO RAPIDO
+            </Text>
 
             <View style={styles.quickRow}>
               <Quick
-                text="06–14"
-                onPress={() => selezionaRapido('06:00', '14:00')}
+                title="06–14"
+                onPress={() =>
+                  turnoRapido(
+                    '06:00',
+                    '14:00'
+                  )
+                }
               />
+
               <Quick
-                text="14–22"
-                onPress={() => selezionaRapido('14:00', '22:00')}
+                title="14–22"
+                onPress={() =>
+                  turnoRapido(
+                    '14:00',
+                    '22:00'
+                  )
+                }
               />
+
               <Quick
-                text="22–06"
-                onPress={() => selezionaRapido('22:00', '06:00')}
+                title="22–06"
+                onPress={() =>
+                  turnoRapido(
+                    '22:00',
+                    '06:00'
+                  )
+                }
               />
             </View>
 
-            <View style={styles.inputRow}>
-              <View style={{ flex: 1 }}>
-                <Input label="INIZIO" value={inizio} setValue={setInizio} />
+            <View style={styles.row}>
+              <View style={styles.half}>
+                <Field
+                  label="INIZIO"
+                  value={inizio}
+                  onChange={setInizio}
+                />
               </View>
 
-              <View style={{ width: 10 }} />
+              <View
+                style={{ width: 10 }}
+              />
 
-              <View style={{ flex: 1 }}>
-                <Input label="FINE" value={fine} setValue={setFine} />
+              <View style={styles.half}>
+                <Field
+                  label="FINE"
+                  value={fine}
+                  onChange={setFine}
+                />
               </View>
             </View>
 
-            <Input
+            <Field
               label="POSTAZIONE"
               value={luogo}
-              setValue={setLuogo}
-              placeholder="Es. Fiumicino"
+              onChange={setLuogo}
             />
 
-            <View style={styles.extraBox}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.extraTitle}>Ore straordinarie</Text>
-                <Text style={styles.extraSub}>
-                  Puoi modificarle manualmente
-                </Text>
-              </View>
-
-              <TextInput
-                style={styles.extraInput}
-                value={extra}
-                onChangeText={setExtra}
-                keyboardType="decimal-pad"
-              />
-            </View>
+            <Field
+              label="ORE STRAORDINARIE"
+              value={extra}
+              onChange={setExtra}
+              keyboardType="decimal-pad"
+            />
 
             <TouchableOpacity
               style={[
-                styles.restBox,
-                riposoLavorato && styles.restBoxOn,
+                styles.restButton,
+                riposoLavorato &&
+                  styles.restButtonOn,
               ]}
-              onPress={() => setRiposoLavorato(!riposoLavorato)}
+              onPress={() =>
+                setRiposoLavorato(
+                  !riposoLavorato
+                )
+              }
             >
-              <View style={{ flex: 1 }}>
-                <Text style={styles.restTitle}>Riposo lavorato</Text>
-                <Text style={styles.restSub}>
-                  Attiva se lavori nel giorno di riposo
-                </Text>
-              </View>
-
-              <Text style={styles.restCheck}>
-                {riposoLavorato ? '✓' : '○'}
+              <Text style={styles.restText}>
+                {riposoLavorato
+                  ? '✓ '
+                  : '○ '}
+                Riposo lavorato
               </Text>
             </TouchableOpacity>
           </>
         )}
 
-        <TouchableOpacity style={styles.blueButton} onPress={salvaGiorno}>
-          <Text style={styles.blueButtonText}>SALVA GIORNATA</Text>
+        <TouchableOpacity
+          style={[
+            styles.saveButton,
+            saving &&
+              styles.disabled,
+          ]}
+          onPress={salvaGiornata}
+          disabled={saving}
+        >
+          {saving ? (
+            <ActivityIndicator
+              color="#FFFFFF"
+            />
+          ) : (
+            <Text style={styles.saveText}>
+              {modalitaModifica
+                ? 'SALVA MODIFICHE'
+                : 'SALVA NUOVA GIORNATA'}
+            </Text>
+          )}
         </TouchableOpacity>
 
-        {editingId && (
+        {modalitaModifica && (
           <TouchableOpacity
             style={styles.deleteButton}
-            onPress={eliminaGiorno}
+            onPress={
+              confermaEliminazione
+            }
           >
-            <Text style={styles.deleteText}>Elimina giornata</Text>
+            <Text style={styles.deleteText}>
+              Elimina giornata
+            </Text>
           </TouchableOpacity>
         )}
       </Screen>
     );
   }
 
-  if (screen === 'stipendio') {
+  if (screen === 'turni') {
+    const ordinati = [
+      ...turniMese,
+    ].sort(
+      (a, b) =>
+        Number(a.giorno) -
+        Number(b.giorno)
+    );
+
     return (
       <Screen>
-        <Back onPress={() => setScreen('home')} />
+        <Back onPress={tornaHome} />
 
-        <Text style={styles.pageTitle}>Stipendio</Text>
+        <Text style={styles.title}>
+          I miei turni
+        </Text>
 
-        <Text style={styles.pageSubtitle}>
+        <Text style={styles.subtitle}>
           {MESI[mese]} {anno}
         </Text>
 
-        <View style={styles.netCard}>
-          <Text style={styles.netLabel}>NETTO STIMATO</Text>
-          <Text style={styles.netValue}>
-            € {soldi(stipendio.netto)}
-          </Text>
-          <Text style={styles.netSub}>Stima indicativa del mese</Text>
-        </View>
+        {ordinati.length === 0 ? (
+          <View style={styles.empty}>
+            <Text style={styles.emptyTitle}>
+              Nessun turno inserito
+            </Text>
 
-        <View style={styles.salaryCard}>
-          <Text style={styles.smallBlue}>LORDO STIMATO</Text>
-          <Text style={styles.salary}>
-            € {soldi(stipendio.lordo)}
-          </Text>
-        </View>
-
-        <Text style={styles.sectionTitle}>Dettaglio</Text>
-
-        <SalaryRow
-          label="Ore lavorate"
-          value={`${numero(stipendio.ore)} h`}
-        />
-
-        <SalaryRow
-          label="Straordinari"
-          value={`${numero(stipendio.extraOre)} h`}
-          euro={stipendio.valoreExtra}
-        />
-
-        <SalaryRow
-          label="Piantonamento notturno"
-          value={`${stipendio.notturni} turni`}
-          euro={stipendio.valoreNotte}
-        />
-
-        <SalaryRow
-          label="Riposo lavorato"
-          value={`${numero(stipendio.oreRiposo)} h`}
-          euro={stipendio.valoreRiposo}
-        />
-
-        <View style={styles.totalBox}>
-          <Text style={styles.totalLabel}>MAGGIORAZIONI</Text>
-          <Text style={styles.totalValue}>
-            + € {soldi(stipendio.maggiorazioni)}
-          </Text>
-        </View>
-      </Screen>
-    );
-  }
-
-  if (screen === 'colleghi') {
-    return (
-      <Screen>
-        <Back onPress={() => setScreen('home')} />
-
-        <Text style={styles.pageTitle}>Colleghi</Text>
-        <Text style={styles.pageSubtitle}>Italpol • modalità demo</Text>
-
-        {COLLEGHI.map((c) => (
-          <View key={c.id} style={styles.colleagueCard}>
-            <View style={styles.colleagueAvatar}>
-              <Text style={styles.colleagueAvatarText}>
-                {c.iniziali}
-              </Text>
-            </View>
-
-            <View style={{ flex: 1 }}>
-              <Text style={styles.colleagueName}>{c.nome}</Text>
-
-              <Text
-                style={
-                  c.servizio
-                    ? styles.serviceOn
-                    : styles.serviceOff
-                }
-              >
-                {c.servizio
-                  ? `${c.turno} • ${c.sede}`
-                  : 'Fuori servizio'}
-              </Text>
-            </View>
-
+            <Text style={styles.emptyText}>
+              Inserisci la prima giornata dal calendario.
+            </Text>
+          </View>
+        ) : (
+          ordinati.map((t) => (
             <TouchableOpacity
-              style={styles.swapButton}
+              key={String(t.id)}
+              style={styles.turnCard}
               onPress={() =>
-                Alert.alert(
-                  'Scambio turno',
-                  `Richiesta demo inviata a ${c.nome}`
-                )
+                modificaGiorno(t)
               }
             >
-              <Text style={styles.swapText}>⇄</Text>
+              <View style={styles.dayBadge}>
+                <Text style={styles.dayBig}>
+                  {t.giorno}
+                </Text>
+              </View>
+
+              <View style={{ flex: 1 }}>
+                <Text style={styles.turnTitle}>
+                  {t.tipo === 'turno'
+                    ? `${formattaOra(
+                        t.inizio
+                      )} — ${formattaOra(
+                        t.fine
+                      )}`
+                    : nomeTipo(t.tipo)}
+                </Text>
+
+                <Text style={styles.turnSub}>
+                  {t.tipo === 'turno'
+                    ? `${t.fascia || ''} • ${
+                        t.luogo || ''
+                      }`
+                    : 'Giornata non lavorata'}
+                </Text>
+              </View>
             </TouchableOpacity>
-          </View>
-        ))}
-      </Screen>
-    );
-  }
-
-  if (screen === 'profile') {
-    return (
-      <Screen>
-        <Back onPress={() => setScreen('home')} />
-
-        <Text style={styles.pageTitle}>Profilo</Text>
-        <Text style={styles.pageSubtitle}>Identità professionale</Text>
-
-        <View style={styles.profileHero}>
-          <View style={styles.profileAvatar}>
-            <Text style={styles.profileAvatarText}>AI</Text>
-          </View>
-
-          <Text style={styles.profileName}>
-            {profilo.nome} {profilo.cognome}
-          </Text>
-
-          <Text style={styles.profileRole}>
-            {profilo.qualifica}
-          </Text>
-
-          <Text style={styles.profileCompany}>
-            {profilo.azienda}
-          </Text>
-        </View>
-
-        <Info label="Azienda" value={profilo.azienda} />
-        <Info label="Qualifica" value={profilo.qualifica} />
-        <Info label="Sede" value={profilo.sede} />
+          ))
+        )}
       </Screen>
     );
   }
@@ -703,29 +1031,27 @@ export default function App() {
   return (
     <Screen>
       <View style={styles.header}>
-        <TouchableOpacity
-          style={{ flex: 1 }}
-          onPress={() => setScreen('profile')}
-        >
+        <View style={{ flex: 1 }}>
           <Text style={styles.welcome}>
-            Buon servizio, {profilo.nome} 👋
+            Buon servizio, Andrea 👋
           </Text>
 
           <Text style={styles.company}>
-            {profilo.azienda} • {profilo.qualifica}
+            ITALPOL • Guardia Particolare Giurata
           </Text>
-        </TouchableOpacity>
+        </View>
 
-        <TouchableOpacity
-          style={styles.avatar}
-          onPress={() => setScreen('profile')}
-        >
-          <Text style={styles.avatarText}>AI</Text>
-        </TouchableOpacity>
+        <View style={styles.avatar}>
+          <Text style={styles.avatarText}>
+            AI
+          </Text>
+        </View>
       </View>
 
       <View style={styles.hero}>
-        <Text style={styles.smallBlue}>QUESTO MESE</Text>
+        <Text style={styles.heroSmall}>
+          QUESTO MESE
+        </Text>
 
         <Text style={styles.heroMonth}>
           {MESI[mese]} {anno}
@@ -733,142 +1059,209 @@ export default function App() {
 
         <View style={styles.heroStats}>
           <HomeStat
-            value={`${numero(stipendio.ore)}h`}
             label="Ore"
+            value={`${statistiche.ore}h`}
           />
 
           <HomeStat
-            value={`${numero(stipendio.extraOre)}h`}
             label="Extra"
+            value={`${statistiche.extraOre}h`}
           />
 
           <HomeStat
-            value={`€${Math.round(stipendio.netto)}`}
-            label="Netto"
+            label="Giorni"
+            value={`${statistiche.giorni}`}
           />
         </View>
       </View>
 
-      <Text style={styles.sectionTitle}>Il tuo servizio</Text>
+      <Text style={styles.section}>
+        Il tuo servizio
+      </Text>
 
       <Menu
         icon="📅"
         title="I miei turni"
         subtitle="Elenco servizi e riposi"
-        onPress={() => setScreen('turni')}
+        onPress={() => {
+          setEditingId(null);
+          setScreen('turni');
+        }}
       />
 
       <Menu
         icon="🗓️"
         title="Calendario"
         subtitle="Inserisci e modifica le giornate"
-        onPress={() => setScreen('calendar')}
-      />
-
-      <Menu
-        icon="💶"
-        title="Stipendio"
-        subtitle="Stima e maggiorazioni"
-        onPress={() => setScreen('stipendio')}
-      />
-
-      <Menu
-        icon="👥"
-        title="Colleghi"
-        subtitle="Chi è in servizio"
-        onPress={() => setScreen('colleghi')}
-      />
-
-      <Menu
-        icon="👮🏻‍♂️"
-        title="Profilo"
-        subtitle="Azienda e qualifica"
-        onPress={() => setScreen('profile')}
+        onPress={() => {
+          setEditingId(null);
+          setScreen('calendar');
+        }}
       />
 
       <TouchableOpacity
-        style={styles.blueButton}
-        onPress={() => setScreen('calendar')}
+        style={styles.saveButton}
+        onPress={() => {
+          setEditingId(null);
+          setScreen('calendar');
+        }}
       >
-        <Text style={styles.blueButtonText}>
+        <Text style={styles.saveText}>
           ＋ INSERISCI GIORNATA
         </Text>
       </TouchableOpacity>
 
+      <TouchableOpacity
+        style={styles.syncButton}
+        onPress={caricaTurni}
+      >
+        <Text style={styles.syncText}>
+          ↻ Sincronizza database
+        </Text>
+      </TouchableOpacity>
+
       <Text style={styles.footer}>
-        VIGILANZA GPG • PROTOTIPO
+        VIGILANZA GPG • DATABASE ONLINE
       </Text>
     </Screen>
   );
 }
 
-function Calendar({ anno, mese, records, onPress }) {
-  const giorni = new Date(anno, mese + 1, 0).getDate();
+function Calendar({
+  anno,
+  mese,
+  records,
+  onPress,
+}) {
+  const giorni = new Date(
+    anno,
+    mese + 1,
+    0
+  ).getDate();
 
-  let primo = new Date(anno, mese, 1).getDay();
-  primo = primo === 0 ? 6 : primo - 1;
+  let primo = new Date(
+    anno,
+    mese,
+    1
+  ).getDay();
+
+  primo =
+    primo === 0
+      ? 6
+      : primo - 1;
 
   const celle = [];
 
-  for (let i = 0; i < primo; i++) celle.push(null);
-  for (let g = 1; g <= giorni; g++) celle.push(g);
-
-  function trova(g) {
-    return records.find((r) => r.giorno === g);
+  for (
+    let i = 0;
+    i < primo;
+    i++
+  ) {
+    celle.push(null);
   }
 
-  function codice(r) {
-    if (!r) return '';
-
-    if (r.tipo === 'riposo') return 'RIP';
-    if (r.tipo === 'ferie') return 'FER';
-    if (r.tipo === 'malattia') return 'MAL';
-    if (r.tipo === 'permesso') return 'PER';
-
-    return `${r.inizio.slice(0, 2)}-${r.fine.slice(0, 2)}`;
+  for (
+    let i = 1;
+    i <= giorni;
+    i++
+  ) {
+    celle.push(i);
   }
 
   return (
     <View style={styles.calendar}>
-      <View style={styles.weekRow}>
-        {['L', 'M', 'M', 'G', 'V', 'S', 'D'].map((d, i) => (
-          <Text key={i} style={styles.weekDay}>
+      <View style={styles.week}>
+        {[
+          'L',
+          'M',
+          'M',
+          'G',
+          'V',
+          'S',
+          'D',
+        ].map((d, index) => (
+          <Text
+            key={`week-${index}`}
+            style={styles.weekText}
+          >
             {d}
           </Text>
         ))}
       </View>
 
-      <View style={styles.calendarGrid}>
-        {celle.map((g, i) => {
-          if (!g) {
-            return <View key={i} style={styles.day} />;
-          }
+      <View style={styles.grid}>
+        {celle.map(
+          (day, index) => {
+            if (!day) {
+              return (
+                <View
+                  key={`vuoto-${index}`}
+                  style={
+                    styles.calendarDay
+                  }
+                />
+              );
+            }
 
-          const r = trova(g);
+            const record =
+              records.find(
+                (r) =>
+                  Number(
+                    r.giorno
+                  ) ===
+                  Number(day)
+              );
 
-          return (
-            <TouchableOpacity
-              key={i}
-              style={[styles.day, r && styles.dayActive]}
-              onPress={() => onPress(g, r)}
-            >
-              <Text
+            return (
+              <TouchableOpacity
+                key={`giorno-${day}`}
                 style={[
-                  styles.dayNumber,
-                  r && styles.dayNumberActive,
+                  styles.calendarDay,
+                  record &&
+                    styles.calendarDayActive,
                 ]}
+                onPress={() =>
+                  onPress(
+                    day,
+                    record || null
+                  )
+                }
               >
-                {g}
-              </Text>
-
-              {r && (
-                <Text style={styles.dayCode}>
-                  {codice(r)}
+                <Text
+                  style={[
+                    styles.calendarNumber,
+                    record &&
+                      styles.calendarNumberActive,
+                  ]}
+                >
+                  {day}
                 </Text>
-              )}
-            </TouchableOpacity>
-          );
-        })}
+
+                {record && (
+                  <Text style={styles.code}>
+                    {record.tipo === 'turno'
+                      ? `${formattaOra(
+                          record.inizio
+                        ).slice(
+                          0,
+                          2
+                        )}-${formattaOra(
+                          record.fine
+                        ).slice(
+                          0,
+                          2
+                        )}`
+                      : String(
+                          record.tipo
+                        )
+                          .slice(0, 3)
+                          .toUpperCase()}
+                  </Text>
+                )}
+              </TouchableOpacity>
+            );
+          }
+        )}
       </View>
     </View>
   );
@@ -878,8 +1271,10 @@ function Screen({ children }) {
   return (
     <SafeAreaView style={styles.safe}>
       <ScrollView
-        style={styles.container}
-        contentContainerStyle={styles.content}
+        style={styles.screen}
+        contentContainerStyle={
+          styles.content
+        }
         keyboardShouldPersistTaps="handled"
       >
         {children}
@@ -890,115 +1285,148 @@ function Screen({ children }) {
 
 function Back({ onPress }) {
   return (
-    <TouchableOpacity style={styles.backButton} onPress={onPress}>
-      <Text style={styles.backText}>‹</Text>
+    <TouchableOpacity
+      style={styles.back}
+      onPress={onPress}
+    >
+      <Text style={styles.backText}>
+        ‹
+      </Text>
     </TouchableOpacity>
   );
 }
 
-function Menu({ icon, title, subtitle, onPress }) {
+function Menu({
+  icon,
+  title,
+  subtitle,
+  onPress,
+}) {
   return (
-    <TouchableOpacity style={styles.menuCard} onPress={onPress}>
-      <Text style={styles.menuIcon}>{icon}</Text>
+    <TouchableOpacity
+      style={styles.menu}
+      onPress={onPress}
+    >
+      <Text style={styles.menuIcon}>
+        {icon}
+      </Text>
 
       <View style={{ flex: 1 }}>
-        <Text style={styles.menuTitle}>{title}</Text>
-        <Text style={styles.menuSubtitle}>{subtitle}</Text>
+        <Text style={styles.menuTitle}>
+          {title}
+        </Text>
+
+        <Text style={styles.menuSub}>
+          {subtitle}
+        </Text>
       </View>
 
-      <Text style={styles.chevron}>›</Text>
+      <Text style={styles.chevron}>
+        ›
+      </Text>
     </TouchableOpacity>
   );
 }
 
-function Quick({ text, onPress }) {
+function Quick({
+  title,
+  onPress,
+}) {
   return (
-    <TouchableOpacity style={styles.quickButton} onPress={onPress}>
-      <Text style={styles.quickText}>{text}</Text>
+    <TouchableOpacity
+      style={styles.quick}
+      onPress={onPress}
+    >
+      <Text style={styles.quickText}>
+        {title}
+      </Text>
     </TouchableOpacity>
   );
 }
 
-function Input({ label, value, setValue, placeholder }) {
+function Field({
+  label,
+  value,
+  onChange,
+  keyboardType,
+}) {
   return (
-    <View style={styles.inputWrap}>
-      <Text style={styles.inputLabel}>{label}</Text>
+    <View style={styles.fieldWrap}>
+      <Text style={styles.label}>
+        {label}
+      </Text>
 
       <TextInput
         style={styles.input}
         value={value}
-        onChangeText={setValue}
-        placeholder={placeholder}
-        placeholderTextColor="#667A91"
+        onChangeText={onChange}
+        keyboardType={keyboardType}
+        autoCorrect={false}
       />
     </View>
   );
 }
 
-function MiniStat({ label, value }) {
+function Stat({
+  label,
+  value,
+}) {
   return (
-    <View style={styles.miniStat}>
-      <Text style={styles.miniValue}>{value}</Text>
-      <Text style={styles.miniLabel}>{label}</Text>
+    <View style={styles.stat}>
+      <Text style={styles.statValue}>
+        {value}
+      </Text>
+
+      <Text style={styles.statLabel}>
+        {label}
+      </Text>
     </View>
   );
 }
 
-function HomeStat({ label, value }) {
+function HomeStat({
+  label,
+  value,
+}) {
   return (
     <View>
-      <Text style={styles.homeStatValue}>{value}</Text>
-      <Text style={styles.homeStatLabel}>{label}</Text>
+      <Text style={styles.homeValue}>
+        {value}
+      </Text>
+
+      <Text style={styles.homeLabel}>
+        {label}
+      </Text>
     </View>
   );
 }
 
-function SalaryRow({ label, value, euro }) {
-  return (
-    <View style={styles.salaryRow}>
-      <Text style={styles.salaryRowLabel}>{label}</Text>
+function nomeTipo(tipo) {
+  if (tipo === 'riposo') {
+    return 'Riposo';
+  }
 
-      <View style={{ alignItems: 'flex-end' }}>
-        <Text style={styles.salaryRowValue}>{value}</Text>
+  if (tipo === 'ferie') {
+    return 'Ferie';
+  }
 
-        {typeof euro === 'number' && (
-          <Text style={styles.salaryEuro}>
-            € {soldi(euro)}
-          </Text>
-        )}
-      </View>
-    </View>
-  );
-}
+  if (tipo === 'malattia') {
+    return 'Malattia';
+  }
 
-function Info({ label, value }) {
-  return (
-    <View style={styles.infoRow}>
-      <Text style={styles.infoLabel}>{label}</Text>
-      <Text style={styles.infoValue}>{value}</Text>
-    </View>
-  );
-}
-
-function labelTipo(tipo) {
-  if (tipo === 'riposo') return 'Riposo';
-  if (tipo === 'ferie') return 'Ferie';
-  if (tipo === 'malattia') return 'Malattia';
-  if (tipo === 'permesso') return 'Permesso';
+  if (tipo === 'permesso') {
+    return 'Permesso';
+  }
 
   return 'Turno';
 }
 
-function soldi(n) {
-  return Number(n || 0).toFixed(2).replace('.', ',');
-}
+function formattaOra(valore) {
+  if (!valore) {
+    return '--:--';
+  }
 
-function numero(n) {
-  const value = Number(n || 0);
-
-  if (Number.isInteger(value)) return String(value);
-
-  return value.toFixed(1).replace('.', ',');
+  return String(valore).slice(0, 5);
 }
 
 const styles = StyleSheet.create({
@@ -1007,21 +1435,36 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.bg,
   },
 
-  container: {
+  screen: {
     flex: 1,
     backgroundColor: COLORS.bg,
   },
 
   content: {
     padding: 20,
-    paddingTop: 20,
     paddingBottom: 60,
+  },
+
+  loading: {
+    flex: 1,
+    backgroundColor: COLORS.bg,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  loadingText: {
+    color: COLORS.muted,
+    marginTop: 12,
+  },
+
+  disabled: {
+    opacity: 0.6,
   },
 
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 25,
+    marginBottom: 24,
   },
 
   welcome: {
@@ -1032,7 +1475,7 @@ const styles = StyleSheet.create({
 
   company: {
     color: COLORS.muted,
-    fontSize: 12,
+    fontSize: 11,
     marginTop: 5,
   },
 
@@ -1041,9 +1484,8 @@ const styles = StyleSheet.create({
     height: 50,
     borderRadius: 25,
     backgroundColor: COLORS.blue,
-    justifyContent: 'center',
     alignItems: 'center',
-    marginLeft: 10,
+    justifyContent: 'center',
   },
 
   avatarText: {
@@ -1055,21 +1497,20 @@ const styles = StyleSheet.create({
     backgroundColor: '#10304B',
     borderRadius: 24,
     padding: 22,
-    marginBottom: 27,
+    marginBottom: 26,
   },
 
-  smallBlue: {
+  heroSmall: {
     color: COLORS.lightBlue,
-    fontWeight: '900',
     fontSize: 11,
-    letterSpacing: 1,
+    fontWeight: '900',
   },
 
   heroMonth: {
     color: COLORS.white,
     fontSize: 28,
     fontWeight: '900',
-    marginTop: 6,
+    marginTop: 5,
   },
 
   heroStats: {
@@ -1078,34 +1519,33 @@ const styles = StyleSheet.create({
     marginTop: 22,
   },
 
-  homeStatValue: {
+  homeValue: {
     color: COLORS.white,
     fontSize: 20,
     fontWeight: '900',
   },
 
-  homeStatLabel: {
+  homeLabel: {
     color: COLORS.muted,
     fontSize: 11,
-    marginTop: 3,
   },
 
-  sectionTitle: {
+  section: {
     color: COLORS.white,
     fontSize: 20,
     fontWeight: '900',
     marginBottom: 14,
   },
 
-  menuCard: {
+  menu: {
     backgroundColor: COLORS.card,
+    borderWidth: 1,
+    borderColor: COLORS.border,
     borderRadius: 18,
     padding: 15,
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 11,
-    borderWidth: 1,
-    borderColor: COLORS.border,
+    marginBottom: 10,
   },
 
   menuIcon: {
@@ -1115,50 +1555,59 @@ const styles = StyleSheet.create({
 
   menuTitle: {
     color: COLORS.white,
-    fontSize: 16,
     fontWeight: '900',
+    fontSize: 16,
   },
 
-  menuSubtitle: {
+  menuSub: {
     color: COLORS.muted,
-    fontSize: 12,
+    fontSize: 11,
     marginTop: 4,
   },
 
   chevron: {
     color: COLORS.muted,
-    fontSize: 30,
+    fontSize: 28,
   },
 
-  blueButton: {
+  saveButton: {
     backgroundColor: COLORS.blue,
     borderRadius: 17,
     padding: 17,
     alignItems: 'center',
-    marginTop: 10,
-    marginBottom: 12,
+    marginTop: 12,
   },
 
-  blueButtonText: {
+  saveText: {
     color: COLORS.white,
     fontWeight: '900',
+  },
+
+  syncButton: {
+    padding: 16,
+    alignItems: 'center',
+  },
+
+  syncText: {
+    color: COLORS.lightBlue,
+    fontWeight: '800',
   },
 
   footer: {
     color: '#586D85',
     textAlign: 'center',
-    marginTop: 25,
-    fontSize: 11,
+    fontSize: 10,
+    marginTop: 10,
   },
 
-  backButton: {
+  back: {
     width: 44,
     height: 44,
-    borderRadius: 15,
     backgroundColor: COLORS.card,
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 20,
+    marginBottom: 18,
   },
 
   backText: {
@@ -1166,97 +1615,66 @@ const styles = StyleSheet.create({
     fontSize: 34,
   },
 
-  pageTitle: {
+  title: {
     color: COLORS.white,
     fontSize: 29,
     fontWeight: '900',
   },
 
-  pageSubtitle: {
+  subtitle: {
     color: COLORS.muted,
     marginTop: 5,
-    marginBottom: 22,
-  },
-
-  recordCard: {
-    backgroundColor: COLORS.card,
-    borderRadius: 18,
-    padding: 13,
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-
-  recordDate: {
-    width: 54,
-    height: 54,
-    borderRadius: 15,
-    backgroundColor: '#193653',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-
-  recordDay: {
-    color: COLORS.white,
-    fontSize: 20,
-    fontWeight: '900',
-  },
-
-  recordMonth: {
-    color: COLORS.lightBlue,
-    fontSize: 9,
-    fontWeight: '900',
-  },
-
-  recordTitle: {
-    color: COLORS.white,
-    fontWeight: '900',
-    fontSize: 16,
-  },
-
-  recordSubtitle: {
-    color: COLORS.muted,
-    fontSize: 11,
-    marginTop: 4,
-  },
-
-  hoursBadge: {
-    color: COLORS.white,
-    backgroundColor: '#173F61',
-    borderRadius: 12,
-    paddingHorizontal: 9,
-    paddingVertical: 7,
-    fontWeight: '900',
-  },
-
-  monthSelector: {
-    backgroundColor: COLORS.card,
-    borderRadius: 20,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 14,
     marginBottom: 14,
   },
 
-  monthArrow: {
+  modeBadge: {
+    borderRadius: 12,
+    paddingVertical: 9,
+    paddingHorizontal: 12,
+    alignSelf: 'flex-start',
+    marginBottom: 20,
+  },
+
+  modeBadgeNew: {
+    backgroundColor: '#123B30',
+  },
+
+  modeBadgeEdit: {
+    backgroundColor: '#3B2D18',
+  },
+
+  modeBadgeText: {
     color: COLORS.white,
-    fontSize: 35,
+    fontWeight: '900',
+    fontSize: 10,
+  },
+
+  monthBox: {
+    backgroundColor: COLORS.card,
+    borderRadius: 18,
+    padding: 12,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 14,
+  },
+
+  arrow: {
+    color: COLORS.white,
+    fontSize: 34,
     paddingHorizontal: 15,
   },
 
-  monthTitle: {
+  month: {
     color: COLORS.white,
-    fontSize: 21,
     fontWeight: '900',
+    fontSize: 20,
     textAlign: 'center',
   },
 
-  monthYear: {
+  year: {
     color: COLORS.muted,
     textAlign: 'center',
-    marginTop: 2,
   },
 
   calendar: {
@@ -1265,100 +1683,99 @@ const styles = StyleSheet.create({
     padding: 10,
   },
 
-  weekRow: {
+  week: {
     flexDirection: 'row',
   },
 
-  weekDay: {
+  weekText: {
     width: '14.285%',
     textAlign: 'center',
     color: COLORS.muted,
     fontWeight: '900',
-    paddingVertical: 8,
+    paddingVertical: 7,
   },
 
-  calendarGrid: {
+  grid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
   },
 
-  day: {
+  calendarDay: {
     width: '14.285%',
     height: 62,
     alignItems: 'center',
     justifyContent: 'center',
   },
 
-  dayActive: {
+  calendarDayActive: {
     backgroundColor: '#173C5D',
     borderRadius: 12,
   },
 
-  dayNumber: {
+  calendarNumber: {
     color: COLORS.muted,
   },
 
-  dayNumberActive: {
+  calendarNumberActive: {
     color: COLORS.white,
     fontWeight: '900',
   },
 
-  dayCode: {
+  code: {
     color: COLORS.lightBlue,
     fontSize: 9,
     fontWeight: '900',
-    marginTop: 4,
+    marginTop: 3,
   },
 
-  statsRow: {
+  stats: {
     flexDirection: 'row',
     marginTop: 14,
   },
 
-  miniStat: {
+  stat: {
     flex: 1,
-    backgroundColor: '#102239',
-    borderRadius: 15,
-    padding: 13,
-    alignItems: 'center',
+    backgroundColor: COLORS.card,
     marginHorizontal: 4,
+    padding: 13,
+    borderRadius: 14,
+    alignItems: 'center',
   },
 
-  miniValue: {
+  statValue: {
     color: COLORS.white,
     fontWeight: '900',
     fontSize: 18,
   },
 
-  miniLabel: {
+  statLabel: {
     color: COLORS.muted,
     fontSize: 9,
-    marginTop: 3,
   },
 
-  inputLabel: {
-    color: '#7F93AB',
+  label: {
+    color: COLORS.muted,
+    fontSize: 10,
     fontWeight: '900',
-    fontSize: 11,
-    marginBottom: 8,
+    marginBottom: 7,
   },
 
-  typeWrap: {
+  types: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    marginBottom: 22,
+    marginBottom: 18,
   },
 
-  typeButton: {
-    backgroundColor: '#15283F',
-    borderRadius: 13,
+  type: {
+    backgroundColor: COLORS.card,
+    paddingVertical: 10,
     paddingHorizontal: 12,
-    paddingVertical: 11,
-    marginRight: 7,
-    marginBottom: 8,
+    borderRadius: 12,
+    marginRight: 6,
+    marginBottom: 7,
   },
 
-  typeButtonOn: {
+  typeSelected: {
     backgroundColor: COLORS.blue,
   },
 
@@ -1367,7 +1784,7 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
 
-  typeTextOn: {
+  typeTextSelected: {
     color: COLORS.white,
   },
 
@@ -1376,13 +1793,13 @@ const styles = StyleSheet.create({
     marginBottom: 18,
   },
 
-  quickButton: {
+  quick: {
     flex: 1,
     backgroundColor: '#19334F',
-    borderRadius: 14,
     padding: 13,
+    marginHorizontal: 3,
+    borderRadius: 13,
     alignItems: 'center',
-    marginHorizontal: 4,
   },
 
   quickText: {
@@ -1390,85 +1807,45 @@ const styles = StyleSheet.create({
     fontWeight: '900',
   },
 
-  inputRow: {
+  row: {
     flexDirection: 'row',
   },
 
-  inputWrap: {
-    marginBottom: 18,
+  half: {
+    flex: 1,
+  },
+
+  fieldWrap: {
+    marginBottom: 16,
   },
 
   input: {
     backgroundColor: COLORS.card,
-    borderRadius: 16,
-    padding: 16,
-    color: COLORS.white,
     borderWidth: 1,
     borderColor: COLORS.border,
-  },
-
-  extraBox: {
-    backgroundColor: '#102A43',
-    borderRadius: 17,
+    borderRadius: 14,
     padding: 15,
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 17,
-  },
-
-  extraTitle: {
     color: COLORS.white,
-    fontWeight: '900',
   },
 
-  extraSub: {
-    color: COLORS.muted,
-    fontSize: 11,
-    marginTop: 4,
-  },
-
-  extraInput: {
-    width: 60,
-    height: 48,
-    backgroundColor: COLORS.bg,
-    borderRadius: 13,
-    textAlign: 'center',
-    color: COLORS.white,
-    fontSize: 20,
-    fontWeight: '900',
-  },
-
-  restBox: {
+  restButton: {
     backgroundColor: COLORS.card,
-    borderRadius: 17,
+    borderRadius: 14,
     padding: 15,
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 17,
+    marginBottom: 10,
   },
 
-  restBoxOn: {
-    backgroundColor: '#2A251D',
+  restButtonOn: {
+    backgroundColor: '#173C5D',
   },
 
-  restTitle: {
+  restText: {
     color: COLORS.white,
-    fontWeight: '900',
-  },
-
-  restSub: {
-    color: COLORS.muted,
-    fontSize: 11,
-    marginTop: 4,
-  },
-
-  restCheck: {
-    color: COLORS.orange,
-    fontSize: 26,
+    fontWeight: '800',
   },
 
   deleteButton: {
-    padding: 16,
+    padding: 17,
     alignItems: 'center',
   },
 
@@ -1476,211 +1853,59 @@ const styles = StyleSheet.create({
     color: COLORS.red,
   },
 
-  netCard: {
-    backgroundColor: '#0F5A49',
-    borderRadius: 24,
-    padding: 22,
-    marginBottom: 14,
-  },
-
-  netLabel: {
-    color: '#8EF0D0',
-    fontWeight: '900',
-    fontSize: 11,
-  },
-
-  netValue: {
-    color: COLORS.white,
-    fontSize: 38,
-    fontWeight: '900',
-    marginTop: 5,
-  },
-
-  netSub: {
-    color: '#B7D9CF',
-    marginTop: 5,
-    fontSize: 11,
-  },
-
-  salaryCard: {
-    backgroundColor: '#123653',
-    borderRadius: 20,
-    padding: 20,
-    marginBottom: 24,
-  },
-
-  salary: {
-    color: COLORS.white,
-    fontSize: 32,
-    fontWeight: '900',
-    marginTop: 7,
-  },
-
-  salaryRow: {
-    backgroundColor: COLORS.card,
-    borderRadius: 15,
-    padding: 15,
-    marginBottom: 9,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-
-  salaryRowLabel: {
-    color: COLORS.white,
-    fontWeight: '800',
-  },
-
-  salaryRowValue: {
-    color: COLORS.white,
-    fontWeight: '900',
-  },
-
-  salaryEuro: {
-    color: COLORS.green,
-    fontSize: 11,
-    marginTop: 3,
-  },
-
-  totalBox: {
-    backgroundColor: '#112C45',
-    borderRadius: 18,
-    padding: 18,
-    marginTop: 7,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-
-  totalLabel: {
-    color: COLORS.lightBlue,
-    fontWeight: '900',
-  },
-
-  totalValue: {
-    color: COLORS.white,
-    fontWeight: '900',
-  },
-
-  colleagueCard: {
+  empty: {
     backgroundColor: COLORS.card,
     borderRadius: 18,
-    padding: 14,
-    flexDirection: 'row',
+    padding: 24,
     alignItems: 'center',
-    marginBottom: 10,
   },
 
-  colleagueAvatar: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    backgroundColor: '#193653',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 13,
-  },
-
-  colleagueAvatarText: {
+  emptyTitle: {
     color: COLORS.white,
     fontWeight: '900',
+    fontSize: 17,
   },
 
-  colleagueName: {
-    color: COLORS.white,
-    fontWeight: '900',
-    fontSize: 16,
-  },
-
-  serviceOn: {
-    color: COLORS.green,
-    fontSize: 11,
-    marginTop: 4,
-  },
-
-  serviceOff: {
-    color: COLORS.muted,
-    fontSize: 11,
-    marginTop: 4,
-  },
-
-  swapButton: {
-    width: 42,
-    height: 42,
-    borderRadius: 14,
-    backgroundColor: '#173F61',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-
-  swapText: {
-    color: COLORS.lightBlue,
-    fontSize: 24,
-    fontWeight: '900',
-  },
-
-  profileHero: {
-    backgroundColor: '#10304B',
-    borderRadius: 24,
-    padding: 25,
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-
-  profileAvatar: {
-    width: 90,
-    height: 90,
-    borderRadius: 45,
-    backgroundColor: COLORS.blue,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-
-  profileAvatarText: {
-    color: COLORS.white,
-    fontSize: 30,
-    fontWeight: '900',
-  },
-
-  profileName: {
-    color: COLORS.white,
-    fontSize: 24,
-    fontWeight: '900',
-    marginTop: 14,
-  },
-
-  profileRole: {
+  emptyText: {
     color: COLORS.muted,
     marginTop: 5,
     textAlign: 'center',
   },
 
-  profileCompany: {
-    color: COLORS.lightBlue,
-    backgroundColor: '#173F61',
-    borderRadius: 13,
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-    marginTop: 13,
+  turnCard: {
+    backgroundColor: COLORS.card,
+    borderRadius: 17,
+    padding: 13,
+    marginBottom: 9,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+
+  dayBadge: {
+    width: 50,
+    height: 50,
+    borderRadius: 14,
+    backgroundColor: '#193653',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+
+  dayBig: {
+    color: COLORS.white,
+    fontSize: 20,
     fontWeight: '900',
   },
 
-  infoRow: {
-    backgroundColor: COLORS.card,
-    borderRadius: 16,
-    padding: 16,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 9,
-  },
-
-  infoLabel: {
-    color: COLORS.muted,
-  },
-
-  infoValue: {
+  turnTitle: {
     color: COLORS.white,
     fontWeight: '900',
-    flexShrink: 1,
-    textAlign: 'right',
+    fontSize: 16,
+  },
+
+  turnSub: {
+    color: COLORS.muted,
+    fontSize: 11,
+    marginTop: 4,
   },
 });
