@@ -24,7 +24,6 @@ const COLORS = {
   blue: '#168BFF',
   lightBlue: '#55B8FF',
   red: '#FF6B6B',
-  green: '#50D89F',
 };
 
 const MESI = [
@@ -66,20 +65,6 @@ export default function App() {
 
   const [riposoLavorato, setRiposoLavorato] = useState(false);
 
-  const [profilo, setProfilo] = useState({
-    nome: 'Andrea',
-    cognome: 'Ischiboni',
-    azienda: 'Italpol',
-    ruolo: 'Guardia Particolare Giurata',
-    sede: 'Roma',
-  });
-
-  const [nomeDraft, setNomeDraft] = useState(profilo.nome);
-  const [cognomeDraft, setCognomeDraft] = useState(profilo.cognome);
-  const [aziendaDraft, setAziendaDraft] = useState(profilo.azienda);
-  const [ruoloDraft, setRuoloDraft] = useState(profilo.ruolo);
-  const [sedeDraft, setSedeDraft] = useState(profilo.sede);
-
   useEffect(() => {
     caricaTurni();
   }, []);
@@ -106,6 +91,9 @@ export default function App() {
       );
 
       const testo = await response.text();
+
+      console.log('GET STATUS:', response.status);
+      console.log('GET RESPONSE:', testo);
 
       if (!response.ok) {
         throw new Error(
@@ -166,13 +154,6 @@ export default function App() {
     };
   }, [turniMese]);
 
-  const iniziali = useMemo(() => {
-    const n = profilo.nome?.trim()?.charAt(0) || '';
-    const c = profilo.cognome?.trim()?.charAt(0) || '';
-
-    return `${n}${c}`.toUpperCase() || 'GPG';
-  }, [profilo]);
-
   function calcolaOre(start, end) {
     if (!start || !end) {
       return 0;
@@ -225,6 +206,8 @@ export default function App() {
   }
 
   function nuovoGiorno(g) {
+    console.log('APERTURA NUOVO GIORNO:', g);
+
     setEditingId(null);
 
     setGiorno(Number(g));
@@ -242,6 +225,8 @@ export default function App() {
   }
 
   function modificaGiorno(record) {
+    console.log('APERTURA MODIFICA:', record);
+
     if (!record || record.id === undefined || record.id === null) {
       return;
     }
@@ -321,6 +306,8 @@ export default function App() {
   }
 
   async function inserisciTurno(payload) {
+    console.log('INVIO POST:', payload);
+
     const response = await fetch(
       `${SUPABASE_URL}/rest/v1/turni`,
       {
@@ -358,6 +345,9 @@ export default function App() {
   }
 
   async function aggiornaTurno(id, payload) {
+    console.log('INVIO PATCH ID:', id);
+    console.log('PAYLOAD PATCH:', payload);
+
     const response = await fetch(
       `${SUPABASE_URL}/rest/v1/turni?id=eq.${id}`,
       {
@@ -373,6 +363,9 @@ export default function App() {
     );
 
     const testo = await response.text();
+
+    console.log('PATCH STATUS:', response.status);
+    console.log('PATCH RESPONSE:', testo);
 
     if (!response.ok) {
       throw new Error(
@@ -415,12 +408,29 @@ export default function App() {
 
       let salvato = null;
 
+      /*
+        REGOLA FONDAMENTALE:
+
+        editingId NULL = POST
+        editingId presente = PATCH
+
+        Non cerchiamo più automaticamente un turno
+        dello stesso giorno durante il salvataggio.
+      */
+
       if (
         editingId === null ||
         editingId === undefined
       ) {
+        console.log('MODALITA SALVATAGGIO: NUOVO / POST');
+
         salvato = await inserisciTurno(payload);
       } else {
+        console.log(
+          'MODALITA SALVATAGGIO: MODIFICA / PATCH',
+          editingId
+        );
+
         salvato = await aggiornaTurno(
           editingId,
           payload
@@ -432,6 +442,11 @@ export default function App() {
           'La giornata non è stata restituita correttamente dal database.'
         );
       }
+
+      /*
+        Aggiornamento immediato locale.
+        Serve per mostrare subito il turno.
+      */
 
       setTurni((precedenti) => {
         const senzaRiga = precedenti.filter(
@@ -446,7 +461,37 @@ export default function App() {
         ];
       });
 
-      await caricaTurni();
+      /*
+        Ora facciamo anche una lettura REALE del database.
+      */
+
+      const aggiornati = await caricaTurni();
+
+      const trovato = aggiornati.find(
+        (t) =>
+          Number(t.giorno) ===
+            Number(payload.giorno) &&
+          Number(t.mese) ===
+            Number(payload.mese) &&
+          Number(t.anno) ===
+            Number(payload.anno)
+      );
+
+      console.log(
+        'VERIFICA DOPO SALVATAGGIO:',
+        trovato
+      );
+
+      if (!trovato) {
+        throw new Error(
+          `Il ${payload.giorno}/${payload.mese}/${payload.anno} non risulta nel database dopo il salvataggio.`
+        );
+      }
+
+      /*
+        Importantissimo:
+        azzeriamo editingId PRIMA di tornare al calendario.
+      */
 
       setEditingId(null);
 
@@ -529,6 +574,16 @@ export default function App() {
 
       const testo = await response.text();
 
+      console.log(
+        'DELETE STATUS:',
+        response.status
+      );
+
+      console.log(
+        'DELETE RESPONSE:',
+        testo
+      );
+
       if (!response.ok) {
         throw new Error(
           `HTTP ${response.status}: ${testo || 'Errore DELETE'}`
@@ -549,6 +604,11 @@ export default function App() {
 
       setScreen('calendar');
     } catch (error) {
+      console.log(
+        'ERRORE ELIMINAZIONE:',
+        error
+      );
+
       Alert.alert(
         'Errore',
         error.message ||
@@ -591,39 +651,6 @@ export default function App() {
     setScreen('calendar');
   }
 
-  function apriProfilo() {
-    setNomeDraft(profilo.nome);
-    setCognomeDraft(profilo.cognome);
-    setAziendaDraft(profilo.azienda);
-    setRuoloDraft(profilo.ruolo);
-    setSedeDraft(profilo.sede);
-
-    setScreen('profile');
-  }
-
-  function salvaProfilo() {
-    const nuovoProfilo = {
-      nome: nomeDraft.trim() || 'Utente',
-      cognome: cognomeDraft.trim(),
-      azienda: aziendaDraft.trim() || 'Azienda non indicata',
-      ruolo: ruoloDraft.trim() || 'Operatore',
-      sede: sedeDraft.trim(),
-    };
-
-    setProfilo(nuovoProfilo);
-
-    Alert.alert(
-      'Profilo salvato ✅',
-      'I dati del profilo sono stati aggiornati.',
-      [
-        {
-          text: 'OK',
-          onPress: () => setScreen('home'),
-        },
-      ]
-    );
-  }
-
   if (loading) {
     return (
       <SafeAreaView style={styles.loading}>
@@ -636,96 +663,6 @@ export default function App() {
           Collegamento al database...
         </Text>
       </SafeAreaView>
-    );
-  }
-
-  if (screen === 'profile') {
-    return (
-      <Screen>
-        <Back onPress={() => setScreen('home')} />
-
-        <Text style={styles.title}>
-          Il mio profilo
-        </Text>
-
-        <Text style={styles.subtitle}>
-          Identità professionale
-        </Text>
-
-        <View style={styles.profileHero}>
-          <View style={styles.profileAvatar}>
-            <Text style={styles.profileAvatarText}>
-              {iniziali}
-            </Text>
-          </View>
-
-          <Text style={styles.profileName}>
-            {profilo.nome} {profilo.cognome}
-          </Text>
-
-          <Text style={styles.profileRole}>
-            {profilo.ruolo}
-          </Text>
-
-          <View style={styles.companyBadge}>
-            <Text style={styles.companyBadgeText}>
-              {profilo.azienda}
-            </Text>
-          </View>
-        </View>
-
-        <Text style={styles.profileSectionTitle}>
-          DATI PERSONALI
-        </Text>
-
-        <Field
-          label="NOME"
-          value={nomeDraft}
-          onChange={setNomeDraft}
-        />
-
-        <Field
-          label="COGNOME"
-          value={cognomeDraft}
-          onChange={setCognomeDraft}
-        />
-
-        <Text style={styles.profileSectionTitle}>
-          DATI PROFESSIONALI
-        </Text>
-
-        <Field
-          label="AZIENDA"
-          value={aziendaDraft}
-          onChange={setAziendaDraft}
-        />
-
-        <Field
-          label="RUOLO"
-          value={ruoloDraft}
-          onChange={setRuoloDraft}
-        />
-
-        <Field
-          label="SEDE / ZONA"
-          value={sedeDraft}
-          onChange={setSedeDraft}
-        />
-
-        <TouchableOpacity
-          style={styles.saveButton}
-          onPress={salvaProfilo}
-        >
-          <Text style={styles.saveText}>
-            SALVA PROFILO
-          </Text>
-        </TouchableOpacity>
-
-        <Text style={styles.profileNote}>
-          Più avanti collegheremo questo profilo al tuo account,
-          così resterà sincronizzato anche cambiando dispositivo.
-        </Text>
-      </Screen>
     );
   }
 
@@ -1094,27 +1031,21 @@ export default function App() {
   return (
     <Screen>
       <View style={styles.header}>
-        <TouchableOpacity
-          style={{ flex: 1 }}
-          onPress={apriProfilo}
-        >
+        <View style={{ flex: 1 }}>
           <Text style={styles.welcome}>
-            Buon servizio, {profilo.nome} 👋
+            Buon servizio, Andrea 👋
           </Text>
 
           <Text style={styles.company}>
-            {profilo.azienda} • {profilo.ruolo}
+            ITALPOL • Guardia Particolare Giurata
           </Text>
-        </TouchableOpacity>
+        </View>
 
-        <TouchableOpacity
-          style={styles.avatar}
-          onPress={apriProfilo}
-        >
+        <View style={styles.avatar}>
           <Text style={styles.avatarText}>
-            {iniziali}
+            AI
           </Text>
-        </TouchableOpacity>
+        </View>
       </View>
 
       <View style={styles.hero}>
@@ -1166,13 +1097,6 @@ export default function App() {
           setEditingId(null);
           setScreen('calendar');
         }}
-      />
-
-      <Menu
-        icon="👤"
-        title="Il mio profilo"
-        subtitle={`${profilo.azienda} • ${profilo.sede}`}
-        onPress={apriProfilo}
       />
 
       <TouchableOpacity
@@ -1562,7 +1486,6 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.blue,
     alignItems: 'center',
     justifyContent: 'center',
-    marginLeft: 10,
   },
 
   avatarText: {
@@ -1984,71 +1907,5 @@ const styles = StyleSheet.create({
     color: COLORS.muted,
     fontSize: 11,
     marginTop: 4,
-  },
-
-  profileHero: {
-    backgroundColor: '#10304B',
-    borderRadius: 24,
-    padding: 24,
-    alignItems: 'center',
-    marginBottom: 24,
-  },
-
-  profileAvatar: {
-    width: 88,
-    height: 88,
-    borderRadius: 44,
-    backgroundColor: COLORS.blue,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-
-  profileAvatarText: {
-    color: COLORS.white,
-    fontSize: 28,
-    fontWeight: '900',
-  },
-
-  profileName: {
-    color: COLORS.white,
-    fontWeight: '900',
-    fontSize: 23,
-    marginTop: 14,
-    textAlign: 'center',
-  },
-
-  profileRole: {
-    color: COLORS.muted,
-    marginTop: 5,
-    textAlign: 'center',
-  },
-
-  companyBadge: {
-    backgroundColor: '#173F61',
-    borderRadius: 13,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    marginTop: 14,
-  },
-
-  companyBadgeText: {
-    color: COLORS.lightBlue,
-    fontWeight: '900',
-  },
-
-  profileSectionTitle: {
-    color: COLORS.lightBlue,
-    fontSize: 11,
-    fontWeight: '900',
-    marginTop: 6,
-    marginBottom: 12,
-  },
-
-  profileNote: {
-    color: COLORS.muted,
-    fontSize: 11,
-    lineHeight: 17,
-    textAlign: 'center',
-    marginTop: 18,
   },
 });
