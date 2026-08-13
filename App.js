@@ -1,3 +1,4 @@
+import LoginScreen from './LoginScreen';
 import React, { useEffect, useMemo, useState } from 'react';
 
 import {
@@ -66,6 +67,7 @@ const PROFILO_DEFAULT = {
 };
 
 export default function App() {
+ const [accessoTest, setAccessoTest] = useState(false);
   const [screen, setScreen] =
     useState('home');
 
@@ -1254,6 +1256,7 @@ export default function App() {
     );
   }
 
+ if (!accessoTest) return<LoginScreen onEnterTest={() => setAccessoTest(true)} />;
   if (loading) {
     return (
       <SafeAreaView
