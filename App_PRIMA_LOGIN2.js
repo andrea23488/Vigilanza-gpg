@@ -1,6 +1,3 @@
-import LoginScreen from './LoginScreen';
-import { caricaTurniUtente, creaTurnoUtente, aggiornaTurnoUtente, eliminaTurnoUtente } from './turniApi';
-import { supabase } from './supabase';
 import React, { useEffect, useMemo, useState } from 'react';
 
 import {
@@ -69,7 +66,6 @@ const PROFILO_DEFAULT = {
 };
 
 export default function App() {
- const [accessoTest, setAccessoTest] = useState(false);
   const [screen, setScreen] =
     useState('home');
 
@@ -161,18 +157,13 @@ export default function App() {
     inizializzaApp();
   }, []);
 
-  useEffect(() => {
-    if (accessoTest) {
-      caricaTurni(false);
-    }
-  }, [accessoTest]);
-
   async function inizializzaApp() {
     try {
       setLoading(true);
 
       await caricaProfiloLocale();
 
+      await caricaTurni(false);
     } catch (error) {
       console.log(
         'ERRORE INIZIALIZZAZIONE:',
@@ -255,24 +246,69 @@ export default function App() {
     };
   }
 
-  async function caricaTurni(mostraLoading = true) {
+  async function caricaTurni(
+    mostraLoading = true
+  ) {
     try {
-      if (mostraLoading) setLoading(true);
-      const dati = await caricaTurniUtente();
-      const lista = Array.isArray(dati) ? dati : [];
+      if (mostraLoading) {
+        setLoading(true);
+      }
+
+      const response =
+        await fetch(
+          `${SUPABASE_URL}/rest/v1/turni?select=*&order=anno.asc,mese.asc,giorno.asc`,
+          {
+            method: 'GET',
+
+            headers: {
+              apikey:
+                SUPABASE_KEY,
+            },
+          }
+        );
+
+      const testo =
+        await response.text();
+
+      if (!response.ok) {
+        throw new Error(
+          `HTTP ${response.status}: ${testo}`
+        );
+      }
+
+      const dati =
+        testo
+          ? JSON.parse(testo)
+          : [];
+
+      const lista =
+        Array.isArray(dati)
+          ? dati
+          : [];
+
       setTurni(lista);
+
       return lista;
     } catch (error) {
-      console.log("ERRORE LETTURA TURNI UTENTE:", error);
-      if (error.message !== "Utente non autenticato.") {
-        Alert.alert("Errore database", error.message || "Impossibile leggere i turni.");
-      }
-      setTurni([]);
+      console.log(
+        'ERRORE LETTURA:',
+        error
+      );
+
+      Alert.alert(
+        'Errore database',
+        error.message ||
+          'Impossibile leggere i turni.'
+      );
+
       return [];
     } finally {
-      if (mostraLoading) setLoading(false);
+      if (mostraLoading) {
+        setLoading(false);
+      }
     }
   }
+
   const turniMese =
     useMemo(() => {
       return turni.filter(
@@ -607,12 +643,132 @@ export default function App() {
     };
   }
 
-  async function inserisciTurno(payload) {
-    return await creaTurnoUtente(payload);
+  async function inserisciTurno(
+    payload
+  ) {
+    const response =
+      await fetch(
+        `${SUPABASE_URL}/rest/v1/turni`,
+        {
+          method:
+            'POST',
+
+          headers: {
+            ...headersJSON(),
+
+            Prefer:
+              'return=representation',
+          },
+
+          body:
+            JSON.stringify(
+              payload
+            ),
+        }
+      );
+
+    const testo =
+      await response.text();
+
+    console.log(
+      'POST STATUS:',
+      response.status
+    );
+
+    if (
+      !response.ok
+    ) {
+      throw new Error(
+        `HTTP ${response.status}: ${
+          testo ||
+          'Errore POST'
+        }`
+      );
+    }
+
+    const righe =
+      testo
+        ? JSON.parse(
+            testo
+          )
+        : [];
+
+    if (
+      !Array.isArray(
+        righe
+      ) ||
+      righe.length ===
+        0
+    ) {
+      throw new Error(
+        'Supabase non ha restituito la nuova giornata.'
+      );
+    }
+
+    return righe[0];
   }
-  async function aggiornaTurno(id, payload) {
-    return await aggiornaTurnoUtente(id, payload);
+
+  async function aggiornaTurno(
+    id,
+    payload
+  ) {
+    const response =
+      await fetch(
+        `${SUPABASE_URL}/rest/v1/turni?id=eq.${id}`,
+        {
+          method:
+            'PATCH',
+
+          headers: {
+            ...headersJSON(),
+
+            Prefer:
+              'return=representation',
+          },
+
+          body:
+            JSON.stringify(
+              payload
+            ),
+        }
+      );
+
+    const testo =
+      await response.text();
+
+    if (
+      !response.ok
+    ) {
+      throw new Error(
+        `HTTP ${response.status}: ${
+          testo ||
+          'Errore PATCH'
+        }`
+      );
+    }
+
+    const righe =
+      testo
+        ? JSON.parse(
+            testo
+          )
+        : [];
+
+    if (
+      !Array.isArray(
+        righe
+      ) ||
+      righe.length ===
+        0
+    ) {
+      throw new Error(
+        'Supabase non ha restituito la giornata modificata.'
+      );
+    }
+
+    return righe[0];
   }
+
   async function salvaGiornata() {
     if (saving) {
       return;
@@ -663,7 +819,8 @@ export default function App() {
       if (
         !salvato ||
         salvato.id ===
-      undefined) {
+          undefined
+      ) {
         throw new Error(
           'La giornata non è stata restituita correttamente dal database.'
         );
@@ -768,35 +925,84 @@ export default function App() {
   }
 
   async function eliminaGiornata() {
-    if (editingId === null || editingId === undefined) {
+    if (
+      editingId ===
+        null ||
+      editingId ===
+        undefined
+    ) {
       return;
     }
 
     try {
       setSaving(true);
-      const idDaEliminare = editingId;
 
-      await eliminaTurnoUtente(idDaEliminare);
+      const id =
+        editingId;
 
-      setTurni((precedenti) =>
-        precedenti.filter(
-          (t) => Number(t.id) !== Number(idDaEliminare)
-        )
+      const response =
+        await fetch(
+          `${SUPABASE_URL}/rest/v1/turni?id=eq.${id}`,
+          {
+            method:
+              'DELETE',
+
+            headers: {
+              apikey:
+                SUPABASE_KEY,
+            },
+          }
+        );
+
+      const testo =
+        await response.text();
+
+      if (
+        !response.ok
+      ) {
+        throw new Error(
+          `HTTP ${response.status}: ${
+            testo ||
+            'Errore DELETE'
+          }`
+        );
+      }
+
+      setTurni(
+        (
+          precedenti
+        ) =>
+          precedenti.filter(
+            (t) =>
+              Number(
+                t.id
+              ) !==
+              Number(id)
+          )
       );
 
-      setEditingId(null);
-      await caricaTurni(false);
-      setScreen("calendar");
+      setEditingId(
+        null
+      );
+
+      await caricaTurni(
+        false
+      );
+
+      setScreen(
+        'calendar'
+      );
     } catch (error) {
-      console.log("ERRORE ELIMINAZIONE TURNO UTENTE:", error);
       Alert.alert(
-        "Errore",
-        error.message || "Eliminazione non riuscita."
+        'Errore',
+        error.message ||
+          'Eliminazione non riuscita.'
       );
     } finally {
       setSaving(false);
     }
   }
+
   function mesePrecedente() {
     setEditingId(null);
 
@@ -944,17 +1150,6 @@ export default function App() {
       );
     }
   }
-  async function logout() {
-    const { error } = await supabase.auth.signOut();
-    if (error) {
-      Alert.alert("Errore", error.message);
-      return;
-    }
-    setTurni([]);
-    setAccessoTest(false);
-    setScreen("home");
-  }
-
 
   async function scegliFotoProfilo() {
     try {
@@ -1059,7 +1254,6 @@ export default function App() {
     );
   }
 
- if (!accessoTest) return<LoginScreen onEnterTest={() => setAccessoTest(true)} />;
   if (loading) {
     return (
       <SafeAreaView
@@ -1359,15 +1553,6 @@ export default function App() {
             SALVA PROFILO
           </Text>
         </TouchableOpacity>
-
-          <TouchableOpacity
-            style={{ backgroundColor: "#c62828", padding: 16, borderRadius: 12, marginTop: 14, alignItems: "center" }}
-            onPress={logout}
-          >
-            <Text style={{ color: "white", fontWeight: "700", fontSize: 16 }}>
-              ESCI DALL'ACCOUNT
-            </Text>
-          </TouchableOpacity>
 
         {fotoProfilo && (
           <TouchableOpacity
