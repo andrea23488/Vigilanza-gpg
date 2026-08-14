@@ -1,4 +1,6 @@
 import { supabase } from './supabase';
+import * as FileSystem from 'expo-file-system/legacy';
+import { decode } from 'base64-arraybuffer';
 
 async function getCurrentUser() {
   const {
@@ -43,8 +45,11 @@ export async function salvaProfiloUtente(profilo) {
     azienda: profilo.azienda || '',
     ruolo: profilo.ruolo || '',
     sede: profilo.sede || '',
-    foto_url: profilo.foto_url || null,
     updated_at: new Date().toISOString(),
+  };
+
+  if (profilo.foto_url !== undefined) {
+    payload.foto_url = profilo.foto_url;
   };
 
   const { data, error } = await supabase
@@ -60,4 +65,66 @@ export async function salvaProfiloUtente(profilo) {
   }
 
   return data;
+}
+
+export async function caricaFotoProfilo(uriLocale) {
+  const user = await getCurrentUser();
+
+  if (!uriLocale) {
+    throw new Error('Nessuna foto selezionata.');
+  }
+
+  const base64 = await FileSystem.readAsStringAsync(
+    uriLocale,
+    {
+      encoding: FileSystem.EncodingType.Base64,
+    }
+  );
+
+  const filePath = `${user.id}/avatar.jpg`;
+
+  const { error: uploadError } = await supabase.storage
+    .from('profili')
+    .upload(
+      filePath,
+      decode(base64),
+      {
+        contentType: 'image/jpeg',
+        upsert: true,
+      }
+    );
+
+  if (uploadError) {
+    throw uploadError;
+  }
+
+  const { data } = supabase.storage
+    .from('profili')
+    .getPublicUrl(filePath);
+
+  const publicUrl = data?.publicUrl;
+
+  if (!publicUrl) {
+    throw new Error(
+      'Impossibile ottenere l’URL della foto.'
+    );
+  }
+
+  return publicUrl;
+}
+
+export async function eliminaFotoProfiloCloud() {
+  const user = await getCurrentUser();
+
+  const filePath = `${user.id}/avatar.jpg`;
+
+  const { error } = await supabase.storage
+    .from('profili')
+    .remove([filePath]);
+
+  if (error) {
+    throw error;
+  }
+
+  return true;
 }

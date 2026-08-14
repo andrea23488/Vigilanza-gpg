@@ -1,7 +1,9 @@
 import LoginScreen from './LoginScreen';
 import { caricaTurniUtente, creaTurnoUtente, aggiornaTurnoUtente, eliminaTurnoUtente } from './turniApi';
 import { supabase } from './supabase';
-import { caricaProfiloUtente, salvaProfiloUtente } from './profiliApi';
+import { caricaProfiloUtente, salvaProfiloUtente, caricaFotoProfilo, eliminaFotoProfiloCloud } from './profiliApi';
+import { caricaColleghi, aggiungiCollega, rimuoviCollega, accettaCollega, rifiutaCollega } from './colleghiApi';
+import { caricaColleghiInServizio } from './servizioApi';
 import React, { useEffect, useMemo, useState } from 'react';
 
 import {
@@ -71,7 +73,13 @@ const PROFILO_DEFAULT = {
 
 export default function App() {
  const [accessoTest, setAccessoTest] = useState(false);
-  const [screen, setScreen] =
+  const [screen, setScreen] = useState("home");
+  const [colleghi, setColleghi] = useState([]);
+  const [colleghiInServizio, setColleghiInServizio] = useState([]);
+  const [loadingServizio, setLoadingServizio] = useState(false);
+  const [loadingColleghi, setLoadingColleghi] = useState(false);
+  const [collegaIdDraft, setCollegaIdDraft] = useState("");
+
     useState('home');
 
   const [mese, setMese] =
@@ -91,6 +99,42 @@ export default function App() {
 
   const [editingId, setEditingId] =
     useState(null);
+
+  async function aggiornaColleghiInServizioOggi() {
+    try {
+      setLoadingServizio(true);
+
+      const oggi = new Date();
+      const giornoOggi = oggi.getDate();
+      const meseOggi = oggi.getMonth() + 1;
+      const annoOggi = oggi.getFullYear();
+
+      const lista = await caricaColleghiInServizio(
+        giornoOggi,
+        meseOggi,
+        annoOggi
+      );
+
+      setColleghiInServizio(lista || []);
+    } catch (error) {
+      console.log("ERRORE COLLEGHI IN SERVIZIO:", error);
+      setColleghiInServizio([]);
+    } finally {
+      setLoadingServizio(false);
+    }
+  }
+
+  async function aggiornaColleghi() {
+    try {
+      setLoadingColleghi(true);
+      const lista = await caricaColleghi();
+      setColleghi(lista);
+    } catch (error) {
+      console.log("ERRORE COLLEGHI:", error);
+    } finally {
+      setLoadingColleghi(false);
+    }
+  }
 
   const [giorno, setGiorno] =
     useState(1);
@@ -160,6 +204,7 @@ export default function App() {
 
   useEffect(() => {
       caricaProfiloLocale();
+      aggiornaColleghiInServizioOggi();
 
     inizializzaApp();
   }, []);
@@ -167,6 +212,7 @@ export default function App() {
   useEffect(() => {
     if (accessoTest) {
       caricaTurni(false);
+      caricaProfiloLocale();
     }
   }, [accessoTest]);
 
@@ -195,6 +241,7 @@ export default function App() {
             azienda: profiloCloud.azienda || "",
             ruolo: profiloCloud.ruolo || "",
             sede: profiloCloud.sede || "",
+            foto_url: profiloCloud.foto_url || null,
           }
         : {
             nome: "",
@@ -202,6 +249,7 @@ export default function App() {
             azienda: "",
             ruolo: "",
             sede: "",
+            foto_url: null,
           };
 
       setProfilo(nuovoProfilo);
@@ -210,29 +258,14 @@ export default function App() {
       setAziendaDraft(nuovoProfilo.azienda);
       setRuoloDraft(nuovoProfilo.ruolo);
       setSedeDraft(nuovoProfilo.sede);
+      setFotoProfilo(nuovoProfilo.foto_url);
 
       return nuovoProfilo;
     } catch (error) {
       console.log("ERRORE PROFILO CLOUD:", error);
-
-      const profiloVuoto = {
-        nome: "",
-        cognome: "",
-        azienda: "",
-        ruolo: "",
-        sede: "",
-      };
-
-      setProfilo(profiloVuoto);
-      setNomeDraft("");
-      setCognomeDraft("");
-      setAziendaDraft("");
-      setRuoloDraft("");
-      setSedeDraft("");
-
-      return profiloVuoto;
     }
   }
+
 
   async function caricaTurni(mostraLoading = true) {
     try {
@@ -901,69 +934,65 @@ export default function App() {
       const permesso =
         await ImagePicker.requestMediaLibraryPermissionsAsync();
 
-      if (
-        !permesso.granted
-      ) {
+      if (!permesso.granted) {
         Alert.alert(
-          'Permesso necessario',
-          'Per scegliere una foto devi consentire l’accesso alla libreria fotografica.'
+          "Permesso necessario",
+          "Per scegliere una foto devi consentire l’accesso alla libreria fotografica."
         );
-
         return;
       }
 
-      const risultato =
-        await ImagePicker.launchImageLibraryAsync(
-          {
-            mediaTypes: [
-              'images',
-            ],
+      const risultato = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ["images"],
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
 
-            allowsEditing:
-              true,
-
-            aspect: [
-              1,
-              1,
-            ],
-
-            quality:
-              0.8,
-          }
-        );
-
-      if (
-        !risultato.canceled
-      ) {
-        const uri =
-          risultato
-            .assets?.[0]
-            ?.uri;
-
-        if (uri) {
-          setFotoProfilo(
-            uri
-          );
-
-          await AsyncStorage.setItem(
-            PHOTO_STORAGE_KEY,
-            uri
-          );
-        }
+      if (risultato.canceled) {
+        return;
       }
-    } catch (error) {
-      console.log(
-        'ERRORE FOTO:',
-        error
-      );
+
+      const uriLocale = risultato.assets?.[0]?.uri;
+
+      if (!uriLocale) {
+        throw new Error("Foto non valida.");
+      }
+
+      setSaving(true);
+
+      const fotoUrl = await caricaFotoProfilo(uriLocale);
+
+      const profiloAggiornato = await salvaProfiloUtente({
+        nome: nomeDraft.trim(),
+        cognome: cognomeDraft.trim(),
+        azienda: aziendaDraft.trim(),
+        ruolo: ruoloDraft.trim(),
+        sede: sedeDraft.trim(),
+        foto_url: fotoUrl,
+      });
+
+      setFotoProfilo(fotoUrl);
+
+      setProfilo((precedente) => ({
+        ...precedente,
+        foto_url: profiloAggiornato.foto_url || fotoUrl,
+      }));
 
       Alert.alert(
-        'Errore',
-        'Non sono riuscito ad aprire la libreria fotografica.'
+        "Foto aggiornata",
+        "La foto profilo è stata salvata sul tuo account."
       );
+    } catch (error) {
+      console.log("ERRORE FOTO PROFILO CLOUD:", error);
+      Alert.alert(
+        "Errore",
+        error.message || "Impossibile salvare la foto profilo."
+      );
+    } finally {
+      setSaving(false);
     }
   }
-
   function rimuoviFotoProfilo() {
     Alert.alert(
       'Rimuovi foto',
@@ -1021,6 +1050,305 @@ export default function App() {
         >
           Caricamento Vigilanza GPG...
         </Text>
+      </SafeAreaView>
+    );
+  }
+
+  if (screen === 'colleghi') {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: '#07142f' }}>
+        <ScrollView contentContainerStyle={{ padding: 22, paddingBottom: 50 }}>
+          
+          <TouchableOpacity
+            onPress={() => setScreen('home')}
+            style={{ marginBottom: 20 }}
+          >
+            <Text style={{ color: 'white', fontSize: 28 }}>‹</Text>
+          </TouchableOpacity>
+
+          <Text style={{ color: 'white', fontSize: 30, fontWeight: '800' }}>
+            I miei colleghi
+          </Text>
+
+          <Text style={{ color: '#9fb2d9', marginTop: 6, marginBottom: 25 }}>
+            Colleghi e contatti di servizio
+          </Text>
+
+          <View
+            style={{
+              backgroundColor: '#10234d',
+              borderRadius: 18,
+              padding: 16,
+              marginBottom: 22,
+            }}
+          >
+            <Text style={{ color: 'white', fontWeight: '700', marginBottom: 10 }}>
+              Aggiungi collega
+            </Text>
+
+            <TextInput
+              value={collegaIdDraft}
+              onChangeText={setCollegaIdDraft}
+              placeholder="ID collega"
+              placeholderTextColor="#7184aa"
+              autoCapitalize="none"
+              style={{
+                backgroundColor: '#091936',
+                color: 'white',
+                borderWidth: 1,
+                borderColor: '#31538d',
+                borderRadius: 12,
+                padding: 14,
+                marginBottom: 12,
+              }}
+            />
+
+            <TouchableOpacity
+              onPress={async () => {
+                try {
+                  await aggiungiCollega(collegaIdDraft.trim());
+                  setCollegaIdDraft('');
+                  await aggiornaColleghi();
+                  Alert.alert('Collega aggiunto');
+                } catch (error) {
+                  Alert.alert('Errore', error.message || 'Impossibile aggiungere il collega');
+                }
+              }}
+              style={{
+                backgroundColor: '#2377ff',
+                padding: 14,
+                borderRadius: 12,
+                alignItems: 'center',
+              }}
+            >
+              <Text style={{ color: 'white', fontWeight: '800' }}>
+                + AGGIUNGI COLLEGA
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          <TouchableOpacity
+            onPress={aggiornaColleghi}
+            style={{ marginBottom: 18 }}
+          >
+            <Text style={{ color: '#52a2ff', fontWeight: '700' }}>
+              ↻ Aggiorna elenco
+            </Text>
+          </TouchableOpacity>
+
+          {loadingColleghi ? (
+            <ActivityIndicator size="large" />
+          ) : (
+            <>
+              {colleghi.filter(
+                (c) => c.stato === 'in_attesa' && c.ricevuta
+              ).length > 0 && (
+                <>
+                  <Text
+                    style={{
+                      color: 'white',
+                      fontSize: 20,
+                      fontWeight: '800',
+                      marginBottom: 12,
+                    }}
+                  >
+                    🔔 Richieste ricevute
+                  </Text>
+
+                  {colleghi
+                    .filter(
+                      (c) => c.stato === 'in_attesa' && c.ricevuta
+                    )
+                    .map((c) => (
+                      <View
+                        key={c.id}
+                        style={{
+                          backgroundColor: '#10234d',
+                          borderRadius: 16,
+                          padding: 16,
+                          marginBottom: 12,
+                        }}
+                      >
+                        <Text
+                          style={{
+                            color: 'white',
+                            fontWeight: '800',
+                            fontSize: 17,
+                          }}
+                        >
+                          👤 {c.profilo?.nome || 'Collega'} {c.profilo?.cognome || ''}
+                        </Text>
+
+                        <Text
+                          style={{
+                            color: '#9fb2d9',
+                            marginTop: 5,
+                          }}
+                        >
+                          {[c.profilo?.azienda, c.profilo?.codice_gpg]
+                            .filter(Boolean)
+                            .join(' · ')}
+                        </Text>
+
+                        <View
+                          style={{
+                            flexDirection: 'row',
+                            gap: 10,
+                            marginTop: 15,
+                          }}
+                        >
+                          <TouchableOpacity
+                            onPress={async () => {
+                              try {
+                                await accettaCollega(c.id);
+                                await aggiornaColleghi();
+                              } catch (error) {
+                                Alert.alert('Errore', error.message);
+                              }
+                            }}
+                            style={{
+                              flex: 1,
+                              backgroundColor: '#1d9b55',
+                              padding: 12,
+                              borderRadius: 10,
+                              alignItems: 'center',
+                            }}
+                          >
+                            <Text style={{ color: 'white', fontWeight: '800' }}>
+                              ✓ ACCETTA
+                            </Text>
+                          </TouchableOpacity>
+
+                          <TouchableOpacity
+                            onPress={async () => {
+                              try {
+                                await rifiutaCollega(c.id);
+                                await aggiornaColleghi();
+                              } catch (error) {
+                                Alert.alert('Errore', error.message);
+                              }
+                            }}
+                            style={{
+                              flex: 1,
+                              backgroundColor: '#b93646',
+                              padding: 12,
+                              borderRadius: 10,
+                              alignItems: 'center',
+                            }}
+                          >
+                            <Text style={{ color: 'white', fontWeight: '800' }}>
+                              ✕ RIFIUTA
+                            </Text>
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+                    ))}
+                </>
+              )}
+
+              <Text
+                style={{
+                  color: 'white',
+                  fontSize: 20,
+                  fontWeight: '800',
+                  marginTop: 8,
+                  marginBottom: 12,
+                }}
+              >
+                👥 I miei colleghi
+              </Text>
+
+              {colleghi.filter((c) => c.stato === 'accettato').length === 0 ? (
+                <View
+                  style={{
+                    backgroundColor: '#10234d',
+                    borderRadius: 18,
+                    padding: 22,
+                  }}
+                >
+                  <Text
+                    style={{
+                      color: 'white',
+                      fontWeight: '700',
+                      textAlign: 'center',
+                    }}
+                  >
+                    Nessun collega collegato
+                  </Text>
+                </View>
+              ) : (
+                colleghi
+                  .filter((c) => c.stato === 'accettato')
+                  .map((c) => (
+                    <View
+                      key={c.id}
+                      style={{
+                        backgroundColor: '#10234d',
+                        borderRadius: 16,
+                        padding: 16,
+                        marginBottom: 12,
+                      }}
+                    >
+                      <Text
+                        style={{
+                          color: 'white',
+                          fontWeight: '800',
+                          fontSize: 17,
+                        }}
+                      >
+                        👤 {c.profilo?.nome || 'Collega'} {c.profilo?.cognome || ''}
+                      </Text>
+
+                      <Text
+                        style={{
+                          color: '#9fb2d9',
+                          marginTop: 5,
+                        }}
+                      >
+                        {[c.profilo?.azienda, c.profilo?.codice_gpg]
+                          .filter(Boolean)
+                          .join(' · ')}
+                      </Text>
+
+                      {c.profilo?.sede ? (
+                        <Text
+                          style={{
+                            color: '#9fb2d9',
+                            marginTop: 3,
+                            fontSize: 12,
+                          }}
+                        >
+                          📍 {c.profilo.sede}
+                        </Text>
+                      ) : null}
+
+                      <TouchableOpacity
+                        onPress={async () => {
+                          try {
+                            await rimuoviCollega(c.id);
+                            await aggiornaColleghi();
+                          } catch (error) {
+                            Alert.alert('Errore', error.message);
+                          }
+                        }}
+                        style={{ marginTop: 12 }}
+                      >
+                        <Text
+                          style={{
+                            color: '#ff6969',
+                            fontWeight: '700',
+                          }}
+                        >
+                          Rimuovi
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  ))
+              )}
+            </>
+          )}
+
+        </ScrollView>
       </SafeAreaView>
     );
   }
@@ -2078,6 +2406,83 @@ export default function App() {
         </View>
       </View>
 
+      <View
+        style={{
+          backgroundColor: '#10234d',
+          borderRadius: 20,
+          padding: 18,
+          marginBottom: 22,
+        }}
+      >
+        <Text
+          style={{
+            color: '#52a2ff',
+            fontSize: 11,
+            fontWeight: '900',
+            marginBottom: 8,
+          }}
+        >
+          IN SERVIZIO CON TE
+        </Text>
+
+        {loadingServizio ? (
+          <ActivityIndicator />
+        ) : colleghiInServizio.length === 0 ? (
+          <Text style={{ color: '#9fb2d9' }}>
+            Nessun collega collegato in servizio oggi
+          </Text>
+        ) : (
+          colleghiInServizio.map((c, index) => (
+            <View
+              key={`${c.altro_user_id}-${index}`}
+              style={{
+                paddingVertical: 8,
+                borderBottomWidth:
+                  index < colleghiInServizio.length - 1 ? 1 : 0,
+                borderBottomColor: '#203b6a',
+              }}
+            >
+              <Text
+                style={{
+                  color: 'white',
+                  fontWeight: '800',
+                  fontSize: 16,
+                }}
+              >
+                👤 {c.profilo?.nome || 'Collega'} {c.profilo?.cognome || ''}
+              </Text>
+
+              <Text
+                style={{
+                  color: '#9fb2d9',
+                  fontSize: 12,
+                  marginTop: 3,
+                }}
+              >
+                {[c.profilo?.azienda, c.profilo?.sede]
+                  .filter(Boolean)
+                  .join(' · ')}
+              </Text>
+            </View>
+          ))
+        )}
+
+        <TouchableOpacity
+          onPress={aggiornaColleghiInServizioOggi}
+          style={{ marginTop: 12 }}
+        >
+          <Text
+            style={{
+              color: '#52a2ff',
+              fontWeight: '800',
+              fontSize: 12,
+            }}
+          >
+            ↻ Aggiorna
+          </Text>
+        </TouchableOpacity>
+      </View>
+
       <Text
         style={
           styles.section
@@ -2119,11 +2524,18 @@ export default function App() {
       <Menu
         icon="👤"
         title="Il mio profilo"
-        subtitle={`${profilo.azienda} • ${profilo.sede}`}
+        subtitle={[profilo.azienda, profilo.sede].filter(Boolean).join(" • ")}
         onPress={
           apriProfilo
         }
       />
+
+        <Menu
+          icon="👥"
+          title="I miei colleghi"
+          subtitle="Colleghi e contatti di servizio"
+          onPress={() => { setScreen("colleghi"); aggiornaColleghi(); }}
+        />
 
       <TouchableOpacity
         style={
