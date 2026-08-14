@@ -65,10 +65,35 @@ export async function caricaColleghiInServizio(giorno, mese, anno) {
 
       if (profiloError) throw profiloError;
 
+      const toMinutes = (ora) => {
+        const [h, m] = ora.split(':').map(Number);
+        return h * 60 + m;
+      };
+
+      const formatMinutes = (minuti) => {
+        const valore = minuti % (24 * 60);
+        const h = Math.floor(valore / 60);
+        const m = valore % 60;
+        return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+      };
+
+      const startA = toMinutes(riga.inizio_utente);
+      let endA = toMinutes(riga.fine_utente);
+      const startB = toMinutes(riga.inizio_collega);
+      let endB = toMinutes(riga.fine_collega);
+
+      if (endA <= startA) endA += 24 * 60;
+      if (endB <= startB) endB += 24 * 60;
+
+      const insiemeDa = Math.max(startA, startB);
+      const insiemeA = Math.min(endA, endB);
+
       return {
         ...riga,
         altro_user_id: altroUserId,
         profilo: profilo || null,
+        insieme_da: formatMinutes(insiemeDa),
+        insieme_a: formatMinutes(insiemeA),
       };
     })
   );

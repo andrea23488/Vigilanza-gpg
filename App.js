@@ -1428,6 +1428,7 @@ export default function App() {
               >
                 📷
               </Text>
+
             </View>
           </TouchableOpacity>
 
@@ -2463,6 +2464,19 @@ export default function App() {
                   .filter(Boolean)
                   .join(' · ')}
               </Text>
+
+              {c.insieme_da && c.insieme_a && (
+                <Text
+                  style={{
+                    color: '#35e58b',
+                    fontWeight: '700',
+                    fontSize: 12,
+                    marginTop: 5,
+                  }}
+                >
+                  🟢 Con te dalle {c.insieme_da} alle {c.insieme_a}
+                </Text>
+              )}
             </View>
           ))
         )}
