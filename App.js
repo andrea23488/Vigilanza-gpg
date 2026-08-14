@@ -1,6 +1,7 @@
 import LoginScreen from './LoginScreen';
 import { caricaTurniUtente, creaTurnoUtente, aggiornaTurnoUtente, eliminaTurnoUtente } from './turniApi';
 import { supabase } from './supabase';
+import { caricaProfiloUtente, salvaProfiloUtente } from './profiliApi';
 import React, { useEffect, useMemo, useState } from 'react';
 
 import {
@@ -158,6 +159,8 @@ export default function App() {
   );
 
   useEffect(() => {
+      caricaProfiloLocale();
+
     inizializzaApp();
   }, []);
 
@@ -171,7 +174,6 @@ export default function App() {
     try {
       setLoading(true);
 
-      await caricaProfiloLocale();
 
     } catch (error) {
       console.log(
@@ -182,77 +184,54 @@ export default function App() {
       setLoading(false);
     }
   }
-
   async function caricaProfiloLocale() {
     try {
-      const [
-        profiloSalvato,
-        fotoSalvata,
-      ] = await Promise.all([
-        AsyncStorage.getItem(
-          PROFILE_STORAGE_KEY
-        ),
+      const profiloCloud = await caricaProfiloUtente();
 
-        AsyncStorage.getItem(
-          PHOTO_STORAGE_KEY
-        ),
-      ]);
+      const nuovoProfilo = profiloCloud
+        ? {
+            nome: profiloCloud.nome || "",
+            cognome: profiloCloud.cognome || "",
+            azienda: profiloCloud.azienda || "",
+            ruolo: profiloCloud.ruolo || "",
+            sede: profiloCloud.sede || "",
+          }
+        : {
+            nome: "",
+            cognome: "",
+            azienda: "",
+            ruolo: "",
+            sede: "",
+          };
 
-      if (profiloSalvato) {
-        const dati =
-          JSON.parse(profiloSalvato);
+      setProfilo(nuovoProfilo);
+      setNomeDraft(nuovoProfilo.nome);
+      setCognomeDraft(nuovoProfilo.cognome);
+      setAziendaDraft(nuovoProfilo.azienda);
+      setRuoloDraft(nuovoProfilo.ruolo);
+      setSedeDraft(nuovoProfilo.sede);
 
-        const nuovoProfilo = {
-          ...PROFILO_DEFAULT,
-          ...dati,
-        };
-
-        setProfilo(
-          nuovoProfilo
-        );
-
-        setNomeDraft(
-          nuovoProfilo.nome
-        );
-
-        setCognomeDraft(
-          nuovoProfilo.cognome
-        );
-
-        setAziendaDraft(
-          nuovoProfilo.azienda
-        );
-
-        setRuoloDraft(
-          nuovoProfilo.ruolo
-        );
-
-        setSedeDraft(
-          nuovoProfilo.sede
-        );
-      }
-
-      if (fotoSalvata) {
-        setFotoProfilo(
-          fotoSalvata
-        );
-      }
+      return nuovoProfilo;
     } catch (error) {
-      console.log(
-        'ERRORE PROFILO LOCALE:',
-        error
-      );
+      console.log("ERRORE PROFILO CLOUD:", error);
+
+      const profiloVuoto = {
+        nome: "",
+        cognome: "",
+        azienda: "",
+        ruolo: "",
+        sede: "",
+      };
+
+      setProfilo(profiloVuoto);
+      setNomeDraft("");
+      setCognomeDraft("");
+      setAziendaDraft("");
+      setRuoloDraft("");
+      setSedeDraft("");
+
+      return profiloVuoto;
     }
-  }
-
-  function headersJSON() {
-    return {
-      apikey:
-        SUPABASE_KEY,
-
-      'Content-Type':
-        'application/json',
-    };
   }
 
   async function caricaTurni(mostraLoading = true) {
@@ -873,77 +852,6 @@ export default function App() {
     );
   }
 
-  async function salvaProfilo() {
-    try {
-      const nuovoProfilo = {
-        nome:
-          nomeDraft.trim() ||
-          'Utente',
-
-        cognome:
-          cognomeDraft.trim(),
-
-        azienda:
-          aziendaDraft.trim() ||
-          'Azienda non indicata',
-
-        ruolo:
-          ruoloDraft.trim() ||
-          'Operatore',
-
-        sede:
-          sedeDraft.trim(),
-      };
-
-      await AsyncStorage.setItem(
-        PROFILE_STORAGE_KEY,
-        JSON.stringify(
-          nuovoProfilo
-        )
-      );
-
-      if (fotoProfilo) {
-        await AsyncStorage.setItem(
-          PHOTO_STORAGE_KEY,
-          fotoProfilo
-        );
-      } else {
-        await AsyncStorage.removeItem(
-          PHOTO_STORAGE_KEY
-        );
-      }
-
-      setProfilo(
-        nuovoProfilo
-      );
-
-      Alert.alert(
-        'Profilo salvato ✅',
-        'Il profilo resterà memorizzato anche dopo la chiusura dell’app.',
-        [
-          {
-            text: 'OK',
-
-            onPress:
-              () =>
-                setScreen(
-                  'home'
-                ),
-          },
-        ]
-      );
-    } catch (error) {
-      console.log(
-        'ERRORE SALVATAGGIO PROFILO:',
-        error
-      );
-
-      Alert.alert(
-        'Errore',
-        'Non sono riuscito a salvare il profilo sul dispositivo.'
-      );
-    }
-  }
   async function logout() {
     const { error } = await supabase.auth.signOut();
     if (error) {
@@ -955,7 +863,39 @@ export default function App() {
     setScreen("home");
   }
 
+  async function salvaProfilo() {
+    try {
+      const profiloDaSalvare = {
+        nome: nomeDraft.trim(),
+        cognome: cognomeDraft.trim(),
+        azienda: aziendaDraft.trim(),
+        ruolo: ruoloDraft.trim(),
+        sede: sedeDraft.trim(),
+      };
 
+      const salvato = await salvaProfiloUtente(profiloDaSalvare);
+
+      const nuovoProfilo = {
+        nome: salvato.nome || "",
+        cognome: salvato.cognome || "",
+        azienda: salvato.azienda || "",
+        ruolo: salvato.ruolo || "",
+        sede: salvato.sede || "",
+      };
+
+      setProfilo(nuovoProfilo);
+      setNomeDraft(nuovoProfilo.nome);
+      setCognomeDraft(nuovoProfilo.cognome);
+      setAziendaDraft(nuovoProfilo.azienda);
+      setRuoloDraft(nuovoProfilo.ruolo);
+      setSedeDraft(nuovoProfilo.sede);
+
+      Alert.alert("Profilo salvato", "Il profilo è stato salvato sul tuo account.");
+    } catch (error) {
+      console.log("ERRORE SALVATAGGIO PROFILO CLOUD:", error);
+      Alert.alert("Errore", error.message || "Impossibile salvare il profilo.");
+    }
+  }
   async function scegliFotoProfilo() {
     try {
       const permesso =
