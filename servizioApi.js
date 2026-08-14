@@ -25,7 +25,30 @@ export async function caricaColleghiInServizio(giorno, mese, anno) {
 
   if (error) throw error;
 
-  const righe = data || [];
+  const righe = (data || []).filter((riga) => {
+    const toMinutes = (ora) => {
+      if (!ora) return null;
+      const [h, m] = ora.split(':').map(Number);
+      return h * 60 + m;
+    };
+
+    const startA = toMinutes(riga.inizio_utente);
+    let endA = toMinutes(riga.fine_utente);
+    const startB = toMinutes(riga.inizio_collega);
+    let endB = toMinutes(riga.fine_collega);
+
+    if ([startA, endA, startB, endB].some((v) => v === null)) {
+      return false;
+    }
+
+    // Se il turno termina dopo mezzanotte, lo portiamo al giorno successivo.
+    if (endA <= startA) endA += 24 * 60;
+    if (endB <= startB) endB += 24 * 60;
+
+    // Due turni si sovrappongono se ciascuno inizia prima
+    // che l'altro sia terminato.
+    return startA < endB && startB < endA;
+  });
 
   const risultati = await Promise.all(
     righe.map(async (riga) => {
