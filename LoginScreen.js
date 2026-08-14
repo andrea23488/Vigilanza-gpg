@@ -9,7 +9,10 @@ import {
   TouchableOpacity,
   StyleSheet,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
+
+import { supabase } from './supabase';
 
 const COLORS = {
   bg: '#07111F',
@@ -19,6 +22,7 @@ const COLORS = {
   muted: '#91A3BA',
   blue: '#168BFF',
   lightBlue: '#55B8FF',
+  green: '#50D89F',
 };
 
 export default function LoginScreen({ onEnterTest }) {
@@ -29,13 +33,22 @@ export default function LoginScreen({ onEnterTest }) {
   const [nome, setNome] = useState('');
   const [cognome, setCognome] = useState('');
 
-  function continua() {
+  const [loading, setLoading] = useState(false);
+
+  async function continua() {
     if (!email.trim() || !password.trim()) {
       Alert.alert(
         'Dati mancanti',
         'Inserisci email e password.'
       );
+      return;
+    }
 
+    if (password.length < 6) {
+      Alert.alert(
+        'Password troppo corta',
+        'Inserisci una password di almeno 6 caratteri.'
+      );
       return;
     }
 
@@ -47,16 +60,110 @@ export default function LoginScreen({ onEnterTest }) {
         'Dati mancanti',
         'Inserisci nome e cognome.'
       );
-
       return;
     }
 
-    Alert.alert(
-      mode === 'login'
-        ? 'Accesso'
-        : 'Registrazione',
-      'Nel prossimo passaggio collegheremo questa schermata a Supabase Auth.'
-    );
+    if (mode === 'register') {
+      await registrati();
+    } else {
+      await accedi();
+    }
+  }
+
+  async function registrati() {
+    try {
+      setLoading(true);
+
+      const { data, error } = await supabase.auth.signUp({
+        email: email.trim().toLowerCase(),
+        password,
+        options: {
+          data: {
+            nome: nome.trim(),
+            cognome: cognome.trim(),
+          },
+        },
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      if (data.session) {
+        Alert.alert(
+          'Account creato ✅',
+          'Registrazione completata. Il tuo account è già attivo.',
+          [
+            {
+              text: 'OK',
+              onPress: onEnterTest,
+            },
+          ]
+        );
+      } else {
+        Alert.alert(
+          'Account creato ✅',
+          'Controlla la tua email e conferma la registrazione. Dopo potrai accedere.',
+          [
+            {
+              text: 'OK',
+              onPress: () => setMode('login'),
+            },
+          ]
+        );
+      }
+    } catch (error) {
+      console.log('ERRORE REGISTRAZIONE:', error);
+
+      Alert.alert(
+        'Registrazione non riuscita',
+        error.message || 'Si è verificato un errore.'
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function accedi() {
+    try {
+      setLoading(true);
+
+      const { data, error } =
+        await supabase.auth.signInWithPassword({
+          email: email.trim().toLowerCase(),
+          password,
+        });
+
+      if (error) {
+        throw error;
+      }
+
+      if (!data.session) {
+        throw new Error(
+          'Accesso non completato. Controlla di aver confermato la tua email.'
+        );
+      }
+
+      Alert.alert(
+        'Accesso riuscito ✅',
+        'Bentornato in Vigilanza GPG.',
+        [
+          {
+            text: 'ENTRA',
+            onPress: onEnterTest,
+          },
+        ]
+      );
+    } catch (error) {
+      console.log('ERRORE LOGIN:', error);
+
+      Alert.alert(
+        'Accesso non riuscito',
+        error.message || 'Email o password non valide.'
+      );
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
@@ -85,16 +192,15 @@ export default function LoginScreen({ onEnterTest }) {
             <TouchableOpacity
               style={[
                 styles.modeButton,
-                mode === 'login' &&
-                  styles.modeButtonActive,
+                mode === 'login' && styles.modeButtonActive,
               ]}
               onPress={() => setMode('login')}
+              disabled={loading}
             >
               <Text
                 style={[
                   styles.modeText,
-                  mode === 'login' &&
-                    styles.modeTextActive,
+                  mode === 'login' && styles.modeTextActive,
                 ]}
               >
                 Accedi
@@ -104,16 +210,15 @@ export default function LoginScreen({ onEnterTest }) {
             <TouchableOpacity
               style={[
                 styles.modeButton,
-                mode === 'register' &&
-                  styles.modeButtonActive,
+                mode === 'register' && styles.modeButtonActive,
               ]}
               onPress={() => setMode('register')}
+              disabled={loading}
             >
               <Text
                 style={[
                   styles.modeText,
-                  mode === 'register' &&
-                    styles.modeTextActive,
+                  mode === 'register' && styles.modeTextActive,
                 ]}
               >
                 Registrati
@@ -130,7 +235,7 @@ export default function LoginScreen({ onEnterTest }) {
           <Text style={styles.subtitle}>
             {mode === 'login'
               ? 'Accedi per entrare nel tuo spazio personale.'
-              : 'Crea il profilo che userai nell’app.'}
+              : 'Registrati per creare il tuo profilo Vigilanza GPG.'}
           </Text>
 
           {mode === 'register' && (
@@ -163,19 +268,27 @@ export default function LoginScreen({ onEnterTest }) {
             label="PASSWORD"
             value={password}
             onChange={setPassword}
-            placeholder="••••••••"
+            placeholder="Almeno 6 caratteri"
             secureTextEntry
           />
 
           <TouchableOpacity
-            style={styles.primaryButton}
+            style={[
+              styles.primaryButton,
+              loading && styles.disabled,
+            ]}
             onPress={continua}
+            disabled={loading}
           >
-            <Text style={styles.primaryButtonText}>
-              {mode === 'login'
-                ? 'ACCEDI'
-                : 'CREA ACCOUNT'}
-            </Text>
+            {loading ? (
+              <ActivityIndicator color="#FFFFFF" />
+            ) : (
+              <Text style={styles.primaryButtonText}>
+                {mode === 'login'
+                  ? 'ACCEDI'
+                  : 'CREA ACCOUNT'}
+              </Text>
+            )}
           </TouchableOpacity>
 
           {mode === 'login' && (
@@ -184,7 +297,7 @@ export default function LoginScreen({ onEnterTest }) {
               onPress={() =>
                 Alert.alert(
                   'Password dimenticata',
-                  'La collegheremo a Supabase Auth nel prossimo passaggio.'
+                  'La funzione di recupero password sarà il prossimo passaggio.'
                 )
               }
             >
@@ -201,7 +314,7 @@ export default function LoginScreen({ onEnterTest }) {
           </Text>
 
           <Text style={styles.testText}>
-            Per ora puoi entrare nell’app senza account mentre completiamo il sistema di accesso.
+            Durante lo sviluppo puoi ancora entrare nell’app senza account.
           </Text>
 
           <TouchableOpacity
@@ -215,7 +328,7 @@ export default function LoginScreen({ onEnterTest }) {
         </View>
 
         <Text style={styles.footer}>
-          VIGILANZA GPG • PROTOTIPO
+          VIGILANZA GPG • VERSIONE TEST
         </Text>
       </ScrollView>
     </SafeAreaView>
@@ -388,11 +501,17 @@ const styles = StyleSheet.create({
     padding: 16,
     alignItems: 'center',
     marginTop: 5,
+    minHeight: 52,
+    justifyContent: 'center',
   },
 
   primaryButtonText: {
     color: COLORS.white,
     fontWeight: '900',
+  },
+
+  disabled: {
+    opacity: 0.6,
   },
 
   forgotButton: {
@@ -416,7 +535,7 @@ const styles = StyleSheet.create({
   },
 
   testTitle: {
-    color: '#50D89F',
+    color: COLORS.green,
     fontWeight: '900',
     fontSize: 13,
   },
