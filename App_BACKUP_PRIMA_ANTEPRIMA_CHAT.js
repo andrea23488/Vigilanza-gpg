@@ -3,6 +3,10 @@ import {
   caricaMessaggi,
   inviaMessaggio,
   mioUserId,
+  contaMessaggiNonLetti,
+  segnaMessaggiComeLetti,
+  ultimoMessaggioNonLetto,
+  mittentiConMessaggiNonLetti,
 } from './chatApi';
 import { caricaTurniUtente, creaTurnoUtente, aggiornaTurnoUtente, eliminaTurnoUtente } from './turniApi';
 import { supabase } from './supabase';
@@ -87,6 +91,73 @@ export default function App() {
   const [chatMessaggi, setChatMessaggi] = useState([]);
   const [chatMioId, setChatMioId] = useState(null);
   const [chatLoading, setChatLoading] = useState(false);
+  const [messaggiNonLetti, setMessaggiNonLetti] = useState(0);
+  const [mittentiNonLetti, setMittentiNonLetti] = useState([]);
+
+  useEffect(() => {
+    const controllaMessaggiNonLetti = async () => {
+      try {
+        const [quanti, ultimo] = await Promise.all([
+          contaMessaggiNonLetti(),
+          ultimoMessaggioNonLetto(),
+        ]);
+
+        setMessaggiNonLetti(quanti || 0);
+
+        if (quanti > 0 && ultimo) {
+          const anteprima =
+            ultimo.testo.length > 70
+              ? ultimo.testo.slice(0, 70) + '…'
+              : ultimo.testo;
+
+          Alert.alert(
+            `💬 Nuovo messaggio da ${ultimo.nomeMittente}`,
+            quanti > 1
+              ? `${anteprima}\n\nHai ${quanti} messaggi non letti.`
+              : anteprima
+          );
+        }
+      } catch (error) {
+        console.log(
+          'Errore controllo messaggi non letti:',
+          error
+        );
+      }
+    };
+    controllaMessaggiNonLetti();
+  }, []);
+
+  useEffect(() => {
+    let attivo = true;
+
+    const aggiornaBadgeMessaggi = async () => {
+      try {
+        const [quanti, mittenti] = await Promise.all([
+          contaMessaggiNonLetti(),
+          mittentiConMessaggiNonLetti(),
+        ]);
+
+        if (attivo) {
+          setMessaggiNonLetti(quanti || 0);
+          setMittentiNonLetti(mittenti || []);
+        }
+      } catch (error) {
+        console.log('Errore aggiornamento badge messaggi:', error);
+      }
+    };
+
+    aggiornaBadgeMessaggi();
+
+    const timer = setInterval(
+      aggiornaBadgeMessaggi,
+      3000
+    );
+
+    return () => {
+      attivo = false;
+      clearInterval(timer);
+    };
+  }, []);
 
   useEffect(() => {
     if (screen !== 'chatCollega') return;
@@ -105,6 +176,16 @@ export default function App() {
           mioUserId(),
           caricaMessaggi(destinatarioId),
         ]);
+
+        await segnaMessaggiComeLetti(destinatarioId);
+
+        const [rimasti, mittentiRimasti] = await Promise.all([
+          contaMessaggiNonLetti(),
+          mittentiConMessaggiNonLetti(),
+        ]);
+
+        setMessaggiNonLetti(rimasti || 0);
+        setMittentiNonLetti(mittentiRimasti || []);
 
         if (!attivo) return;
 
@@ -1269,8 +1350,23 @@ export default function App() {
                           borderRadius: 16,
                           padding: 16,
                           marginBottom: 12,
+                    position: 'relative',
                         }}
                       >
+                  {mittentiNonLetti.includes(c.altro_user_id) ? (
+                    <View
+                      style={{
+                        position: 'absolute',
+                        top: 12,
+                        right: 12,
+                        width: 12,
+                        height: 12,
+                        borderRadius: 6,
+                        backgroundColor: '#ff3b30',
+                      }}
+                    />
+                  ) : null}
+
                         <Text
                           style={{
                             color: 'white',
@@ -1383,10 +1479,7 @@ export default function App() {
                   .filter((c) => c.stato === 'accettato')
                   .map((c) => (
                     <View
-                  onTouchEnd={() => {
-                    setCollegaSelezionato(c);
-                    setScreen('profiloCollega');
-                  }}
+                  
                       key={c.id}
                       style={{
                         backgroundColor: '#10234d',
@@ -4213,7 +4306,11 @@ export default function App() {
 
         <Menu
           icon="👥"
-          title="I miei colleghi"
+          title={
+            messaggiNonLetti > 0
+              ? "I miei colleghi 🔴"
+              : "I miei colleghi"
+          }
           subtitle="Colleghi e contatti di servizio"
           onPress={() => { setScreen("colleghi"); aggiornaColleghi(); }}
         />

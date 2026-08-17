@@ -3,6 +3,11 @@ import {
   caricaMessaggi,
   inviaMessaggio,
   mioUserId,
+  contaMessaggiNonLetti,
+  segnaMessaggiComeLetti,
+  ultimoMessaggioNonLetto,
+  mittentiConMessaggiNonLetti,
+  ultimoMessaggioConCollega,
 } from './chatApi';
 import { caricaTurniUtente, creaTurnoUtente, aggiornaTurnoUtente, eliminaTurnoUtente } from './turniApi';
 import { supabase } from './supabase';
@@ -87,6 +92,117 @@ export default function App() {
   const [chatMessaggi, setChatMessaggi] = useState([]);
   const [chatMioId, setChatMioId] = useState(null);
   const [chatLoading, setChatLoading] = useState(false);
+  const [messaggiNonLetti, setMessaggiNonLetti] = useState(0);
+  const [mittentiNonLetti, setMittentiNonLetti] = useState({});
+  const [anteprimeChat, setAnteprimeChat] = useState({});
+
+  useEffect(() => {
+    const controllaMessaggiNonLetti = async () => {
+      try {
+        const [quanti, ultimo] = await Promise.all([
+          contaMessaggiNonLetti(),
+          ultimoMessaggioNonLetto(),
+        ]);
+
+        setMessaggiNonLetti(quanti || 0);
+
+        if (quanti > 0 && ultimo) {
+          const anteprima =
+            ultimo.testo.length > 70
+              ? ultimo.testo.slice(0, 70) + '…'
+              : ultimo.testo;
+
+          Alert.alert(
+            `💬 Nuovo messaggio da ${ultimo.nomeMittente}`,
+            quanti > 1
+              ? `${anteprima}\n\nHai ${quanti} messaggi non letti.`
+              : anteprima
+          );
+        }
+      } catch (error) {
+        console.log(
+          'Errore controllo messaggi non letti:',
+          error
+        );
+      }
+    };
+    controllaMessaggiNonLetti();
+  }, []);
+
+  useEffect(() => {
+    let attivo = true;
+
+    const aggiornaBadgeMessaggi = async () => {
+      try {
+        const [quanti, mittenti] = await Promise.all([
+          contaMessaggiNonLetti(),
+          mittentiConMessaggiNonLetti(),
+        ]);
+
+        if (attivo) {
+          setMessaggiNonLetti(quanti || 0);
+          setMittentiNonLetti(mittenti || {});
+        }
+      } catch (error) {
+        console.log('Errore aggiornamento badge messaggi:', error);
+      }
+    };
+
+    aggiornaBadgeMessaggi();
+
+    const timer = setInterval(
+      aggiornaBadgeMessaggi,
+      3000
+    );
+
+    return () => {
+      attivo = false;
+      clearInterval(timer);
+    };
+  }, []);
+
+  useEffect(() => {
+    let attivo = true;
+
+    const aggiornaAnteprimeChat = async () => {
+      try {
+        const accettati = (colleghi || []).filter(
+          (c) => c.stato === 'accettato'
+        );
+
+        const risultati = await Promise.all(
+          accettati.map(async (c) => {
+            const ultimo = await ultimoMessaggioConCollega(
+              c.altro_user_id
+            );
+
+            return [c.altro_user_id, ultimo];
+          })
+        );
+
+        if (attivo) {
+          setAnteprimeChat(Object.fromEntries(risultati));
+        }
+      } catch (error) {
+        console.log(
+          'Errore anteprime chat:',
+          error
+        );
+      }
+    };
+
+    aggiornaAnteprimeChat();
+
+    const timer = setInterval(
+      aggiornaAnteprimeChat,
+      3000
+    );
+
+    return () => {
+      attivo = false;
+      clearInterval(timer);
+    };
+  }, [colleghi]);
 
   useEffect(() => {
     if (screen !== 'chatCollega') return;
@@ -105,6 +221,16 @@ export default function App() {
           mioUserId(),
           caricaMessaggi(destinatarioId),
         ]);
+
+        await segnaMessaggiComeLetti(destinatarioId);
+
+        const [rimasti, mittentiRimasti] = await Promise.all([
+          contaMessaggiNonLetti(),
+          mittentiConMessaggiNonLetti(),
+        ]);
+
+        setMessaggiNonLetti(rimasti || 0);
+        setMittentiNonLetti(mittentiRimasti || {});
 
         if (!attivo) return;
 
@@ -1016,6 +1142,7 @@ export default function App() {
         azienda: salvato.azienda || "",
         ruolo: salvato.ruolo || "",
         sede: salvato.sede || "",
+      matricola: salvato.matricola || "",
       };
 
       setProfilo(nuovoProfilo);
@@ -1269,8 +1396,38 @@ export default function App() {
                           borderRadius: 16,
                           padding: 16,
                           marginBottom: 12,
+                    position: 'relative',
                         }}
                       >
+                  {(mittentiNonLetti[c.altro_user_id] || 0) > 0 ? (
+                <View
+                  style={{
+                    position: 'absolute',
+                    top: 8,
+                    right: 8,
+                    minWidth: 22,
+                    height: 22,
+                    borderRadius: 11,
+                    backgroundColor: '#ff3b30',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    paddingHorizontal: 6,
+                  }}
+                >
+                  <Text
+                    style={{
+                      color: 'white',
+                      fontSize: 12,
+                      fontWeight: '800',
+                    }}
+                  >
+                    {mittentiNonLetti[c.altro_user_id] > 99
+                      ? '99+'
+                      : mittentiNonLetti[c.altro_user_id]}
+                  </Text>
+                </View>
+              ) : null}
+
                         <Text
                           style={{
                             color: 'white',
@@ -1381,12 +1538,19 @@ export default function App() {
               ) : (
                 colleghi
                   .filter((c) => c.stato === 'accettato')
-                  .map((c) => (
+                  .sort((a, b) => {
+                const dataA = anteprimeChat[a.altro_user_id]?.created_at;
+                const dataB = anteprimeChat[b.altro_user_id]?.created_at;
+
+                if (!dataA && !dataB) return 0;
+                if (!dataA) return 1;
+                if (!dataB) return -1;
+
+                return new Date(dataB).getTime() - new Date(dataA).getTime();
+              })
+              .map((c) => (
                     <View
-                  onTouchEnd={() => {
-                    setCollegaSelezionato(c);
-                    setScreen('profiloCollega');
-                  }}
+                  
                       key={c.id}
                       style={{
                         backgroundColor: '#10234d',
@@ -1395,6 +1559,32 @@ export default function App() {
                         marginBottom: 12,
                       }}
                     >
+              {(mittentiNonLetti[c.altro_user_id] || 0) > 0 ? (
+                <View style={{
+                  position: 'absolute',
+                  top: 8,
+                  right: 8,
+                  minWidth: 22,
+                  height: 22,
+                  borderRadius: 11,
+                  backgroundColor: '#ff3b30',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  paddingHorizontal: 6,
+                  zIndex: 10,
+                }}>
+                  <Text style={{
+                    color: 'white',
+                    fontSize: 12,
+                    fontWeight: '800',
+                  }}>
+                    {mittentiNonLetti[c.altro_user_id] > 99
+                      ? '99+'
+                      : mittentiNonLetti[c.altro_user_id]}
+                  </Text>
+                </View>
+              ) : null}
+
                       <Text
                         style={{
                           color: 'white',
@@ -1428,7 +1618,46 @@ export default function App() {
                         </Text>
                       ) : null}
 
-                      <TouchableOpacity
+                                        {anteprimeChat[c.altro_user_id] ? (
+                    <View
+                      style={{
+                        marginTop: 10,
+                        marginBottom: 4,
+                        flexDirection: 'row',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                      }}
+                    >
+                      <Text
+                        numberOfLines={1}
+                        style={{
+                          color: '#c8d2e8',
+                          fontSize: 13,
+                          flex: 1,
+                          marginRight: 12,
+                        }}
+                      >
+                        💬 {anteprimeChat[c.altro_user_id].testo}
+                      </Text>
+
+                      <Text
+                        style={{
+                          color: '#7f8ba8',
+                          fontSize: 11,
+                          fontWeight: '700',
+                        }}
+                      >
+                        {new Date(
+                          anteprimeChat[c.altro_user_id].created_at
+                        ).toLocaleTimeString('it-IT', {
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })}
+                      </Text>
+                    </View>
+                  ) : null}
+
+<TouchableOpacity
                     onPress={() => {
                       setCollegaSelezionato(c);
                       setChatMessaggio('');
@@ -1632,30 +1861,6 @@ export default function App() {
 
         </View>
       
-        {c?.stato === 'accettato' ? (
-          <TouchableOpacity
-            onPress={() => {
-              setChatMessaggio('');
-              setScreen('chatCollega');
-            }}
-            style={{
-              backgroundColor: '#284cff',
-              borderRadius: 16,
-              padding: 16,
-              alignItems: 'center',
-              marginTop: 16,
-              marginBottom: 12,
-            }}
-          >
-            <Text style={{
-              color: 'white',
-              fontSize: 15,
-              fontWeight: '900',
-            }}>
-              💬 MESSAGGIO
-            </Text>
-          </TouchableOpacity>
-        ) : null}
 
         </Screen>
     );
@@ -4205,7 +4410,7 @@ export default function App() {
       <Menu
         icon="👤"
         title="Il mio profilo"
-        subtitle={[profilo.azienda, profilo.sede].filter(Boolean).join(" • ")}
+          subtitle={[profilo.azienda, profilo.sede, profilo.matricola ? `Matricola ${profilo.matricola}` : null].filter(Boolean).join(" • ")}
         onPress={
           apriProfilo
         }
@@ -4213,7 +4418,11 @@ export default function App() {
 
         <Menu
           icon="👥"
-          title="I miei colleghi"
+          title={
+            messaggiNonLetti > 0
+              ? "I miei colleghi 🔴"
+              : "I miei colleghi"
+          }
           subtitle="Colleghi e contatti di servizio"
           onPress={() => { setScreen("colleghi"); aggiornaColleghi(); }}
         />

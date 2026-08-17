@@ -29,7 +29,6 @@ export default function LoginScreen({ onEnterTest }) {
   const [mode, setMode] = useState('login');
 
   const [email, setEmail] = useState('');
-  const [matricola, setMatricola] = useState('');
   const [password, setPassword] = useState('');
   const [nome, setNome] = useState('');
   const [cognome, setCognome] = useState('');
@@ -82,7 +81,6 @@ export default function LoginScreen({ onEnterTest }) {
           data: {
             nome: nome.trim(),
             cognome: cognome.trim(),
-          matricola: matricola.trim() || null,
           },
         },
       });
@@ -257,15 +255,6 @@ export default function LoginScreen({ onEnterTest }) {
               />
             </>
           )}
-
-        {mode === "register" && (
-          <Field
-            label="NUMERO DI MATRICOLA (FACOLTATIVO)"
-            value={matricola}
-            onChange={setMatricola}
-            placeholder="Es. 123456"
-          />
-        )}
 
           <Field
             label="EMAIL"

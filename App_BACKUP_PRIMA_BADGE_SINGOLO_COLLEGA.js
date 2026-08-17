@@ -3,6 +3,9 @@ import {
   caricaMessaggi,
   inviaMessaggio,
   mioUserId,
+  contaMessaggiNonLetti,
+  segnaMessaggiComeLetti,
+  ultimoMessaggioNonLetto,
 } from './chatApi';
 import { caricaTurniUtente, creaTurnoUtente, aggiornaTurnoUtente, eliminaTurnoUtente } from './turniApi';
 import { supabase } from './supabase';
@@ -87,6 +90,68 @@ export default function App() {
   const [chatMessaggi, setChatMessaggi] = useState([]);
   const [chatMioId, setChatMioId] = useState(null);
   const [chatLoading, setChatLoading] = useState(false);
+  const [messaggiNonLetti, setMessaggiNonLetti] = useState(0);
+
+  useEffect(() => {
+    const controllaMessaggiNonLetti = async () => {
+      try {
+        const [quanti, ultimo] = await Promise.all([
+          contaMessaggiNonLetti(),
+          ultimoMessaggioNonLetto(),
+        ]);
+
+        setMessaggiNonLetti(quanti || 0);
+
+        if (quanti > 0 && ultimo) {
+          const anteprima =
+            ultimo.testo.length > 70
+              ? ultimo.testo.slice(0, 70) + '…'
+              : ultimo.testo;
+
+          Alert.alert(
+            `💬 Nuovo messaggio da ${ultimo.nomeMittente}`,
+            quanti > 1
+              ? `${anteprima}\n\nHai ${quanti} messaggi non letti.`
+              : anteprima
+          );
+        }
+      } catch (error) {
+        console.log(
+          'Errore controllo messaggi non letti:',
+          error
+        );
+      }
+    };
+    controllaMessaggiNonLetti();
+  }, []);
+
+  useEffect(() => {
+    let attivo = true;
+
+    const aggiornaBadgeMessaggi = async () => {
+      try {
+        const quanti = await contaMessaggiNonLetti();
+
+        if (attivo) {
+          setMessaggiNonLetti(quanti || 0);
+        }
+      } catch (error) {
+        console.log('Errore aggiornamento badge messaggi:', error);
+      }
+    };
+
+    aggiornaBadgeMessaggi();
+
+    const timer = setInterval(
+      aggiornaBadgeMessaggi,
+      3000
+    );
+
+    return () => {
+      attivo = false;
+      clearInterval(timer);
+    };
+  }, []);
 
   useEffect(() => {
     if (screen !== 'chatCollega') return;
@@ -105,6 +170,11 @@ export default function App() {
           mioUserId(),
           caricaMessaggi(destinatarioId),
         ]);
+
+        await segnaMessaggiComeLetti(destinatarioId);
+
+        const rimasti = await contaMessaggiNonLetti();
+        setMessaggiNonLetti(rimasti || 0);
 
         if (!attivo) return;
 
@@ -1383,10 +1453,7 @@ export default function App() {
                   .filter((c) => c.stato === 'accettato')
                   .map((c) => (
                     <View
-                  onTouchEnd={() => {
-                    setCollegaSelezionato(c);
-                    setScreen('profiloCollega');
-                  }}
+                  
                       key={c.id}
                       style={{
                         backgroundColor: '#10234d',
@@ -4213,7 +4280,11 @@ export default function App() {
 
         <Menu
           icon="👥"
-          title="I miei colleghi"
+          title={
+            messaggiNonLetti > 0
+              ? "I miei colleghi 🔴"
+              : "I miei colleghi"
+          }
           subtitle="Colleghi e contatti di servizio"
           onPress={() => { setScreen("colleghi"); aggiornaColleghi(); }}
         />

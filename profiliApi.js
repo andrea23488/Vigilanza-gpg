@@ -44,6 +44,7 @@ export async function salvaProfiloUtente(profilo) {
     cognome: profilo.cognome || '',
     azienda: profilo.azienda || '',
     ruolo: profilo.ruolo || '',
+    matricola: profilo.matricola || null,
     sede: profilo.sede || '',
     updated_at: new Date().toISOString(),
   };

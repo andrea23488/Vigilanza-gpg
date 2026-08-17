@@ -57,7 +57,7 @@ export async function caricaColleghiInServizio(giorno, mese, anno) {
           ? riga.collega_id
           : riga.user_id;
 
-        const { data: profilo, error: profiloError } = await supabase
+      const { data: profilo, error: profiloError } = await supabase
         .from('profili')
         .select('nome, cognome, azienda, sede, foto_url, codice_gpg')
         .eq('user_id', altroUserId)
@@ -100,4 +100,3 @@ export async function caricaColleghiInServizio(giorno, mese, anno) {
 
   return risultati;
 }
-

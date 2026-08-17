@@ -89,28 +89,7 @@ export async function aggiungiCollega(codiceGpg) {
     .select()
     .single();
 
-  if (error) {
-    if (error.code === '23505') {
-      const { data: esistente } = await supabase
-        .from('colleghi')
-        .select('stato')
-        .eq('user_id', user.id)
-        .eq('collega_id', collegaId)
-        .maybeSingle();
-
-      if (esistente?.stato === 'accettato') {
-        throw new Error('Siete già colleghi.');
-      }
-
-      if (esistente?.stato === 'in_attesa') {
-        throw new Error('Richiesta già inviata.');
-      }
-
-      throw new Error('Collegamento già esistente.');
-    }
-
-    throw error;
-  }
+  if (error) throw error;
 
   return data;
 }

@@ -3,6 +3,9 @@ import {
   caricaMessaggi,
   inviaMessaggio,
   mioUserId,
+  contaMessaggiNonLetti,
+  segnaMessaggiComeLetti,
+  ultimoMessaggioNonLetto,
 } from './chatApi';
 import { caricaTurniUtente, creaTurnoUtente, aggiornaTurnoUtente, eliminaTurnoUtente } from './turniApi';
 import { supabase } from './supabase';
@@ -89,6 +92,37 @@ export default function App() {
   const [chatLoading, setChatLoading] = useState(false);
 
   useEffect(() => {
+    const controllaMessaggiNonLetti = async () => {
+      try {
+        const [quanti, ultimo] = await Promise.all([
+          contaMessaggiNonLetti(),
+          ultimoMessaggioNonLetto(),
+        ]);
+
+        if (quanti > 0 && ultimo) {
+          const anteprima =
+            ultimo.testo.length > 70
+              ? ultimo.testo.slice(0, 70) + '…'
+              : ultimo.testo;
+
+          Alert.alert(
+            `💬 Nuovo messaggio da ${ultimo.nomeMittente}`,
+            quanti > 1
+              ? `${anteprima}\n\nHai ${quanti} messaggi non letti.`
+              : anteprima
+          );
+        }
+      } catch (error) {
+        console.log(
+          'Errore controllo messaggi non letti:',
+          error
+        );
+      }
+    };
+    controllaMessaggiNonLetti();
+  }, []);
+
+  useEffect(() => {
     if (screen !== 'chatCollega') return;
 
     const destinatarioId = collegaSelezionato?.altro_user_id;
@@ -105,6 +139,8 @@ export default function App() {
           mioUserId(),
           caricaMessaggi(destinatarioId),
         ]);
+
+        await segnaMessaggiComeLetti(destinatarioId);
 
         if (!attivo) return;
 
@@ -1383,10 +1419,7 @@ export default function App() {
                   .filter((c) => c.stato === 'accettato')
                   .map((c) => (
                     <View
-                  onTouchEnd={() => {
-                    setCollegaSelezionato(c);
-                    setScreen('profiloCollega');
-                  }}
+                  
                       key={c.id}
                       style={{
                         backgroundColor: '#10234d',
