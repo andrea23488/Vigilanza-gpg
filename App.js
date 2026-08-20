@@ -1186,7 +1186,7 @@ export default function App() {
 
           <View
             style={{
-              backgroundColor: '#10234d',
+              backgroundColor: '#07101F',
               borderRadius: 18,
               padding: 16,
               marginBottom: 22,
@@ -1241,7 +1241,7 @@ export default function App() {
             onPress={aggiornaColleghi}
             style={{ marginBottom: 18 }}
           >
-            <Text style={{ color: '#52a2ff', fontWeight: '700' }}>
+            <Text style={{ color: '#45E36F', fontWeight: '700' }}>
               ↻ Aggiorna elenco
             </Text>
           </TouchableOpacity>
@@ -1273,7 +1273,7 @@ export default function App() {
                       <View
                         key={c.id}
                         style={{
-                          backgroundColor: '#10234d',
+                          backgroundColor: '#07101F',
                           borderRadius: 16,
                           padding: 16,
                           marginBottom: 12,
@@ -1371,7 +1371,7 @@ export default function App() {
               {colleghi.filter((c) => c.stato === 'accettato').length === 0 ? (
                 <View
                   style={{
-                    backgroundColor: '#10234d',
+                    backgroundColor: '#07101F',
                     borderRadius: 18,
                     padding: 22,
                   }}
@@ -1397,7 +1397,7 @@ export default function App() {
                   }}
                       key={c.id}
                       style={{
-                        backgroundColor: '#10234d',
+                        backgroundColor: '#07101F',
                         borderRadius: 16,
                         padding: 16,
                         marginBottom: 12,
@@ -1527,7 +1527,7 @@ export default function App() {
         </Text>
 
         <View style={{
-          backgroundColor: '#10234d',
+          backgroundColor: '#07101F',
           borderRadius: 20,
           padding: 18,
           gap: 14,
@@ -1961,7 +1961,7 @@ export default function App() {
     const turnoGiaMaturato = (turno) => {
       if (!turno?.giorno) return true;
 
-      const dataTurno = new Date(`${turno.giorno}T12:00:00`);
+      const dataTurno = new Date(Number(turno.anno), Number(turno.mese) - 1, Number(turno.giorno), 12, 0, 0);
       if (Number.isNaN(dataTurno.getTime())) return true;
 
       return dataTurno <= oggiCalcolo;
@@ -2115,7 +2115,7 @@ export default function App() {
 
         <View
           style={{
-            backgroundColor: '#10234d',
+            backgroundColor: '#07101F',
             borderRadius: 20,
             padding: 18,
             marginBottom: 14,
@@ -2147,7 +2147,7 @@ export default function App() {
           <View
             style={{
               flex: 1,
-              backgroundColor: '#10234d',
+              backgroundColor: '#07101F',
               borderRadius: 18,
               padding: 16,
             }}
@@ -2163,7 +2163,7 @@ export default function App() {
           <View
             style={{
               flex: 1,
-              backgroundColor: '#10234d',
+              backgroundColor: '#07101F',
               borderRadius: 18,
               padding: 16,
             }}
@@ -2179,7 +2179,7 @@ export default function App() {
 
         <View
           style={{
-            backgroundColor: '#10234d',
+            backgroundColor: '#07101F',
             borderRadius: 20,
             padding: 18,
           }}
@@ -2353,7 +2353,7 @@ export default function App() {
                 fontWeight: '900',
                 marginTop: 5,
               }}>
-                € {riepilogoTemporale.futuroNetto.toFixed(2)}
+                    € {economiaFutura.netto.toFixed(2).replace(".", ",")}
               </Text>
 
               <Text style={{
@@ -2361,7 +2361,7 @@ export default function App() {
                 fontSize: 12,
                 marginTop: 4,
               }}>
-                {riepilogoTemporale.oreFuture.toFixed(1)} ore programmate
+                    {turniFuturi.reduce((tot, turno) => tot + Number(calcolaOreTurno(turno.inizio, turno.fine) || 0), 0).toFixed(1).replace(".", ",")} ore programmate
               </Text>
 
               <View
@@ -2435,7 +2435,7 @@ export default function App() {
 
               <View
                 style={{
-                  backgroundColor: '#10234d',
+                  backgroundColor: '#07101F',
                   borderRadius: 14,
                   padding: 14,
                   marginTop: 18,
@@ -2683,7 +2683,7 @@ export default function App() {
                   setScreen('chatCollega');
                 }}
                 style={{
-                  backgroundColor: '#10234d',
+                  backgroundColor: '#07101F',
                   borderRadius: 18,
                   padding: 16,
                   marginBottom: 12,
@@ -2916,7 +2916,7 @@ export default function App() {
             placeholderTextColor="#7184aa"
             style={{
               flex: 1,
-              backgroundColor: '#10234d',
+              backgroundColor: '#07101F',
               color: 'white',
               borderRadius: 16,
               paddingHorizontal: 16,
@@ -3054,7 +3054,7 @@ export default function App() {
 
         <View
           style={{
-            backgroundColor: '#10234d',
+            backgroundColor: '#07101F',
             borderRadius: 20,
             padding: 18,
             marginBottom: 16,
@@ -3080,7 +3080,7 @@ export default function App() {
 
         <View
           style={{
-            backgroundColor: '#10234d',
+            backgroundColor: '#07101F',
             borderRadius: 20,
             padding: 18,
           }}
@@ -4186,379 +4186,247 @@ export default function App() {
 
   return (
     <Screen>
-      <View
-        style={
-          styles.header
-        }
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: 120 }}
       >
-        <TouchableOpacity
-          style={{
-            flex: 1,
-          }}
-          onPress={
-            apriProfilo
-          }
-        >
-          <Text
-            style={
-              styles.welcome
-            }
-          >
-            Buon servizio,{' '}
-            {profilo.nome} 👋
-          </Text>
 
-          <Text
-            style={
-              styles.company
-            }
-          >
-            {profilo.azienda}{' '}
-            •{' '}
-            {profilo.ruolo}
-          </Text>
-        </TouchableOpacity>
+        {/* HEADER WOW */}
+        <View style={{paddingHorizontal:20,paddingTop:10,paddingBottom:18}}>
+          <View style={{flexDirection:'row',alignItems:'center',justifyContent:'space-between'}}>
+            <TouchableOpacity onPress={apriProfilo} style={{flex:1}}>
+              <Text style={{color:'#FFFFFF',fontSize:19,fontWeight:'700'}}>
+                Buon servizio,
+              </Text>
+              <Text style={{color:'#FFFFFF',fontSize:32,fontWeight:'900',lineHeight:35}}>
+                {profilo.nome} 👋
+              </Text>
+              <Text style={{color:'#AEB9D6',fontSize:13,fontWeight:'700',marginTop:5}}>
+                {profilo.azienda}{' • '}{profilo.ruolo}
+              </Text>
+            </TouchableOpacity>
 
-        <TouchableOpacity
-          style={
-            styles.avatar
-          }
-          onPress={
-            apriProfilo
-          }
-        >
-          {fotoProfilo ? (
-            <Image
-              source={{
-                uri:
-                  fotoProfilo,
+            <TouchableOpacity
+              onPress={apriProfilo}
+              style={{
+                width:64,height:64,borderRadius:32,
+                borderWidth:2,borderColor:'#8DB8FF',
+                alignItems:'center',justifyContent:'center',
+                overflow:'hidden',backgroundColor:'#142044'
               }}
-              style={
-                styles.avatarImage
-              }
-            />
-          ) : (
-            <Text
-              style={
-                styles.avatarText
-              }
             >
-              {iniziali}
-            </Text>
-          )}
-        </TouchableOpacity>
-      </View>
-
-      <View
-        style={{
-          backgroundColor: '#102a52',
-          borderRadius: 24,
-          padding: 20,
-          marginBottom: 18,
-          borderWidth: 1,
-          borderColor: '#315f9e',
-          shadowColor: '#000',
-          shadowOpacity: 0.30,
-          shadowRadius: 14,
-          shadowOffset: { width: 0, height: 8 },
-          elevation: 8,
-        }}
-      >
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-          <View>
-            <Text style={{ color: '#73b7ff', fontSize: 11, fontWeight: '900', letterSpacing: 1.2 }}>
-              PANORAMICA MENSILE
-            </Text>
-            <Text style={{ color: 'white', fontSize: 29, fontWeight: '900', marginTop: 4 }}>
-              {MESI[mese]} {anno}
-            </Text>
+              {fotoProfilo ? (
+                <Image
+                  source={{uri:fotoProfilo}}
+                  style={{width:'100%',height:'100%'}}
+                />
+              ) : (
+                <Ionicons name="person" size={30} color="#FFFFFF" />
+              )}
+            </TouchableOpacity>
           </View>
 
           <View style={{
-            backgroundColor: '#173b70',
-            borderRadius: 14,
-            paddingHorizontal: 11,
-            paddingVertical: 7,
-            borderWidth: 1,
-            borderColor: '#315f9e',
+            alignSelf:'flex-start',marginTop:13,
+            backgroundColor:'rgba(41,255,102,0.10)',
+            borderRadius:20,paddingHorizontal:12,paddingVertical:7
           }}>
-            <Text style={{ color: '#8bc7ff', fontSize: 11, fontWeight: '800' }}>
-              IN CORSO
+            <Text style={{color:'#42F56C',fontWeight:'900',fontSize:12}}>
+              ● IN SERVIZIO
             </Text>
           </View>
         </View>
 
+        {/* MESE */}
         <View style={{
-          height: 1,
-          backgroundColor: '#315f9e',
-          marginVertical: 17,
-          opacity: 0.7,
-        }} />
-
-        <View style={{ flexDirection: 'row' }}>
-          <View style={{ flex: 1 }}>
-            <Text style={{ color: 'white', fontSize: 23, fontWeight: '900' }}>
-              {statistiche.ore}h
+          marginHorizontal:16,marginBottom:16,padding:17,
+          borderRadius:22,
+          backgroundColor:'#101D4B',
+          borderWidth:1,borderColor:'#284995'
+        }}>
+          <View style={{flexDirection:'row',justifyContent:'space-between',alignItems:'center'}}>
+            <Text style={{color:'#FFFFFF',fontSize:18,fontWeight:'900'}}>
+              AGOSTO 2026
             </Text>
-            <Text style={{ color: '#9fb2d9', fontSize: 11, marginTop: 2 }}>ORE TOTALI</Text>
+            <Ionicons name="calendar-outline" size={23} color="#C9B6FF" />
           </View>
 
-          <View style={{ width: 1, backgroundColor: '#315f9e', marginHorizontal: 12 }} />
+          <View style={{flexDirection:'row',marginTop:16,gap:8}}>
+            <View style={{flex:1,backgroundColor:'#0B1638',borderRadius:15,padding:12}}>
+              <Ionicons name="time-outline" size={24} color="#9FB1FF" />
+              <Text style={{color:'white',fontSize:23,fontWeight:'900',marginTop:9}}>
+                169,5h
+              </Text>
+              <Text style={{color:'#B8C1DA',fontSize:10,fontWeight:'800'}}>LAVORATE</Text>
+            </View>
 
-          <View style={{ flex: 1 }}>
-            <Text style={{ color: '#65d6ff', fontSize: 23, fontWeight: '900' }}>
-              {statistiche.extraOre}h
-            </Text>
-            <Text style={{ color: '#9fb2d9', fontSize: 11, marginTop: 2 }}>EXTRA</Text>
+            <View style={{flex:1,backgroundColor:'#0B1638',borderRadius:15,padding:12}}>
+              <Ionicons name="star-outline" size={24} color="#FFD24A" />
+              <Text style={{color:'white',fontSize:23,fontWeight:'900',marginTop:9}}>
+                38h
+              </Text>
+              <Text style={{color:'#B8C1DA',fontSize:10,fontWeight:'800'}}>EXTRA</Text>
+            </View>
+
+            <View style={{flex:1,backgroundColor:'#0B1638',borderRadius:15,padding:12}}>
+              <Ionicons name="calendar-number-outline" size={24} color="#FFB7EA" />
+              <Text style={{color:'white',fontSize:23,fontWeight:'900',marginTop:9}}>
+                19
+              </Text>
+              <Text style={{color:'#B8C1DA',fontSize:10,fontWeight:'800'}}>GIORNI</Text>
+            </View>
           </View>
 
-          <View style={{ width: 1, backgroundColor: '#315f9e', marginHorizontal: 12 }} />
+          <View style={{flexDirection:'row',justifyContent:'space-between',marginTop:16}}>
+            <Text style={{color:'#AEB9D6',fontSize:11,fontWeight:'800'}}>AVANZAMENTO MESE</Text>
+            <Text style={{color:'#FFFFFF',fontSize:12,fontWeight:'900'}}>
+                {Math.round((new Date().getDate() / new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate()) * 100)}%
+              </Text>
+          </View>
 
-          <View style={{ flex: 1 }}>
-            <Text style={{ color: 'white', fontSize: 23, fontWeight: '900' }}>
-              {statistiche.giorni}
-            </Text>
-            <Text style={{ color: '#9fb2d9', fontSize: 11, marginTop: 2 }}>GIORNI</Text>
+          <View style={{height:6,borderRadius:10,backgroundColor:'#19264A',marginTop:7,overflow:'hidden'}}>
+              <View style={{
+                height:'100%',
+                width:`${Math.round((new Date().getDate() / new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate()) * 100)}%`,
+                borderRadius:10,
+                backgroundColor:'#9CFF45'
+              }}/>
+            <View style={{width:'68%',height:'100%',borderRadius:10,backgroundColor:'#53E36D'}} />
           </View>
         </View>
-      </View>
 
-      
-          <View
-            style={{
-              backgroundColor: '#10234d',
-              borderRadius: 20,
-              padding: 18,
-              marginBottom: 14,
-            }}
-          >
-            <TouchableOpacity
-  onPress={() => setScreen('stipendio')}
-  style={{
-    backgroundColor: '#162f72',
-    borderRadius: 28,
-    padding: 22,
-    marginBottom: 14,
-    borderWidth: 2,
-    borderColor: '#5271ff',
-  }}
->
-  <Text style={{
-    color: '#5a8cff',
-    fontSize: 11,
-    fontWeight: '900',
-    marginBottom: 8,
-  }}>
-    💰 STIPENDIO
-  </Text>
-
-  <Text style={{
-    color: 'white',
-    fontSize: 21,
-    fontWeight: '900',
-  }}>
-    Stipendio stimato
-  </Text>
-
-  <Text style={{
-    color: '#9fb2d9',
-    fontSize: 14,
-    marginTop: 6,
-  }}>
-    Calcola quanto stai maturando questo mese →
-  </Text>
-</TouchableOpacity>
-
-          <Text
-              style={{
-                color: '#52a2ff',
-                fontSize: 11,
-                fontWeight: '900',
-                marginBottom: 8,
-              }}
-            >
-              TURNO DI OGGI
-            </Text>
-
-            <Text
-              style={{
-                color: 'white',
-                fontSize: 20,
-                fontWeight: '800',
-              }}
-            >
-              {turnoOggi
-                ? `${turnoOggi.inizio || '--:--'} – ${turnoOggi.fine || '--:--'}`
-                : 'Nessun turno oggi'}
-            </Text>
-
-            <Text
-              style={{
-                color: '#9fb2d9',
-                fontSize: 13,
-                marginTop: 6,
-              }}
-            >
-              {turnoOggi
-                ? `📍 ${turnoOggi.luogo || 'Luogo non indicato'}`
-                : 'Giornata libera'}
-            </Text>
-        {turnoOggi && (
-          <TouchableOpacity onPress={() => modificaGiorno(turnoOggi)} style={{ marginTop: 12 }}>
-            <Text style={{ color: "#5a8cff", fontWeight: "800" }}>GESTISCI TURNO ›</Text>
-          </TouchableOpacity>
-        )}
-          </View>
-
-<View
-        style={{
-          backgroundColor: '#10234d',
-          borderRadius: 20,
-          padding: 18,
-          marginBottom: 22,
-        }}
-      >
-        <Text
+        {/* TURNO OGGI */}
+        <TouchableOpacity
+          activeOpacity={0.85}
+          onPress={() => setScreen('calendar')}
           style={{
-            color: '#52a2ff',
-            fontSize: 11,
-            fontWeight: '900',
-            marginBottom: 8,
+            marginHorizontal:16,marginBottom:14,padding:17,
+            borderRadius:20,backgroundColor:'#07110E',
+            borderWidth:1.5,borderColor:'#46E764'
           }}
         >
-          IN SERVIZIO CON TE
+          <View style={{flexDirection:'row',justifyContent:'space-between'}}>
+            <View style={{flex:1}}>
+              <Text style={{color:'#4BE66B',fontSize:12,fontWeight:'900'}}>
+                TURNO DI OGGI
+              </Text>
+
+        <Text style={{color:'#FFFFFF',fontSize:29,fontWeight:'900',marginTop:8}}>
+          {turnoOggi
+            ? (turnoOggi.tipo === 'turno'
+                ? `${turnoOggi.inizio || '--:--'} - ${turnoOggi.fine || '--:--'}`
+                : '🌿 RIPOSO')
+            : '--:-- - --:--'}
         </Text>
 
-        {loadingServizio ? (
-          <ActivityIndicator />
-        ) : colleghiInServizio.length === 0 ? (
-          <Text style={{ color: '#9fb2d9' }}>
+        <Text style={{color:'#C8D0E0',fontSize:14,marginTop:6}}>
+                📍 {turnoOggi ? (turnoOggi.luogo || 'Luogo non indicato') : 'Luogo non indicato'}
+              </Text>
+            </View>
+
+            <View style={{
+              width:62,height:62,borderRadius:31,
+              borderWidth:2,borderColor:'#43ED63',
+              alignItems:'center',justifyContent:'center',
+              backgroundColor:'rgba(46,255,85,0.08)'
+            }}>
+              <Ionicons name="time-outline" size={37} color="#43ED63" />
+            </View>
+          </View>
+        </TouchableOpacity>
+
+        {/* STIPENDIO */}
+        <TouchableOpacity
+          activeOpacity={0.85}
+          onPress={() => setScreen('stipendio')}
+          style={{
+            marginHorizontal:16,marginBottom:14,
+            backgroundColor:'#0D1428',borderRadius:17,
+            borderWidth:1,borderColor:'#222E4C',
+            padding:15,flexDirection:'row',
+            alignItems:'center'
+          }}
+        >
+          <Ionicons name="wallet-outline" size={25} color="#55E86E" />
+          <View style={{flex:1,marginLeft:13}}>
+            <Text style={{color:'#FFFFFF',fontSize:14,fontWeight:'900'}}>
+              STIPENDIO STIMATO
+            </Text>
+            <Text style={{color:'#AEB7CB',fontSize:11,marginTop:3}}>
+              Calcola quanto stai maturando questo mese →
+            </Text>
+          </View>
+          <Ionicons name="chevron-forward" size={24} color="#FFFFFF" />
+        </TouchableOpacity>
+
+        {/* COLLEGA */}
+        <View style={{
+          marginHorizontal:16,marginBottom:18,padding:16,
+          borderRadius:19,backgroundColor:'#101725',
+          borderWidth:1,borderColor:'#1E2B3E'
+        }}>
+          <Text style={{color:'#4BE66B',fontSize:12,fontWeight:'900',marginBottom:10}}>
+            IN SERVIZIO CON TE
+          </Text>
+
+          <Text style={{color:'#FFFFFF',fontSize:14,fontWeight:'700'}}>
             Nessun collega collegato in servizio oggi
           </Text>
-        ) : (
-          colleghiInServizio.map((c, index) => (
-            <View
-                key={`${c.altro_user_id}-${index}`}
-              style={{
-                paddingVertical: 8,
-                borderBottomWidth:
-                  index < colleghiInServizio.length - 1 ? 1 : 0,
-                borderBottomColor: '#203b6a',
-              }}
-            >
-              <Text
-                style={{
-                  color: 'white',
-                  fontWeight: '800',
-                  fontSize: 16,
-                }}
-              >
-                👤 {c.profilo?.nome || 'Collega'} {c.profilo?.cognome || ''}
-              </Text>
 
-              <Text
-                style={{
-                  color: '#9fb2d9',
-                  fontSize: 12,
-                  marginTop: 3,
-                }}
-              >
-                {[c.profilo?.azienda, c.profilo?.sede]
-                  .filter(Boolean)
-                  .join(' · ')}
-              </Text>
+          <TouchableOpacity onPress={caricaTurni} style={{marginTop:10}}>
+            <Text style={{color:'#4BE66B',fontSize:12,fontWeight:'900'}}>
+              ↻ Aggiorna
+            </Text>
+          </TouchableOpacity>
+        </View>
 
-              {c.insieme_da && c.insieme_a && (
-                <Text
-                  style={{
-                    color: '#35e58b',
-                    fontWeight: '700',
-                    fontSize: 12,
-                    marginTop: 5,
-                  }}
-                >
-                  🟢 Con te dalle {c.insieme_da} alle {c.insieme_a}
-                </Text>
-              )}
-        <TouchableOpacity onPress={() => { setCollegaSelezionato(c); setScreen("profiloCollega"); }} style={{ marginTop: 8, alignSelf: "flex-start", paddingVertical: 6, paddingHorizontal: 12, borderRadius: 12, backgroundColor: "#284cff" }}><Text style={{ color: "white", fontSize: 12, fontWeight: "900" }}>VEDI ›</Text></TouchableOpacity>
-            </View>
-          ))
-        )}
+        {/* ACCESSI RAPIDI */}
+      <View style={{
+        marginHorizontal:16,
+        marginBottom:20,
+        padding:10,
+        borderRadius:20,
+        backgroundColor:'#0C1222',
+        borderWidth:1,
+        borderColor:'#222C42',
+        flexDirection:'row',
+        gap:6
+      }}>
 
         <TouchableOpacity
-          onPress={aggiornaColleghiInServizioOggi}
-          style={{ marginTop: 12 }}
-        >
-          <Text
-            style={{
-              color: '#52a2ff',
-              fontWeight: '800',
-              fontSize: 12,
-            }}
-          >
-            ↻ Aggiorna
-          </Text>
-        </TouchableOpacity>
-      </View>
-
-      <Text
-        style={
-          styles.section
-        }
-      >
-        Il tuo servizio
-      </Text>
-
-      <View
-        style={{
-          flexDirection: 'row',
-          flexWrap: 'wrap',
-          justifyContent: 'space-between',
-          marginTop: 4,
-        }}
-      >
-        <HomeServiceCard
-          icon="calendar-outline"
-          title="I miei turni"
-          subtitle="Servizi, riposi e programmazione"
           onPress={() => {
             setEditingId(null);
             setScreen('turni');
           }}
-        />
+          style={{flex:1,alignItems:'center',justifyContent:'center',paddingVertical:10}}
+        >
+          <Ionicons name="calendar-outline" size={24} color="#9D86FF" />
+          <Text style={{color:'#FFFFFF',fontSize:9,fontWeight:'800',marginTop:5}}>TURNI</Text>
+        </TouchableOpacity>
 
-        <HomeServiceCard
-          icon="calendar-number-outline"
-          title="Calendario"
-          subtitle="Consulta e modifica le giornate"
+        <TouchableOpacity
           onPress={() => {
             setEditingId(null);
             setScreen('calendar');
           }}
-        />
+          style={{flex:1,alignItems:'center',justifyContent:'center',paddingVertical:10}}
+        >
+          <Ionicons name="calendar-number-outline" size={24} color="#FFFFFF" />
+          <Text style={{color:'#FFFFFF',fontSize:9,fontWeight:'800',marginTop:5}}>CALENDARIO</Text>
+        </TouchableOpacity>
 
-        <HomeServiceCard
-          icon="person-outline"
-          title="Il mio profilo"
-          subtitle="Azienda, sede e informazioni personali"
-          onPress={apriProfilo}
-        />
-
-        <HomeServiceCard
-          icon="people-outline"
-          title="I miei colleghi"
-          subtitle="Colleghi e contatti di servizio"
+        <TouchableOpacity
           onPress={() => {
             setScreen('colleghi');
             aggiornaColleghi();
           }}
-        />
+          style={{flex:1,alignItems:'center',justifyContent:'center',paddingVertical:10}}
+        >
+          <Ionicons name="people-outline" size={24} color="#FFFFFF" />
+          <Text style={{color:'#FFFFFF',fontSize:9,fontWeight:'800',marginTop:5}}>COLLEGHI</Text>
+        </TouchableOpacity>
 
-        <HomeServiceCard
-          icon="chatbubble-ellipses-outline"
-          title="Chat"
-          subtitle="Messaggi con i tuoi colleghi"
-          wide
+        <TouchableOpacity
           onPress={async () => {
             try {
               await aggiornaColleghi();
@@ -4569,56 +4437,14 @@ export default function App() {
               Alert.alert('Errore', e?.message || 'Impossibile caricare le conversazioni.');
             }
           }}
-        />
+          style={{flex:1,alignItems:'center',justifyContent:'center',paddingVertical:10}}
+        >
+          <Ionicons name="chatbubble-ellipses-outline" size={24} color="#FFFFFF" />
+          <Text style={{color:'#FFFFFF',fontSize:9,fontWeight:'800',marginTop:5}}>CHAT</Text>
+        </TouchableOpacity>
+
       </View>
-
-      <TouchableOpacity
-        style={
-          styles.saveButton
-        }
-        onPress={() => {
-          setEditingId(
-            null
-          );
-
-          setScreen(
-            'calendar'
-          );
-        }}
-      >
-        <Text
-          style={
-            styles.saveText
-          }
-        >
-          ＋ INSERISCI GIORNATA
-        </Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity
-        style={
-          styles.syncButton
-        }
-        onPress={() =>
-          caricaTurni()
-        }
-      >
-        <Text
-          style={
-            styles.syncText
-          }
-        >
-          ↻ Sincronizza database
-        </Text>
-      </TouchableOpacity>
-
-      <Text
-        style={
-          styles.footer
-        }
-      >
-        VIGILANZA GPG TEST LIVE • DATABASE ONLINE
-      </Text>
+      </ScrollView>
     </Screen>
   );
 }
@@ -4857,7 +4683,7 @@ function HomeServiceCard({ icon, title, subtitle, onPress, wide = false }) {
         width: wide ? '100%' : '48.5%',
         minHeight: wide ? 88 : 138,
         backgroundColor: wide ? '#102B5B' : '#07172F',
-        borderRadius: 24,
+        borderRadius: 18,
         borderWidth: 1,
         borderColor: wide
           ? 'rgba(89, 166, 255, 0.90)'
@@ -4869,7 +4695,7 @@ function HomeServiceCard({ icon, title, subtitle, onPress, wide = false }) {
         alignItems: wide ? 'center' : 'flex-start',
         justifyContent: 'center',
 
-        shadowColor: '#2979FF',
+        shadowColor: '#526CFF',
         shadowOffset: { width: 0, height: 7 },
         shadowOpacity: wide ? 0.28 : 0.16,
         shadowRadius: 14,
@@ -4922,7 +4748,7 @@ function HomeServiceCard({ icon, title, subtitle, onPress, wide = false }) {
           marginBottom: wide ? 0 : 12,
           marginRight: wide ? 15 : 0,
 
-          shadowColor: '#4C9CFF',
+          shadowColor: '#526CFF',
           shadowOffset: { width: 0, height: 0 },
           shadowOpacity: 0.50,
           shadowRadius: 9,
