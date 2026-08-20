@@ -4250,76 +4250,46 @@ export default function App() {
       </View>
 
       <View
-        style={{
-          backgroundColor: '#102a52',
-          borderRadius: 24,
-          padding: 20,
-          marginBottom: 18,
-          borderWidth: 1,
-          borderColor: '#315f9e',
-          shadowColor: '#000',
-          shadowOpacity: 0.30,
-          shadowRadius: 14,
-          shadowOffset: { width: 0, height: 8 },
-          elevation: 8,
-        }}
+        style={
+          styles.hero
+        }
       >
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-          <View>
-            <Text style={{ color: '#73b7ff', fontSize: 11, fontWeight: '900', letterSpacing: 1.2 }}>
-              PANORAMICA MENSILE
-            </Text>
-            <Text style={{ color: 'white', fontSize: 29, fontWeight: '900', marginTop: 4 }}>
-              {MESI[mese]} {anno}
-            </Text>
-          </View>
+        <Text
+          style={
+            styles.heroSmall
+          }
+        >
+          QUESTO MESE
+        </Text>
 
-          <View style={{
-            backgroundColor: '#173b70',
-            borderRadius: 14,
-            paddingHorizontal: 11,
-            paddingVertical: 7,
-            borderWidth: 1,
-            borderColor: '#315f9e',
-          }}>
-            <Text style={{ color: '#8bc7ff', fontSize: 11, fontWeight: '800' }}>
-              IN CORSO
-            </Text>
-          </View>
-        </View>
+        <Text
+          style={
+            styles.heroMonth
+          }
+        >
+          {MESI[mese]}{' '}
+          {anno}
+        </Text>
 
-        <View style={{
-          height: 1,
-          backgroundColor: '#315f9e',
-          marginVertical: 17,
-          opacity: 0.7,
-        }} />
+        <View
+          style={
+            styles.heroStats
+          }
+        >
+          <HomeStat
+            label="Ore"
+            value={`${statistiche.ore}h`}
+          />
 
-        <View style={{ flexDirection: 'row' }}>
-          <View style={{ flex: 1 }}>
-            <Text style={{ color: 'white', fontSize: 23, fontWeight: '900' }}>
-              {statistiche.ore}h
-            </Text>
-            <Text style={{ color: '#9fb2d9', fontSize: 11, marginTop: 2 }}>ORE TOTALI</Text>
-          </View>
+          <HomeStat
+            label="Extra"
+            value={`${statistiche.extraOre}h`}
+          />
 
-          <View style={{ width: 1, backgroundColor: '#315f9e', marginHorizontal: 12 }} />
-
-          <View style={{ flex: 1 }}>
-            <Text style={{ color: '#65d6ff', fontSize: 23, fontWeight: '900' }}>
-              {statistiche.extraOre}h
-            </Text>
-            <Text style={{ color: '#9fb2d9', fontSize: 11, marginTop: 2 }}>EXTRA</Text>
-          </View>
-
-          <View style={{ width: 1, backgroundColor: '#315f9e', marginHorizontal: 12 }} />
-
-          <View style={{ flex: 1 }}>
-            <Text style={{ color: 'white', fontSize: 23, fontWeight: '900' }}>
-              {statistiche.giorni}
-            </Text>
-            <Text style={{ color: '#9fb2d9', fontSize: 11, marginTop: 2 }}>GIORNI</Text>
-          </View>
+          <HomeStat
+            label="Giorni"
+            value={`${statistiche.giorni}`}
+          />
         </View>
       </View>
 
@@ -5252,23 +5222,23 @@ const styles =
       opacity: 0.6,
     },
 
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 28,
-    paddingHorizontal: 8,
-    paddingTop: 14,
-    paddingBottom: 20,
+    header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 22,
+    paddingHorizontal: 4,
+    paddingTop: 6,
+    paddingBottom: 14,
     borderBottomWidth: 1,
-    borderBottomColor: "rgba(111, 181, 255, 0.22)",
-  },
+    borderBottomColor: 'rgba(91, 157, 255, 0.28)',
+    },
 
     welcome: {
     color: COLORS.white,
-    fontSize: 31,
+    fontSize: 27,
     fontWeight: '900',
-    letterSpacing: -1.2,
+    letterSpacing: -0.7,
     lineHeight: 32,
     textShadowColor: 'rgba(74, 144, 255, 0.35)',
     textShadowOffset: { width: 0, height: 2 },
@@ -5285,9 +5255,9 @@ const styles =
     },
 
     avatar: {
-    width: 66,
-    height: 66,
-    borderRadius: 33,
+    width: 58,
+    height: 58,
+    borderRadius: 29,
     backgroundColor: '#173A75',
     borderWidth: 2,
     borderColor: '#67B5FF',

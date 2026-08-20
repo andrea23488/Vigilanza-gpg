@@ -83,7 +83,6 @@ const PROFILO_DEFAULT = {
 };
 
 export default function App() {
-  const giorniSettimana = ["Dom", "Lun", "Mar", "Mer", "Gio", "Ven", "Sab"];
  const [accessoTest, setAccessoTest] = useState(false);
   const [screen, setScreen] = useState("home");
   const [stipendioCCNL, setStipendioCCNL] = useState('Vigilanza Privata e Servizi di Sicurezza');
@@ -3633,7 +3632,7 @@ export default function App() {
       <Screen>
         <Back
           onPress={
-            () => { setEditingId(null); setScreen("turni"); }
+            tornaCalendario
           }
         />
 
@@ -3995,40 +3994,13 @@ export default function App() {
           }
         />
 
-        <View style={{
-          marginBottom: 18,
-          padding: 18,
-          borderRadius: 22,
-          backgroundColor: '#101A33',
-          borderWidth: 1,
-          borderColor: 'rgba(130,160,255,0.22)',
-        }}>
-          <Text style={{
-            color: '#8FA8FF',
-            fontSize: 12,
-            fontWeight: '800',
-            letterSpacing: 1.2,
-            marginBottom: 5,
-          }}>
-            AREA PERSONALE
-          </Text>
-
-          <Text style={{
-            color: '#FFFFFF',
-            fontSize: 28,
-            fontWeight: '900',
-          }}>
-            I miei turni
-          </Text>
-
-          <Text style={{
-            color: '#8997B2',
-            fontSize: 13,
-            marginTop: 5,
-          }}>
-            {MESI[mese]} {anno} · riepilogo attività
-          </Text>
-        </View>
+        <Text
+          style={
+            styles.title
+          }
+        >
+          I miei turni
+        </Text>
 
         <Text
           style={
@@ -4102,7 +4074,7 @@ export default function App() {
         >
           <View style={styles.dayBadge}>
             <Text style={{ color: '#AFC8F5', fontSize: 11, fontWeight: '800' }}>
-                {giorniSettimana[new Date(t.data).getDay()]?.toUpperCase() || "---"}
+              {giorniSettimana[dataTurno.getDay()].toUpperCase()}
             </Text>
 
             <Text style={styles.dayBig}>
@@ -4250,76 +4222,46 @@ export default function App() {
       </View>
 
       <View
-        style={{
-          backgroundColor: '#102a52',
-          borderRadius: 24,
-          padding: 20,
-          marginBottom: 18,
-          borderWidth: 1,
-          borderColor: '#315f9e',
-          shadowColor: '#000',
-          shadowOpacity: 0.30,
-          shadowRadius: 14,
-          shadowOffset: { width: 0, height: 8 },
-          elevation: 8,
-        }}
+        style={
+          styles.hero
+        }
       >
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-          <View>
-            <Text style={{ color: '#73b7ff', fontSize: 11, fontWeight: '900', letterSpacing: 1.2 }}>
-              PANORAMICA MENSILE
-            </Text>
-            <Text style={{ color: 'white', fontSize: 29, fontWeight: '900', marginTop: 4 }}>
-              {MESI[mese]} {anno}
-            </Text>
-          </View>
+        <Text
+          style={
+            styles.heroSmall
+          }
+        >
+          QUESTO MESE
+        </Text>
 
-          <View style={{
-            backgroundColor: '#173b70',
-            borderRadius: 14,
-            paddingHorizontal: 11,
-            paddingVertical: 7,
-            borderWidth: 1,
-            borderColor: '#315f9e',
-          }}>
-            <Text style={{ color: '#8bc7ff', fontSize: 11, fontWeight: '800' }}>
-              IN CORSO
-            </Text>
-          </View>
-        </View>
+        <Text
+          style={
+            styles.heroMonth
+          }
+        >
+          {MESI[mese]}{' '}
+          {anno}
+        </Text>
 
-        <View style={{
-          height: 1,
-          backgroundColor: '#315f9e',
-          marginVertical: 17,
-          opacity: 0.7,
-        }} />
+        <View
+          style={
+            styles.heroStats
+          }
+        >
+          <HomeStat
+            label="Ore"
+            value={`${statistiche.ore}h`}
+          />
 
-        <View style={{ flexDirection: 'row' }}>
-          <View style={{ flex: 1 }}>
-            <Text style={{ color: 'white', fontSize: 23, fontWeight: '900' }}>
-              {statistiche.ore}h
-            </Text>
-            <Text style={{ color: '#9fb2d9', fontSize: 11, marginTop: 2 }}>ORE TOTALI</Text>
-          </View>
+          <HomeStat
+            label="Extra"
+            value={`${statistiche.extraOre}h`}
+          />
 
-          <View style={{ width: 1, backgroundColor: '#315f9e', marginHorizontal: 12 }} />
-
-          <View style={{ flex: 1 }}>
-            <Text style={{ color: '#65d6ff', fontSize: 23, fontWeight: '900' }}>
-              {statistiche.extraOre}h
-            </Text>
-            <Text style={{ color: '#9fb2d9', fontSize: 11, marginTop: 2 }}>EXTRA</Text>
-          </View>
-
-          <View style={{ width: 1, backgroundColor: '#315f9e', marginHorizontal: 12 }} />
-
-          <View style={{ flex: 1 }}>
-            <Text style={{ color: 'white', fontSize: 23, fontWeight: '900' }}>
-              {statistiche.giorni}
-            </Text>
-            <Text style={{ color: '#9fb2d9', fontSize: 11, marginTop: 2 }}>GIORNI</Text>
-          </View>
+          <HomeStat
+            label="Giorni"
+            value={`${statistiche.giorni}`}
+          />
         </View>
       </View>
 
@@ -4335,12 +4277,12 @@ export default function App() {
             <TouchableOpacity
   onPress={() => setScreen('stipendio')}
   style={{
-    backgroundColor: '#162f72',
-    borderRadius: 28,
-    padding: 22,
+    backgroundColor: '#10234d',
+    borderRadius: 20,
+    padding: 18,
     marginBottom: 14,
-    borderWidth: 2,
-    borderColor: '#5271ff',
+    borderWidth: 1,
+    borderColor: '#284cff',
   }}
 >
   <Text style={{
@@ -4438,6 +4380,10 @@ export default function App() {
         ) : (
           colleghiInServizio.map((c, index) => (
             <View
+                onTouchEnd={() => {
+                  setCollegaSelezionato(c);
+                  setScreen('profiloCollega');
+                }}
                 key={`${c.altro_user_id}-${index}`}
               style={{
                 paddingVertical: 8,
@@ -4480,7 +4426,6 @@ export default function App() {
                   🟢 Con te dalle {c.insieme_da} alle {c.insieme_a}
                 </Text>
               )}
-        <TouchableOpacity onPress={() => { setCollegaSelezionato(c); setScreen("profiloCollega"); }} style={{ marginTop: 8, alignSelf: "flex-start", paddingVertical: 6, paddingHorizontal: 12, borderRadius: 12, backgroundColor: "#284cff" }}><Text style={{ color: "white", fontSize: 12, fontWeight: "900" }}>VEDI ›</Text></TouchableOpacity>
             </View>
           ))
         )}
@@ -5252,23 +5197,23 @@ const styles =
       opacity: 0.6,
     },
 
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 28,
-    paddingHorizontal: 8,
-    paddingTop: 14,
-    paddingBottom: 20,
+    header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 22,
+    paddingHorizontal: 4,
+    paddingTop: 6,
+    paddingBottom: 14,
     borderBottomWidth: 1,
-    borderBottomColor: "rgba(111, 181, 255, 0.22)",
-  },
+    borderBottomColor: 'rgba(91, 157, 255, 0.28)',
+    },
 
     welcome: {
     color: COLORS.white,
-    fontSize: 31,
+    fontSize: 27,
     fontWeight: '900',
-    letterSpacing: -1.2,
+    letterSpacing: -0.7,
     lineHeight: 32,
     textShadowColor: 'rgba(74, 144, 255, 0.35)',
     textShadowOffset: { width: 0, height: 2 },
@@ -5285,9 +5230,9 @@ const styles =
     },
 
     avatar: {
-    width: 66,
-    height: 66,
-    borderRadius: 33,
+    width: 58,
+    height: 58,
+    borderRadius: 29,
     backgroundColor: '#173A75',
     borderWidth: 2,
     borderColor: '#67B5FF',

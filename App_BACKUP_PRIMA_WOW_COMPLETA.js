@@ -5266,9 +5266,9 @@ const styles =
 
     welcome: {
     color: COLORS.white,
-    fontSize: 31,
+    fontSize: 27,
     fontWeight: '900',
-    letterSpacing: -1.2,
+    letterSpacing: -0.7,
     lineHeight: 32,
     textShadowColor: 'rgba(74, 144, 255, 0.35)',
     textShadowOffset: { width: 0, height: 2 },
@@ -5285,9 +5285,9 @@ const styles =
     },
 
     avatar: {
-    width: 66,
-    height: 66,
-    borderRadius: 33,
+    width: 58,
+    height: 58,
+    borderRadius: 29,
     backgroundColor: '#173A75',
     borderWidth: 2,
     borderColor: '#67B5FF',

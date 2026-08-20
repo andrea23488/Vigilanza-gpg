@@ -5252,23 +5252,23 @@ const styles =
       opacity: 0.6,
     },
 
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 28,
-    paddingHorizontal: 8,
-    paddingTop: 14,
-    paddingBottom: 20,
+    header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 22,
+    paddingHorizontal: 4,
+    paddingTop: 6,
+    paddingBottom: 14,
     borderBottomWidth: 1,
-    borderBottomColor: "rgba(111, 181, 255, 0.22)",
-  },
+    borderBottomColor: 'rgba(91, 157, 255, 0.28)',
+    },
 
     welcome: {
     color: COLORS.white,
-    fontSize: 31,
+    fontSize: 27,
     fontWeight: '900',
-    letterSpacing: -1.2,
+    letterSpacing: -0.7,
     lineHeight: 32,
     textShadowColor: 'rgba(74, 144, 255, 0.35)',
     textShadowOffset: { width: 0, height: 2 },
@@ -5285,9 +5285,9 @@ const styles =
     },
 
     avatar: {
-    width: 66,
-    height: 66,
-    borderRadius: 33,
+    width: 58,
+    height: 58,
+    borderRadius: 29,
     backgroundColor: '#173A75',
     borderWidth: 2,
     borderColor: '#67B5FF',

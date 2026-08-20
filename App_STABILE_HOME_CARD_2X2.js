@@ -1,12 +1,8 @@
-import { Ionicons } from '@expo/vector-icons';
 import LoginScreen from './LoginScreen';
 import {
   caricaMessaggi,
   inviaMessaggio,
   mioUserId,
-  eliminaMessaggio,
-  eliminaConversazione,
-  colleghiConConversazione,
 } from './chatApi';
 import { caricaTurniUtente, creaTurnoUtente, aggiornaTurnoUtente, eliminaTurnoUtente } from './turniApi';
 import { supabase } from './supabase';
@@ -83,7 +79,6 @@ const PROFILO_DEFAULT = {
 };
 
 export default function App() {
-  const giorniSettimana = ["Dom", "Lun", "Mar", "Mer", "Gio", "Ven", "Sab"];
  const [accessoTest, setAccessoTest] = useState(false);
   const [screen, setScreen] = useState("home");
   const [stipendioCCNL, setStipendioCCNL] = useState('Vigilanza Privata e Servizi di Sicurezza');
@@ -177,7 +172,6 @@ export default function App() {
     caricaConfigurazioneStipendio();
   }, []);
   const [colleghi, setColleghi] = useState([]);
-  const [chatColleghiIds, setChatColleghiIds] = useState([]);
   const [colleghiInServizio, setColleghiInServizio] = useState([]);
   const [collegaSelezionato, setCollegaSelezionato] = useState(null);
   const [loadingServizio, setLoadingServizio] = useState(false);
@@ -2574,33 +2568,6 @@ export default function App() {
                 setChatMessaggio('');
                 setScreen('chatCollega');
               }}
-              onLongPress={() => {
-                Alert.alert(
-                  'Elimina conversazione',
-                  'Vuoi eliminare definitivamente tutti i messaggi di questa conversazione?',
-                  [
-                    { text: 'Annulla', style: 'cancel' },
-                    {
-                      text: 'Elimina',
-                      style: 'destructive',
-                      onPress: async () => {
-                        try {
-                          await eliminaConversazione(c.altro_user_id);
-                          setChatColleghiIds(prev => prev.filter(id => id !== c.altro_user_id));
-                          setChatMessaggi([]);
-                          Alert.alert('Conversazione eliminata');
-                        } catch (e) {
-                          Alert.alert(
-                            'Errore',
-                            e?.message || 'Non è stato possibile eliminare la conversazione.'
-                          );
-                        }
-                      },
-                    },
-                  ]
-                );
-
-              }}
               style={{
                 backgroundColor: '#102968',
                 borderRadius: 16,
@@ -2672,9 +2639,7 @@ export default function App() {
               Nessun collega disponibile.
             </Text>
           ) : (
-            colleghi
-              .filter((c) => chatColleghiIds.includes(c.altro_user_id))
-              .map((c) => (
+            colleghi.map((c) => (
               <TouchableOpacity
                 key={c.id}
                 onPress={() => {
@@ -2842,31 +2807,8 @@ export default function App() {
               const mio = m.mittente_id === chatMioId;
 
               return (
-                <TouchableOpacity
+                <View
                   key={m.id}
-            activeOpacity={0.85}
-            onLongPress={() => {
-              if (!mio) return;
-              Alert.alert(
-                'Elimina messaggio',
-                'Vuoi eliminare definitivamente questo messaggio?',
-                [
-                  { text: 'Annulla', style: 'cancel' },
-                  {
-                    text: 'Elimina',
-                    style: 'destructive',
-                    onPress: async () => {
-                      try {
-                        await eliminaMessaggio(m.id);
-                        setChatMessaggi(prev => prev.filter(msg => msg.id !== m.id));
-                      } catch (e) {
-                        Alert.alert('Errore', 'Non è stato possibile eliminare il messaggio.');
-                      }
-                    },
-                  },
-                ]
-              );
-            }}
                   style={{
                     alignSelf: mio ? 'flex-end' : 'flex-start',
                     backgroundColor: mio ? '#284cff' : '#10234d',
@@ -2898,7 +2840,7 @@ export default function App() {
                       }
                     )}
                   </Text>
-                </TouchableOpacity>
+                </View>
               );
             })
           )}
@@ -3633,7 +3575,7 @@ export default function App() {
       <Screen>
         <Back
           onPress={
-            () => { setEditingId(null); setScreen("turni"); }
+            tornaCalendario
           }
         />
 
@@ -3963,30 +3905,6 @@ export default function App() {
           )
       );
 
-    const turniLavorati = ordinati.filter(t => t.tipo === "turno");
-    const minutiTotali = turniLavorati.reduce((tot, t) => {
-      if (!t.inizio || !t.fine) return tot;
-      const [hi, mi] = t.inizio.split(":").map(Number);
-      const [hf, mf] = t.fine.split(":").map(Number);
-      let minuti = (hf * 60 + mf) - (hi * 60 + mi);
-      if (minuti < 0) minuti += 24 * 60;
-      return tot + minuti;
-    }, 0);
-    const oreTotali = Math.round(minutiTotali / 60);
-    const minutiStraordinari = turniLavorati.reduce((tot, t) => {
-      if (!t.inizio || !t.fine) return tot;
-      const [hi, mi] = t.inizio.split(":").map(Number);
-      const [hf, mf] = t.fine.split(":").map(Number);
-      let minuti = (hf * 60 + mf) - (hi * 60 + mi);
-      if (minuti < 0) minuti += 24 * 60;
-      return tot + Math.max(0, minuti - 480);
-    }, 0);
-    const oreStraordinari = Math.round(minutiStraordinari / 60);
-    const turniNotte = turniLavorati.filter(t => {
-      if (!t.inizio) return false;
-      const ora = Number(t.inizio.split(":")[0]);
-      return ora >= 20 || ora < 6;
-    }).length;
     return (
       <Screen>
         <Back
@@ -3995,40 +3913,13 @@ export default function App() {
           }
         />
 
-        <View style={{
-          marginBottom: 18,
-          padding: 18,
-          borderRadius: 22,
-          backgroundColor: '#101A33',
-          borderWidth: 1,
-          borderColor: 'rgba(130,160,255,0.22)',
-        }}>
-          <Text style={{
-            color: '#8FA8FF',
-            fontSize: 12,
-            fontWeight: '800',
-            letterSpacing: 1.2,
-            marginBottom: 5,
-          }}>
-            AREA PERSONALE
-          </Text>
-
-          <Text style={{
-            color: '#FFFFFF',
-            fontSize: 28,
-            fontWeight: '900',
-          }}>
-            I miei turni
-          </Text>
-
-          <Text style={{
-            color: '#8997B2',
-            fontSize: 13,
-            marginTop: 5,
-          }}>
-            {MESI[mese]} {anno} · riepilogo attività
-          </Text>
-        </View>
+        <Text
+          style={
+            styles.title
+          }
+        >
+          I miei turni
+        </Text>
 
         <Text
           style={
@@ -4038,30 +3929,6 @@ export default function App() {
           {MESI[mese]}{' '}
           {anno}
         </Text>
-        <View style={{ backgroundColor: "#07152E", borderRadius: 16, borderWidth: 1, borderColor: "rgba(72,132,255,0.30)", marginTop: 14, marginBottom: 16, paddingVertical: 16, paddingHorizontal: 8 }}>
-          <View style={{ flexDirection: "row", justifyContent: "space-around" }}>
-            <View style={{ flex: 1, alignItems: "center" }}>
-              <Ionicons name="calendar-outline" size={22} color="#AFC8F5" />
-              <Text style={{ color: "#8997B2", fontSize: 10, marginTop: 6 }}>TEST NUOVO TURNI</Text>
-              <Text style={{ color: "#FFFFFF", fontSize: 18, fontWeight: "800", marginTop: 2 }}>{turniLavorati.length}</Text>
-            </View>
-            <View style={{ flex: 1, alignItems: "center" }}>
-              <Ionicons name="time-outline" size={22} color="#AFC8F5" />
-              <Text style={{ color: "#8997B2", fontSize: 10, marginTop: 6 }}>ORE TOTALI</Text>
-              <Text style={{ color: "#FFFFFF", fontSize: 18, fontWeight: "800", marginTop: 2 }}>{oreTotali}h</Text>
-            </View>
-            <View style={{ flex: 1, alignItems: "center" }}>
-              <Ionicons name="star" size={22} color="#AFC8F5" />
-              <Text style={{ color: "#8997B2", fontSize: 10, marginTop: 6 }}>STRAORD.</Text>
-              <Text style={{ color: "#FFFFFF", fontSize: 18, fontWeight: "800", marginTop: 2 }}>{oreStraordinari}h</Text>
-            </View>
-            <View style={{ flex: 1, alignItems: "center" }}>
-              <Ionicons name="moon-outline" size={22} color="#AFC8F5" />
-              <Text style={{ color: "#8997B2", fontSize: 10, marginTop: 6 }}>NOTTI</Text>
-              <Text style={{ color: "#FFFFFF", fontSize: 18, fontWeight: "800", marginTop: 2 }}>{turniNotte}</Text>
-            </View>
-          </View>
-        </View>
 
         {ordinati.length ===
         0 ? (
@@ -4090,93 +3957,66 @@ export default function App() {
           ordinati.map(
             (t) => (
               <TouchableOpacity
-          key={String(t.id)}
-          style={[
-            styles.turnCard,
-            t.tipo !== 'turno' && {
-              backgroundColor: '#092719',
-              borderColor: 'rgba(74,222,128,0.38)',
-            },
-          ]}
-          onPress={() => modificaGiorno(t)}
-        >
-          <View style={styles.dayBadge}>
-            <Text style={{ color: '#AFC8F5', fontSize: 11, fontWeight: '800' }}>
-                {giorniSettimana[new Date(t.data).getDay()]?.toUpperCase() || "---"}
-            </Text>
-
-            <Text style={styles.dayBig}>
-              {String(t.giorno).padStart(2, '0')}
-            </Text>
-
-            <Text style={{ color: '#AFC8F5', fontSize: 10, fontWeight: '700' }}>
-              {MESI[mese].toUpperCase()}
-            </Text>
-          </View>
-
-          <View style={{ flex: 1, paddingLeft: 4 }}>
-            {t.tipo === 'turno' ? (
-              <>
-                <Text style={styles.turnTitle}>
-                  {Number(t.inizio?.split(':')[0]) >= 20 || Number(t.inizio?.split(':')[0]) < 6 ? '🌙 ' : '☀️ '}
-                  {`${formattaOra(t.inizio)} – ${formattaOra(t.fine)}`}
-                </Text>
-
-                <Text style={styles.turnSub}>
-                  ◉ {t.fascia || 'Servizio'}
-                </Text>
-
-                <Text style={styles.turnSub}>
-                  ♧ {t.luogo || 'Luogo non indicato'}
-                </Text>
-
-                <View style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  flexWrap: 'wrap',
-                  marginTop: 7,
-                  gap: 6,
-                }}>
-                  <View style={{
-                    backgroundColor: 'rgba(63,93,170,0.25)',
-                    borderWidth: 1,
-                    borderColor: 'rgba(130,160,255,0.20)',
-                    borderRadius: 8,
-                    paddingHorizontal: 9,
-                    paddingVertical: 4,
-                  }}>
-                    <Text style={{
-                      color: '#EAF1FF',
-                      fontSize: 11,
-                      fontWeight: '800',
-                    }}>
-                      TURNO
-                    </Text>
-                  </View>
+                key={String(
+                  t.id
+                )}
+                style={
+                  styles.turnCard
+                }
+                onPress={() =>
+                  modificaGiorno(
+                    t
+                  )
+                }
+              >
+                <View
+                  style={
+                    styles.dayBadge
+                  }
+                >
+                  <Text
+                    style={
+                      styles.dayBig
+                    }
+                  >
+                    {t.giorno}
+                  </Text>
                 </View>
-              </>
-            ) : (
-              <>
-                <Text style={{
-                  color: '#55E47B',
-                  fontSize: 18,
-                  fontWeight: '900',
-                }}>
-                  🍃 RIPOSO
-                </Text>
 
-                <Text style={{
-                  color: '#A7CDB2',
-                  fontSize: 12,
-                  fontWeight: '600',
-                  marginTop: 5,
-                }}>
-                  ◉ Giornata non lavorata
-                </Text>
-              </>
-            )}
-          </View>
-        </TouchableOpacity>
+                <View
+                  style={{
+                    flex: 1,
+                  }}
+                >
+                  <Text
+                    style={
+                      styles.turnTitle
+                    }
+                  >
+                    {t.tipo ===
+                    'turno'
+                      ? `${formattaOra(
+                          t.inizio
+                        )} — ${formattaOra(
+                          t.fine
+                        )}`
+                      : nomeTipo(
+                          t.tipo
+                        )}
+                  </Text>
+
+                  <Text
+                    style={
+                      styles.turnSub
+                    }
+                  >
+                    {t.tipo ===
+                    'turno'
+                      ? `${t.fascia || ''} • ${t.luogo || ''}`
+                      : 'Giornata non lavorata'}
+                  </Text>
+                </View>
+              </TouchableOpacity>
             )
           )
         )}
@@ -4250,76 +4090,46 @@ export default function App() {
       </View>
 
       <View
-        style={{
-          backgroundColor: '#102a52',
-          borderRadius: 24,
-          padding: 20,
-          marginBottom: 18,
-          borderWidth: 1,
-          borderColor: '#315f9e',
-          shadowColor: '#000',
-          shadowOpacity: 0.30,
-          shadowRadius: 14,
-          shadowOffset: { width: 0, height: 8 },
-          elevation: 8,
-        }}
+        style={
+          styles.hero
+        }
       >
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-          <View>
-            <Text style={{ color: '#73b7ff', fontSize: 11, fontWeight: '900', letterSpacing: 1.2 }}>
-              PANORAMICA MENSILE
-            </Text>
-            <Text style={{ color: 'white', fontSize: 29, fontWeight: '900', marginTop: 4 }}>
-              {MESI[mese]} {anno}
-            </Text>
-          </View>
+        <Text
+          style={
+            styles.heroSmall
+          }
+        >
+          QUESTO MESE
+        </Text>
 
-          <View style={{
-            backgroundColor: '#173b70',
-            borderRadius: 14,
-            paddingHorizontal: 11,
-            paddingVertical: 7,
-            borderWidth: 1,
-            borderColor: '#315f9e',
-          }}>
-            <Text style={{ color: '#8bc7ff', fontSize: 11, fontWeight: '800' }}>
-              IN CORSO
-            </Text>
-          </View>
-        </View>
+        <Text
+          style={
+            styles.heroMonth
+          }
+        >
+          {MESI[mese]}{' '}
+          {anno}
+        </Text>
 
-        <View style={{
-          height: 1,
-          backgroundColor: '#315f9e',
-          marginVertical: 17,
-          opacity: 0.7,
-        }} />
+        <View
+          style={
+            styles.heroStats
+          }
+        >
+          <HomeStat
+            label="Ore"
+            value={`${statistiche.ore}h`}
+          />
 
-        <View style={{ flexDirection: 'row' }}>
-          <View style={{ flex: 1 }}>
-            <Text style={{ color: 'white', fontSize: 23, fontWeight: '900' }}>
-              {statistiche.ore}h
-            </Text>
-            <Text style={{ color: '#9fb2d9', fontSize: 11, marginTop: 2 }}>ORE TOTALI</Text>
-          </View>
+          <HomeStat
+            label="Extra"
+            value={`${statistiche.extraOre}h`}
+          />
 
-          <View style={{ width: 1, backgroundColor: '#315f9e', marginHorizontal: 12 }} />
-
-          <View style={{ flex: 1 }}>
-            <Text style={{ color: '#65d6ff', fontSize: 23, fontWeight: '900' }}>
-              {statistiche.extraOre}h
-            </Text>
-            <Text style={{ color: '#9fb2d9', fontSize: 11, marginTop: 2 }}>EXTRA</Text>
-          </View>
-
-          <View style={{ width: 1, backgroundColor: '#315f9e', marginHorizontal: 12 }} />
-
-          <View style={{ flex: 1 }}>
-            <Text style={{ color: 'white', fontSize: 23, fontWeight: '900' }}>
-              {statistiche.giorni}
-            </Text>
-            <Text style={{ color: '#9fb2d9', fontSize: 11, marginTop: 2 }}>GIORNI</Text>
-          </View>
+          <HomeStat
+            label="Giorni"
+            value={`${statistiche.giorni}`}
+          />
         </View>
       </View>
 
@@ -4335,12 +4145,12 @@ export default function App() {
             <TouchableOpacity
   onPress={() => setScreen('stipendio')}
   style={{
-    backgroundColor: '#162f72',
-    borderRadius: 28,
-    padding: 22,
+    backgroundColor: '#10234d',
+    borderRadius: 20,
+    padding: 18,
     marginBottom: 14,
-    borderWidth: 2,
-    borderColor: '#5271ff',
+    borderWidth: 1,
+    borderColor: '#284cff',
   }}
 >
   <Text style={{
@@ -4438,6 +4248,10 @@ export default function App() {
         ) : (
           colleghiInServizio.map((c, index) => (
             <View
+                onTouchEnd={() => {
+                  setCollegaSelezionato(c);
+                  setScreen('profiloCollega');
+                }}
                 key={`${c.altro_user_id}-${index}`}
               style={{
                 paddingVertical: 8,
@@ -4480,7 +4294,6 @@ export default function App() {
                   🟢 Con te dalle {c.insieme_da} alle {c.insieme_a}
                 </Text>
               )}
-        <TouchableOpacity onPress={() => { setCollegaSelezionato(c); setScreen("profiloCollega"); }} style={{ marginTop: 8, alignSelf: "flex-start", paddingVertical: 6, paddingHorizontal: 12, borderRadius: 12, backgroundColor: "#284cff" }}><Text style={{ color: "white", fontSize: 12, fontWeight: "900" }}>VEDI ›</Text></TouchableOpacity>
             </View>
           ))
         )}
@@ -4518,7 +4331,7 @@ export default function App() {
         }}
       >
         <HomeServiceCard
-          icon="calendar-outline"
+          icon="📅"
           title="I miei turni"
           subtitle="Servizi, riposi e programmazione"
           onPress={() => {
@@ -4528,7 +4341,7 @@ export default function App() {
         />
 
         <HomeServiceCard
-          icon="calendar-number-outline"
+          icon="▦"
           title="Calendario"
           subtitle="Consulta e modifica le giornate"
           onPress={() => {
@@ -4538,14 +4351,14 @@ export default function App() {
         />
 
         <HomeServiceCard
-          icon="person-outline"
+          icon="👤"
           title="Il mio profilo"
           subtitle="Azienda, sede e informazioni personali"
           onPress={apriProfilo}
         />
 
         <HomeServiceCard
-          icon="people-outline"
+          icon="👥"
           title="I miei colleghi"
           subtitle="Colleghi e contatti di servizio"
           onPress={() => {
@@ -4555,19 +4368,13 @@ export default function App() {
         />
 
         <HomeServiceCard
-          icon="chatbubble-ellipses-outline"
+          icon="💬"
           title="Chat"
           subtitle="Messaggi con i tuoi colleghi"
           wide
-          onPress={async () => {
-            try {
-              await aggiornaColleghi();
-              const ids = await colleghiConConversazione();
-              setChatColleghiIds(ids);
-              setScreen('listaChat');
-            } catch (e) {
-              Alert.alert('Errore', e?.message || 'Impossibile caricare le conversazioni.');
-            }
+          onPress={() => {
+            setScreen('listaChat');
+            aggiornaColleghi();
           }}
         />
       </View>
@@ -4617,7 +4424,7 @@ export default function App() {
           styles.footer
         }
       >
-        VIGILANZA GPG TEST LIVE • DATABASE ONLINE
+        VIGILANZA GPG • DATABASE ONLINE
       </Text>
     </Screen>
   );
@@ -4851,105 +4658,44 @@ function Back({
 function HomeServiceCard({ icon, title, subtitle, onPress, wide = false }) {
   return (
     <TouchableOpacity
-      activeOpacity={0.78}
+      activeOpacity={0.82}
       onPress={onPress}
       style={{
         width: wide ? '100%' : '48.5%',
-        minHeight: wide ? 88 : 138,
-        backgroundColor: wide ? '#102B5B' : '#07172F',
-        borderRadius: 24,
+        minHeight: wide ? 92 : 150,
+        backgroundColor: '#0d2147',
+        borderRadius: 22,
         borderWidth: 1,
-        borderColor: wide
-          ? 'rgba(89, 166, 255, 0.90)'
-          : 'rgba(77, 143, 255, 0.60)',
-        padding: 15,
+        borderColor: '#285a9e',
+        padding: 16,
         marginBottom: 12,
-        overflow: 'hidden',
         flexDirection: wide ? 'row' : 'column',
         alignItems: wide ? 'center' : 'flex-start',
         justifyContent: 'center',
-
-        shadowColor: '#2979FF',
-        shadowOffset: { width: 0, height: 7 },
-        shadowOpacity: wide ? 0.28 : 0.16,
-        shadowRadius: 14,
-        elevation: 6,
       }}
     >
-
-      {/* alone decorativo */}
-      <View
-        pointerEvents="none"
-        style={{
-          position: 'absolute',
-          width: wide ? 170 : 115,
-          height: wide ? 170 : 115,
-          borderRadius: 100,
-          backgroundColor: wide
-            ? 'rgba(42, 120, 255, 0.16)'
-            : 'rgba(42, 120, 255, 0.11)',
-          right: -45,
-          top: -50,
-        }}
-      />
-
-      {/* linea luminosa superiore */}
-      <View
-        pointerEvents="none"
-        style={{
-          position: 'absolute',
-          top: 0,
-          left: 22,
-          width: wide ? 120 : 55,
-          height: 2,
-          borderRadius: 2,
-          backgroundColor: '#64B5FF',
-          opacity: 0.85,
-        }}
-      />
-
-      {/* icona */}
       <View
         style={{
-          width: wide ? 48 : 46,
-          height: wide ? 48 : 46,
+          width: 46,
+          height: 46,
           borderRadius: 15,
-          backgroundColor: '#123B78',
-          borderWidth: 1,
-          borderColor: '#4C9CFF',
+          backgroundColor: '#15366d',
           alignItems: 'center',
           justifyContent: 'center',
-          marginBottom: wide ? 0 : 12,
+          marginBottom: wide ? 0 : 13,
           marginRight: wide ? 15 : 0,
-
-          shadowColor: '#4C9CFF',
-          shadowOffset: { width: 0, height: 0 },
-          shadowOpacity: 0.50,
-          shadowRadius: 9,
-          elevation: 5,
         }}
       >
-        <Ionicons
-          name={icon}
-          size={wide ? 25 : 24}
-          color="#8CC8FF"
-        />
+        <Text style={{ fontSize: 24 }}>{icon}</Text>
       </View>
 
-      {/* testi */}
-      <View
-        style={{
-          flex: wide ? 1 : 0,
-          width: wide ? undefined : '100%',
-        }}
-      >
+      <View style={{ flex: wide ? 1 : 0, width: wide ? undefined : '100%' }}>
         <Text
           style={{
-            color: '#FFFFFF',
-            fontSize: wide ? 17 : 16,
+            color: '#ffffff',
+            fontSize: 16,
             fontWeight: '900',
-            marginBottom: 4,
-            letterSpacing: -0.25,
+            marginBottom: 5,
           }}
         >
           {title}
@@ -4958,33 +4704,32 @@ function HomeServiceCard({ icon, title, subtitle, onPress, wide = false }) {
         <Text
           numberOfLines={2}
           style={{
-            color: '#A9BFE3',
-            fontSize: 11.5,
-            lineHeight: 15,
-            paddingRight: wide ? 5 : 15,
-            fontWeight: '500',
+            color: '#9fb2d9',
+            fontSize: 12,
+            lineHeight: 16,
+            paddingRight: 20,
           }}
         >
           {subtitle}
         </Text>
       </View>
 
-      {/* freccia */}
       <View
         style={{
           position: wide ? 'relative' : 'absolute',
           right: wide ? 0 : 14,
-          top: wide ? 0 : 15,
-          marginLeft: wide ? 10 : 0,
+          top: wide ? 0 : 16,
+          width: 30,
+          height: 30,
+          borderRadius: 15,
+          backgroundColor: '#07162f',
+          alignItems: 'center',
+          justifyContent: 'center',
+          marginLeft: wide ? 8 : 0,
         }}
       >
-        <Ionicons
-          name="chevron-forward"
-          size={wide ? 24 : 21}
-          color="#82BCFF"
-        />
+        <Text style={{ color: '#ffffff', fontSize: 22, lineHeight: 24 }}>›</Text>
       </View>
-
     </TouchableOpacity>
   );
 }
@@ -5252,54 +4997,42 @@ const styles =
       opacity: 0.6,
     },
 
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 28,
-    paddingHorizontal: 8,
-    paddingTop: 14,
-    paddingBottom: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: "rgba(111, 181, 255, 0.22)",
-  },
+    header: {
+      flexDirection:
+        'row',
+      alignItems:
+        'center',
+      marginBottom: 24,
+    },
 
     welcome: {
-    color: COLORS.white,
-    fontSize: 31,
-    fontWeight: '900',
-    letterSpacing: -1.2,
-    lineHeight: 32,
-    textShadowColor: 'rgba(74, 144, 255, 0.35)',
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 8,
+      color:
+        COLORS.white,
+      fontSize: 23,
+      fontWeight:
+        '900',
     },
 
     company: {
-    color: '#9FC5FF',
-    fontSize: 12,
-    fontWeight: '700',
-    marginTop: 6,
-    letterSpacing: 0.35,
-    opacity: 0.95,
+      color:
+        COLORS.muted,
+      fontSize: 11,
+      marginTop: 5,
     },
 
     avatar: {
-    width: 66,
-    height: 66,
-    borderRadius: 33,
-    backgroundColor: '#173A75',
-    borderWidth: 2,
-    borderColor: '#67B5FF',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginLeft: 14,
-    overflow: 'hidden',
-    shadowColor: '#4C9BFF',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.65,
-    shadowRadius: 10,
-    elevation: 8,
+      width: 50,
+      height: 50,
+      borderRadius: 25,
+      backgroundColor:
+        COLORS.blue,
+      alignItems:
+        'center',
+      justifyContent:
+        'center',
+      marginLeft: 10,
+      overflow:
+        'hidden',
     },
 
     avatarText: {
@@ -5797,59 +5530,55 @@ const styles =
         'center',
     },
 
-  turnCard: {
-    backgroundColor: '#101B36',
-    borderRadius: 15,
-    paddingVertical: 10,
-    paddingHorizontal: 10,
-    marginBottom: 9,
-    flexDirection: 'row',
-    alignItems: 'center',
-    minHeight: 96,
-    borderWidth: 1,
-    borderColor: 'rgba(91,120,255,0.38)',
-    shadowColor: '#315BFF',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.22,
-    shadowRadius: 10,
-    elevation: 6,
-  },
+    turnCard: {
+      backgroundColor:
+        COLORS.card,
+      borderRadius: 17,
+      padding: 13,
+      marginBottom: 9,
+      flexDirection:
+        'row',
+      alignItems:
+        'center',
+    },
 
-  dayBadge: {
-    width: 68,
-    minHeight: 76,
-    borderRadius: 12,
-    backgroundColor: 'rgba(38,63,125,0.30)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(122,151,255,0.20)',
-    paddingVertical: 5,
-  },
+    dayBadge: {
+      width: 50,
+      height: 50,
+      borderRadius: 14,
+      backgroundColor:
+        '#193653',
+      alignItems:
+        'center',
+      justifyContent:
+        'center',
+      marginRight: 12,
+    },
 
-  dayBig: {
-    color: '#FFFFFF',
-    fontSize: 30,
-    lineHeight: 34,
-    fontWeight: '900',
-  },
+    dayBig: {
+      color:
+        COLORS.white,
+      fontSize: 20,
+      fontWeight:
+        '900',
+    },
 
-  turnTitle: {
-    color: '#FFFFFF',
-    fontWeight: '900',
-    fontSize: 17,
-    letterSpacing: 0.2,
-  },
+    turnTitle: {
+      color:
+        COLORS.white,
+      fontWeight:
+        '900',
+      fontSize: 16,
+    },
 
-  turnSub: {
-    color: '#AFC8F5',
-    fontSize: 12,
-    fontWeight: '600',
-    marginTop: 4,
-  },
+    turnSub: {
+      color:
+        COLORS.muted,
+      fontSize: 11,
+      marginTop: 4,
+    },
 
-  profileHero: {
+    profileHero: {
       backgroundColor:
         '#10304B',
       borderRadius: 24,
@@ -6050,6 +5779,4 @@ const styles =
       marginTop: 5,
       lineHeight: 15,
     },
-});
-
-/* ===== TURNI PREMIUM ===== */
+  });
