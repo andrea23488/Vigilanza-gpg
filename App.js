@@ -4232,7 +4232,7 @@ export default function App() {
             borderRadius:20,paddingHorizontal:12,paddingVertical:7
           }}>
             <Text style={{color:'#42F56C',fontWeight:'900',fontSize:12}}>
-              ● IN SERVIZIO
+              {turnoOggi?.tipo === 'turno' ? '● IN SERVIZIO' : '🌿 A RIPOSO'}
             </Text>
           </View>
         </View>
