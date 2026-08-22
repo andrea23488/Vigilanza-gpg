@@ -1,0 +1,151 @@
+                color: '#35e58b',
+                fontSize: 20,
+                fontWeight: '900',
+                marginTop: 8,
+              }}>
+                Netto stimato: € {nettoTotaleConMaggiorazioni.toFixed(2)}
+              </Text>
+
+              <View
+                style={{
+                  height: 1,
+                  backgroundColor: '#284cff',
+                  marginVertical: 16,
+                }}
+              />
+
+              <Text style={{
+                color: '#5a8cff',
+                fontSize: 11,
+                fontWeight: '900',
+              }}>
+                GUADAGNATO AD OGGI
+              </Text>
+
+              <Text style={{
+                color: '#35e58b',
+                fontSize: 25,
+                fontWeight: '900',
+                marginTop: 5,
+              }}>
+                € {riepilogoTemporale.oggiNetto.toFixed(2)}
+              </Text>
+
+              <Text style={{
+                color: '#9fb2d9',
+                fontSize: 12,
+                marginTop: 4,
+              }}>
+                {riepilogoTemporale.oreMaturate.toFixed(1)} ore già lavorate
+              </Text>
+
+              <Text style={{
+                color: '#5a8cff',
+                fontSize: 11,
+                fontWeight: '900',
+                marginTop: 18,
+              }}>
+                TURNI FUTURI GIÀ INSERITI
+              </Text>
+
+              <Text style={{
+                color: 'white',
+                fontSize: 20,
+                fontWeight: '900',
+                marginTop: 5,
+              }}>
+                € {riepilogoTemporale.futuroNetto.toFixed(2)}
+              </Text>
+
+              <Text style={{
+                color: '#9fb2d9',
+                fontSize: 12,
+                marginTop: 4,
+              }}>
+                {riepilogoTemporale.oreFuture.toFixed(1)} ore programmate
+              </Text>
+
+              <View
+                style={{
+                  backgroundColor: '#162d67',
+                  borderRadius: 16,
+                  padding: 16,
+                  marginTop: 18,
+                }}
+              >
+                <Text style={{
+                  color: '#9fb2d9',
+                  fontSize: 11,
+                  fontWeight: '900',
+                }}>
+                  PREVISIONE CON I TURNI INSERITI
+                </Text>
+
+                <Text style={{
+                  color: 'white',
+                  fontSize: 27,
+                  fontWeight: '900',
+                  marginTop: 5,
+                }}>
+                  € {previsioneNettoFineMese.toFixed(2)}
+                </Text>
+              </View>
+
+              <View
+                style={{
+                  height: 1,
+                  backgroundColor: '#284cff',
+                  marginVertical: 16,
+                }}
+              />
+
+              <Text style={{
+                color: '#9fb2d9',
+                fontSize: 12,
+                fontWeight: '900',
+              }}>
+                GUADAGNATO AD OGGI
+              </Text>
+
+              <Text style={{
+                color: '#35e58b',
+                fontSize: 24,
+                fontWeight: '900',
+                marginTop: 5,
+              }}>
+                € {economiaAdOggi.netto.toFixed(2)}
+              </Text>
+
+              <Text style={{
+                color: '#9fb2d9',
+                fontSize: 12,
+                fontWeight: '900',
+                marginTop: 16,
+              }}>
+                TURNI FUTURI GIÀ INSERITI
+              </Text>
+
+              <Text style={{
+                color: 'white',
+                fontSize: 19,
+                fontWeight: '800',
+                marginTop: 5,
+              }}>
+                € {economiaFutura.netto.toFixed(2)}
+              </Text>
+
+              <View
+                style={{
+                  backgroundColor: '#07101F',
+                  borderRadius: 14,
+                  padding: 14,
+                  marginTop: 18,
+                }}
+              >
+                <Text style={{
+                  color: '#5a8cff',
+                  fontSize: 11,
+                  fontWeight: '900',
+                }}>
+                  PREVISIONE FINE MESE
+                </Text>

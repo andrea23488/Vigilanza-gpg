@@ -4386,21 +4386,15 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
 
         {/* ACCESSI RAPIDI */}
       <View style={{
-        marginHorizontal: 16,
-        marginBottom: 20,
-        paddingVertical: 12,
-        paddingHorizontal: 8,
-        borderRadius: 24,
-        backgroundColor: '#081426',
-        borderWidth: 1,
-        borderColor: '#365170',
-        flexDirection: 'row',
-        gap: 6,
-
-        shadowColor: '#4E74FF',
-        shadowOpacity: 0.18,
-        shadowRadius: 17,
-        shadowOffset: { width: 0, height: 6 },
+        marginHorizontal:16,
+        marginBottom:20,
+        padding:10,
+        borderRadius:20,
+        backgroundColor:'#0C1222',
+        borderWidth:1,
+        borderColor:'#222C42',
+        flexDirection:'row',
+        gap:6
       }}>
 
         <TouchableOpacity
@@ -4408,22 +4402,10 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
             setEditingId(null);
             setScreen('turni');
           }}
-          style={{
-        flex: 1,
-        alignItems: 'center',
-        justifyContent: 'center',
-        paddingVertical: 11,
-        borderRadius: 17,
-      }}
+          style={{flex:1,alignItems:'center',justifyContent:'center',paddingVertical:10}}
         >
-          <Ionicons name="calendar-outline" size={26} color="#7FDBFF" />
-          <Text style={{
-          color: '#D9F5FF',
-          fontSize: 9.5,
-          fontWeight: '900',
-          marginTop: 7,
-          letterSpacing: 0.25,
-        }}>TURNI</Text>
+          <Ionicons name="calendar-outline" size={24} color="#9D86FF" />
+          <Text style={{color:'#FFFFFF',fontSize:9,fontWeight:'800',marginTop:5}}>TURNI</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -4431,22 +4413,10 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
             setEditingId(null);
             setScreen('calendar');
           }}
-          style={{
-        flex: 1,
-        alignItems: 'center',
-        justifyContent: 'center',
-        paddingVertical: 11,
-        borderRadius: 17,
-      }}
+          style={{flex:1,alignItems:'center',justifyContent:'center',paddingVertical:10}}
         >
-          <Ionicons name="calendar-number-outline" size={26} color="#7FDBFF" />
-          <Text style={{
-          color: '#D9F5FF',
-          fontSize: 9.5,
-          fontWeight: '900',
-          marginTop: 7,
-          letterSpacing: 0.25,
-        }}>CALENDARIO</Text>
+          <Ionicons name="calendar-number-outline" size={24} color="#FFFFFF" />
+          <Text style={{color:'#FFFFFF',fontSize:9,fontWeight:'800',marginTop:5}}>CALENDARIO</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -4454,22 +4424,10 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
             setScreen('colleghi');
             aggiornaColleghi();
           }}
-          style={{
-        flex: 1,
-        alignItems: 'center',
-        justifyContent: 'center',
-        paddingVertical: 11,
-        borderRadius: 17,
-      }}
+          style={{flex:1,alignItems:'center',justifyContent:'center',paddingVertical:10}}
         >
-          <Ionicons name="people-outline" size={26} color="#7FDBFF" />
-          <Text style={{
-          color: '#D9F5FF',
-          fontSize: 9.5,
-          fontWeight: '900',
-          marginTop: 7,
-          letterSpacing: 0.25,
-        }}>COLLEGHI</Text>
+          <Ionicons name="people-outline" size={24} color="#FFFFFF" />
+          <Text style={{color:'#FFFFFF',fontSize:9,fontWeight:'800',marginTop:5}}>COLLEGHI</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -4483,22 +4441,10 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
               Alert.alert('Errore', e?.message || 'Impossibile caricare le conversazioni.');
             }
           }}
-          style={{
-        flex: 1,
-        alignItems: 'center',
-        justifyContent: 'center',
-        paddingVertical: 11,
-        borderRadius: 17,
-      }}
+          style={{flex:1,alignItems:'center',justifyContent:'center',paddingVertical:10}}
         >
-          <Ionicons name="chatbubble-ellipses-outline" size={26} color="#7FDBFF" />
-          <Text style={{
-          color: '#D9F5FF',
-          fontSize: 9.5,
-          fontWeight: '900',
-          marginTop: 7,
-          letterSpacing: 0.25,
-        }}>CHAT</Text>
+          <Ionicons name="chatbubble-ellipses-outline" size={24} color="#FFFFFF" />
+          <Text style={{color:'#FFFFFF',fontSize:9,fontWeight:'800',marginTop:5}}>CHAT</Text>
         </TouchableOpacity>
 
       </View>

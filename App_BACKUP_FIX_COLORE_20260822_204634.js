@@ -687,42 +687,6 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
       Number(t.anno) === oggi.getFullYear()
   );
 
-  const turnoInCorso = turni.find((t) => {
-    if (t.tipo !== 'turno' || !t.inizio || !t.fine) return false;
-
-    const giorno = Number(t.giorno);
-    const meseTurno = Number(t.mese);
-    const annoTurno = Number(t.anno);
-
-    const [hi, mi] = String(t.inizio).split(':').map(Number);
-    const [hf, mf] = String(t.fine).split(':').map(Number);
-
-    const inizioTurno = new Date(
-      annoTurno,
-      meseTurno - 1,
-      giorno,
-      hi,
-      mi,
-      0
-    );
-
-    const fineTurno = new Date(
-      annoTurno,
-      meseTurno - 1,
-      giorno,
-      hf,
-      mf,
-      0
-    );
-
-    // Se finisce dopo mezzanotte, la fine appartiene al giorno successivo
-    if (fineTurno <= inizioTurno) {
-      fineTurno.setDate(fineTurno.getDate() + 1);
-    }
-
-    return oggi >= inizioTurno && oggi < fineTurno;
-  });
-
   const statistiche =
     useMemo(() => {
       let ore = 0;
@@ -3419,86 +3383,6 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
           }}
         />
 
-      <View
-        style={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          backgroundColor: '#09172A',
-          borderWidth: 1,
-          borderColor: '#1D3558',
-          borderRadius: 18,
-          paddingVertical: 10,
-          paddingHorizontal: 10,
-          marginTop: 10,
-          marginBottom: 14,
-        }}
-      >
-        <View style={{ alignItems: 'center', flex: 1 }}>
-          <Ionicons name="sunny" size={16} color="#20EDF2" />
-          <Text style={{
-            color: '#AFC0D7',
-            fontSize: 8,
-            fontWeight: '800',
-            marginTop: 3
-          }}>
-            Mattina
-          </Text>
-        </View>
-
-        <View style={{ alignItems: 'center', flex: 1 }}>
-          <Ionicons name="sunny-outline" size={16} color="#FF9D3D" />
-          <Text style={{
-            color: '#AFC0D7',
-            fontSize: 8,
-            fontWeight: '800',
-            marginTop: 3
-          }}>
-            Serale
-          </Text>
-        </View>
-
-        <View style={{ alignItems: 'center', flex: 1 }}>
-          <Ionicons name="moon" size={15} color="#A77CFF" />
-          <Text style={{
-            color: '#AFC0D7',
-            fontSize: 8,
-            fontWeight: '800',
-            marginTop: 3
-          }}>
-            Notturno
-          </Text>
-        </View>
-
-        <View style={{ alignItems: 'center', flex: 1 }}>
-          <View style={{
-            backgroundColor: '#2B3B57',
-            borderRadius: 8,
-            paddingHorizontal: 5,
-            paddingVertical: 2,
-          }}>
-            <Text style={{
-              color: '#D0DCF0',
-              fontSize: 8,
-              fontWeight: '900'
-            }}>
-              RIP
-            </Text>
-          </View>
-
-          <Text style={{
-            color: '#AFC0D7',
-            fontSize: 8,
-            fontWeight: '800',
-            marginTop: 3
-          }}>
-            Riposo
-          </Text>
-        </View>
-      </View>
-
-
-
         <View
           style={
             styles.stats
@@ -4175,25 +4059,18 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
             borderRadius:20,paddingHorizontal:12,paddingVertical:7
           }}>
             <Text style={{color:'#42F56C',fontWeight:'900',fontSize:12}}>
-              {turnoInCorso ? '● IN SERVIZIO' : '🌿 FUORI SERVIZIO'}
+              {turnoOggi?.tipo === 'turno' ? '● IN SERVIZIO' : '🌿 A RIPOSO'}
             </Text>
           </View>
         </View>
 
         {/* MESE */}
         <View style={{
-        marginHorizontal: 16,
-        marginBottom: 17,
-        padding: 18,
-        borderRadius: 24,
-        backgroundColor: '#101A3D',
-        borderWidth: 1.2,
-        borderColor: '#526BFF',
-        shadowColor: '#526BFF',
-        shadowOpacity: 0.25,
-        shadowRadius: 18,
-        shadowOffset: { width: 0, height: 8 },
-      }}>
+          marginHorizontal:16,marginBottom:16,padding:17,
+          borderRadius:22,
+          backgroundColor:'#101D4B',
+          borderWidth:1,borderColor:'#284995'
+        }}>
           <View style={{flexDirection:'row',justifyContent:'space-between',alignItems:'center'}}>
             <Text style={{color:'#FFFFFF',fontSize:18,fontWeight:'900'}}>
               AGOSTO 2026
@@ -4250,29 +4127,10 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
           activeOpacity={0.85}
           onPress={() => setScreen('calendar')}
           style={{
-        marginHorizontal: 16,
-        marginBottom: 16,
-        padding: 18,
-        borderRadius: 23,
-
-        backgroundColor: turnoInCorso
-          ? '#07160F'
-          : '#09182C',
-
-        borderWidth: 1.5,
-
-        borderColor: turnoInCorso
-          ? '#5AF47C'
-          : '#42CFFF',
-
-        shadowColor: turnoInCorso
-          ? '#5AF47C'
-          : '#42CFFF',
-
-        shadowOpacity: turnoInCorso ? 0.32 : 0.18,
-        shadowRadius: 17,
-        shadowOffset: { width: 0, height: 7 },
-      }}
+            marginHorizontal:16,marginBottom:14,padding:17,
+            borderRadius:20,backgroundColor:'#07110E',
+            borderWidth:1.5,borderColor:'#46E764'
+          }}
         >
           <View style={{flexDirection:'row',justifyContent:'space-between'}}>
             <View style={{flex:1}}>
@@ -4294,30 +4152,11 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
             </View>
 
             <View style={{
-          width: 64,
-          height: 64,
-          borderRadius: 32,
-
-          borderWidth: 2,
-
-          borderColor: turnoInCorso
-            ? '#5AF47C'
-            : '#42CFFF',
-
-          alignItems: 'center',
-          justifyContent: 'center',
-
-          backgroundColor: turnoInCorso
-            ? 'rgba(90,244,124,0.10)'
-            : 'rgba(66,207,255,0.09)',
-
-          shadowColor: turnoInCorso
-            ? '#5AF47C'
-            : '#42CFFF',
-
-          shadowOpacity: 0.30,
-          shadowRadius: 13,
-        }}>
+              width:62,height:62,borderRadius:31,
+              borderWidth:2,borderColor:'#43ED63',
+              alignItems:'center',justifyContent:'center',
+              backgroundColor:'rgba(46,255,85,0.08)'
+            }}>
               <Ionicons name="time-outline" size={37} color="#43ED63" />
             </View>
           </View>
@@ -4328,20 +4167,12 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
           activeOpacity={0.85}
           onPress={() => setScreen('stipendio')}
           style={{
-        marginHorizontal: 16,
-        marginBottom: 15,
-        backgroundColor: '#0B1930',
-        borderRadius: 20,
-        borderWidth: 1,
-        borderColor: '#3B6EA5',
-        padding: 16,
-        flexDirection: 'row',
-        alignItems: 'center',
-        shadowColor: '#3FCFFF',
-        shadowOpacity: 0.14,
-        shadowRadius: 14,
-        shadowOffset: { width: 0, height: 6 },
-      }}
+            marginHorizontal:16,marginBottom:14,
+            backgroundColor:'#0D1428',borderRadius:17,
+            borderWidth:1,borderColor:'#222E4C',
+            padding:15,flexDirection:'row',
+            alignItems:'center'
+          }}
         >
           <Ionicons name="wallet-outline" size={25} color="#55E86E" />
           <View style={{flex:1,marginLeft:13}}>
@@ -4357,18 +4188,10 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
 
         {/* COLLEGA */}
         <View style={{
-        marginHorizontal: 16,
-        marginBottom: 18,
-        padding: 17,
-        borderRadius: 21,
-        backgroundColor: '#0C1728',
-        borderWidth: 1,
-        borderColor: '#2B4568',
-        shadowColor: '#45CFFF',
-        shadowOpacity: 0.09,
-        shadowRadius: 12,
-        shadowOffset: { width: 0, height: 5 },
-      }}>
+          marginHorizontal:16,marginBottom:18,padding:16,
+          borderRadius:19,backgroundColor:'#101725',
+          borderWidth:1,borderColor:'#1E2B3E'
+        }}>
           <Text style={{color:'#4BE66B',fontSize:12,fontWeight:'900',marginBottom:10}}>
             IN SERVIZIO CON TE
           </Text>
@@ -4386,21 +4209,15 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
 
         {/* ACCESSI RAPIDI */}
       <View style={{
-        marginHorizontal: 16,
-        marginBottom: 20,
-        paddingVertical: 12,
-        paddingHorizontal: 8,
-        borderRadius: 24,
-        backgroundColor: '#081426',
-        borderWidth: 1,
-        borderColor: '#365170',
-        flexDirection: 'row',
-        gap: 6,
-
-        shadowColor: '#4E74FF',
-        shadowOpacity: 0.18,
-        shadowRadius: 17,
-        shadowOffset: { width: 0, height: 6 },
+        marginHorizontal:16,
+        marginBottom:20,
+        padding:10,
+        borderRadius:20,
+        backgroundColor:'#0C1222',
+        borderWidth:1,
+        borderColor:'#222C42',
+        flexDirection:'row',
+        gap:6
       }}>
 
         <TouchableOpacity
@@ -4408,22 +4225,10 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
             setEditingId(null);
             setScreen('turni');
           }}
-          style={{
-        flex: 1,
-        alignItems: 'center',
-        justifyContent: 'center',
-        paddingVertical: 11,
-        borderRadius: 17,
-      }}
+          style={{flex:1,alignItems:'center',justifyContent:'center',paddingVertical:10}}
         >
-          <Ionicons name="calendar-outline" size={26} color="#7FDBFF" />
-          <Text style={{
-          color: '#D9F5FF',
-          fontSize: 9.5,
-          fontWeight: '900',
-          marginTop: 7,
-          letterSpacing: 0.25,
-        }}>TURNI</Text>
+          <Ionicons name="calendar-outline" size={24} color="#9D86FF" />
+          <Text style={{color:'#FFFFFF',fontSize:9,fontWeight:'800',marginTop:5}}>TURNI</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -4431,22 +4236,10 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
             setEditingId(null);
             setScreen('calendar');
           }}
-          style={{
-        flex: 1,
-        alignItems: 'center',
-        justifyContent: 'center',
-        paddingVertical: 11,
-        borderRadius: 17,
-      }}
+          style={{flex:1,alignItems:'center',justifyContent:'center',paddingVertical:10}}
         >
-          <Ionicons name="calendar-number-outline" size={26} color="#7FDBFF" />
-          <Text style={{
-          color: '#D9F5FF',
-          fontSize: 9.5,
-          fontWeight: '900',
-          marginTop: 7,
-          letterSpacing: 0.25,
-        }}>CALENDARIO</Text>
+          <Ionicons name="calendar-number-outline" size={24} color="#FFFFFF" />
+          <Text style={{color:'#FFFFFF',fontSize:9,fontWeight:'800',marginTop:5}}>CALENDARIO</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -4454,22 +4247,10 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
             setScreen('colleghi');
             aggiornaColleghi();
           }}
-          style={{
-        flex: 1,
-        alignItems: 'center',
-        justifyContent: 'center',
-        paddingVertical: 11,
-        borderRadius: 17,
-      }}
+          style={{flex:1,alignItems:'center',justifyContent:'center',paddingVertical:10}}
         >
-          <Ionicons name="people-outline" size={26} color="#7FDBFF" />
-          <Text style={{
-          color: '#D9F5FF',
-          fontSize: 9.5,
-          fontWeight: '900',
-          marginTop: 7,
-          letterSpacing: 0.25,
-        }}>COLLEGHI</Text>
+          <Ionicons name="people-outline" size={24} color="#FFFFFF" />
+          <Text style={{color:'#FFFFFF',fontSize:9,fontWeight:'800',marginTop:5}}>COLLEGHI</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -4483,22 +4264,10 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
               Alert.alert('Errore', e?.message || 'Impossibile caricare le conversazioni.');
             }
           }}
-          style={{
-        flex: 1,
-        alignItems: 'center',
-        justifyContent: 'center',
-        paddingVertical: 11,
-        borderRadius: 17,
-      }}
+          style={{flex:1,alignItems:'center',justifyContent:'center',paddingVertical:10}}
         >
-          <Ionicons name="chatbubble-ellipses-outline" size={26} color="#7FDBFF" />
-          <Text style={{
-          color: '#D9F5FF',
-          fontSize: 9.5,
-          fontWeight: '900',
-          marginTop: 7,
-          letterSpacing: 0.25,
-        }}>CHAT</Text>
+          <Ionicons name="chatbubble-ellipses-outline" size={24} color="#FFFFFF" />
+          <Text style={{color:'#FFFFFF',fontSize:9,fontWeight:'800',marginTop:5}}>CHAT</Text>
         </TouchableOpacity>
 
       </View>
@@ -4682,72 +4451,6 @@ function Calendar({
               ? 'sunny-outline'
               : null;
 
-          const oggiCalendario = new Date();
-
-          const eOggi =
-            Number(day) === oggiCalendario.getDate() &&
-            Number(mese) === oggiCalendario.getMonth() &&
-            Number(anno) === oggiCalendario.getFullYear();
-
-          const prossimiTurni = records
-            .filter((r) => {
-              if (
-                r.tipo !== 'turno' ||
-                !r.inizio
-              ) {
-                return false;
-              }
-
-              const [h, m] = String(r.inizio)
-                .split(':')
-                .map(Number);
-
-              const dataTurno = new Date(
-                anno,
-                mese,
-                Number(r.giorno),
-                h,
-                m,
-                0
-              );
-
-              return dataTurno > oggiCalendario;
-            })
-            .sort((a, b) => {
-              const [ha, ma] = String(a.inizio).split(':').map(Number);
-              const [hb, mb] = String(b.inizio).split(':').map(Number);
-
-              const da = new Date(
-                anno,
-                mese,
-                Number(a.giorno),
-                ha,
-                ma,
-                0
-              );
-
-              const db = new Date(
-                anno,
-                mese,
-                Number(b.giorno),
-                hb,
-                mb,
-                0
-              );
-
-              return da - db;
-            });
-
-          const prossimoTurno =
-            prossimiTurni.length > 0
-              ? prossimiTurni[0]
-              : null;
-
-          const eProssimo =
-            !eOggi &&
-            prossimoTurno &&
-            Number(day) === Number(prossimoTurno.giorno);
-
           return (
             <TouchableOpacity
               key={`giorno-${day}`}
@@ -4760,34 +4463,21 @@ function Calendar({
               }
               style={{
                 width: '14.285%',
-                aspectRatio: 0.82,
-                padding: 2.5,
+                aspectRatio: 0.92,
+                padding: 3,
               }}
             >
               <View
                 style={{
                   flex: 1,
-                  borderRadius: 14,
-                  borderWidth:
-                    eOggi
-                      ? 2.5
-                      : eProssimo
-                      ? 2
-                      : 1,
+                  borderRadius: 13,
+                  borderWidth: 1,
                   borderColor:
-                    eOggi
-                      ? '#6FE8FF'
-                      : eProssimo
-                      ? '#FFD166'
-                      : record
+                    record
                       ? bordo
                       : '#26354D',
                   backgroundColor:
-                    eOggi
-                      ? '#10395A'
-                      : eProssimo
-                      ? '#3A3018'
-                      : record
+                    record
                       ? sfondo
                       : '#111D32',
                   alignItems: 'center',
@@ -4795,29 +4485,13 @@ function Calendar({
                   paddingHorizontal: 2,
 
                   shadowColor:
-                    eOggi
-                      ? '#5EDBFF'
-                      : eProssimo
-                      ? '#FFD166'
-                      : record
+                    record
                       ? colore
                       : '#000000',
                   shadowOpacity:
-                    eOggi
-                      ? 0.75
-                      : eProssimo
-                      ? 0.50
-                      : record
-                      ? 0.20
-                      : 0.04,
+                    record ? 0.20 : 0.04,
                   shadowRadius:
-                    eOggi
-                      ? 16
-                      : eProssimo
-                      ? 12
-                      : record
-                      ? 7
-                      : 2,
+                    record ? 7 : 2,
                   shadowOffset: {
                     width: 0,
                     height: 3,
@@ -4827,10 +4501,10 @@ function Calendar({
                 <Text
                   style={{
                     color: '#FFFFFF',
-                    fontSize: 15,
+                    fontSize: 16,
                     fontWeight: '900',
                     marginBottom:
-                      record ? 4 : 0,
+                      record ? 3 : 0,
                   }}
                 >
                   {day}
@@ -4877,34 +4551,16 @@ function Calendar({
                         }}
                       />
 
-                      <View
+                      <Text
+                        numberOfLines={1}
                         style={{
-                          alignItems: 'center',
-                          justifyContent: 'center',
+                          color,
+                          fontSize: 8,
+                          fontWeight: '900',
                         }}
                       >
-                        <Text
-                          style={{
-                            color: colore,
-                            fontSize: 8.5,
-                            fontWeight: '900',
-                            lineHeight: 10,
-                          }}
-                        >
-                          {formattaOra(record.inizio)}
-                        </Text>
-
-                        <Text
-                          style={{
-                            color: colore,
-                            fontSize: 8,
-                            fontWeight: '900',
-                            lineHeight: 9,
-                          }}
-                        >
-                          {formattaOra(record.fine)}
-                        </Text>
-                      </View>
+                        {formattaOra(record.inizio)}-{formattaOra(record.fine)}
+                      </Text>
                     </View>
                   )
                 )}
@@ -5601,32 +5257,17 @@ const styles =
     },
 
     syncButton: {
-    minHeight: 58,
-    borderRadius: 20,
-    marginTop: 15,
-    marginBottom: 8,
-    backgroundColor: '#173A86',
-    borderWidth: 1.5,
-    borderColor: '#44CFFF',
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#32C8FF',
-    shadowOpacity: 0.32,
-    shadowRadius: 18,
-    shadowOffset: { width: 0, height: 7 },
-    elevation: 8,
-  },
+      padding: 16,
+      alignItems:
+        'center',
+    },
 
     syncText: {
-    color: '#FFFFFF',
-    fontSize: 15,
-    fontWeight: '900',
-    letterSpacing: 0.4,
-    textAlign: 'center',
-    textShadowColor: 'rgba(68, 207, 255, 0.55)',
-    textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 8,
-  },
+      color:
+        COLORS.lightBlue,
+      fontWeight:
+        '800',
+    },
 
     footer: {
       color:
@@ -5657,24 +5298,18 @@ const styles =
     },
 
     title: {
-    color: '#FFFFFF',
-    fontSize: 34,
-    fontWeight: '900',
-    letterSpacing: -1,
-    marginBottom: 3,
-    textShadowColor: 'rgba(66, 140, 255, 0.35)',
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 12,
-
+      color:
+        COLORS.white,
+      fontSize: 29,
+      fontWeight:
+        '900',
     },
 
     subtitle: {
-    color: '#8FA6C9',
-    fontSize: 13,
-    fontWeight: '600',
-    marginTop: 2,
-    marginBottom: 18,
-
+      color:
+        COLORS.muted,
+      marginTop: 5,
+      marginBottom: 14,
     },
 
     modeBadge: {
@@ -5705,32 +5340,24 @@ const styles =
     },
 
     monthBox: {
-    backgroundColor: '#101F38',
-    borderRadius: 22,
-    paddingVertical: 14,
-    paddingHorizontal: 12,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: '#294E83',
-    shadowColor: '#2E7DFF',
-    shadowOpacity: 0.18,
-    shadowRadius: 16,
-    shadowOffset: { width: 0, height: 7 },
-
+      backgroundColor:
+        COLORS.card,
+      borderRadius: 18,
+      padding: 12,
+      flexDirection:
+        'row',
+      justifyContent:
+        'space-between',
+      alignItems:
+        'center',
+      marginBottom: 14,
     },
 
     arrow: {
-    color: '#5EDBFF',
-    fontSize: 38,
-    fontWeight: '900',
-    paddingHorizontal: 16,
-    textShadowColor: 'rgba(94, 219, 255, 0.65)',
-    textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 10,
-
+      color:
+        COLORS.white,
+      fontSize: 34,
+      paddingHorizontal: 15,
     },
 
     month: {
@@ -5751,16 +5378,10 @@ const styles =
     },
 
     calendar: {
-    backgroundColor: '#09172A',
-    borderRadius: 24,
-    padding: 10,
-    borderWidth: 1,
-    borderColor: '#1D3558',
-    shadowColor: '#246BFD',
-    shadowOpacity: 0.12,
-    shadowRadius: 20,
-    shadowOffset: { width: 0, height: 8 },
-
+      backgroundColor:
+        COLORS.card,
+      borderRadius: 20,
+      padding: 10,
     },
 
     week: {

@@ -1,0 +1,151 @@
+                            .join(' · ')}
+                        </Text>
+
+                        <View
+                          style={{
+                            flexDirection: 'row',
+                            gap: 10,
+                            marginTop: 15,
+                          }}
+                        >
+                          <TouchableOpacity
+                            onPress={async () => {
+                              try {
+                                await accettaCollega(c.id);
+                                await aggiornaColleghi();
+                              } catch (error) {
+                                Alert.alert('Errore', error.message);
+                              }
+                            }}
+                            style={{
+                              flex: 1,
+                              backgroundColor: '#1d9b55',
+                              padding: 12,
+                              borderRadius: 10,
+                              alignItems: 'center',
+                            }}
+                          >
+                            <Text style={{ color: 'white', fontWeight: '800' }}>
+                              ✓ ACCETTA
+                            </Text>
+                          </TouchableOpacity>
+
+                          <TouchableOpacity
+                            onPress={async () => {
+                              try {
+                                await rifiutaCollega(c.id);
+                                await aggiornaColleghi();
+                              } catch (error) {
+                                Alert.alert('Errore', error.message);
+                              }
+                            }}
+                            style={{
+                              flex: 1,
+                              backgroundColor: '#b93646',
+                              padding: 12,
+                              borderRadius: 10,
+                              alignItems: 'center',
+                            }}
+                          >
+                            <Text style={{ color: 'white', fontWeight: '800' }}>
+                              ✕ RIFIUTA
+                            </Text>
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+                    ))}
+                </>
+              )}
+
+              <Text
+                style={{
+                  color: 'white',
+                  fontSize: 20,
+                  fontWeight: '800',
+                  marginTop: 8,
+                  marginBottom: 12,
+                }}
+              >
+                👥 I miei colleghi
+              </Text>
+
+              {colleghi.filter((c) => c.stato === 'accettato').length === 0 ? (
+                <View
+                  style={{
+                    backgroundColor: '#07101F',
+                    borderRadius: 18,
+                    padding: 22,
+                  }}
+                >
+                  <Text
+                    style={{
+                      color: 'white',
+                      fontWeight: '700',
+                      textAlign: 'center',
+                    }}
+                  >
+                    Nessun collega collegato
+                  </Text>
+                </View>
+              ) : (
+                colleghi
+                  .filter((c) => c.stato === 'accettato')
+                  .map((c) => (
+                    <View
+                  onTouchEnd={() => {
+                    setCollegaSelezionato(c);
+                    setScreen('profiloCollega');
+                  }}
+                      key={c.id}
+                      style={{
+                        backgroundColor: '#07101F',
+                        borderRadius: 16,
+                        padding: 16,
+                        marginBottom: 12,
+                      }}
+                    >
+                      <Text
+                        style={{
+                          color: 'white',
+                          fontWeight: '800',
+                          fontSize: 17,
+                        }}
+                      >
+                        👤 {c.profilo?.nome || 'Collega'} {c.profilo?.cognome || ''}
+                      </Text>
+
+                      <Text
+                        style={{
+                          color: '#9fb2d9',
+                          marginTop: 5,
+                        }}
+                      >
+                        {[c.profilo?.azienda, c.profilo?.codice_gpg]
+                          .filter(Boolean)
+                          .join(' · ')}
+                      </Text>
+
+                      {c.profilo?.sede ? (
+                        <Text
+                          style={{
+                            color: '#9fb2d9',
+                            marginTop: 3,
+                            fontSize: 12,
+                          }}
+                        >
+                          📍 {c.profilo.sede}
+                        </Text>
+                      ) : null}
+
+                      <TouchableOpacity
+                    onPress={() => {
+                      setCollegaSelezionato(c);
+                      setChatMessaggio('');
+                      setScreen('chatCollega');
+                    }}
+                    style={{
+                      backgroundColor: '#284cff',
+                      borderRadius: 12,
+                      paddingVertical: 12,
+                      paddingHorizontal: 16,
+                      alignItems: 'center',

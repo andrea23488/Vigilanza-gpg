@@ -4182,18 +4182,11 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
 
         {/* MESE */}
         <View style={{
-        marginHorizontal: 16,
-        marginBottom: 17,
-        padding: 18,
-        borderRadius: 24,
-        backgroundColor: '#101A3D',
-        borderWidth: 1.2,
-        borderColor: '#526BFF',
-        shadowColor: '#526BFF',
-        shadowOpacity: 0.25,
-        shadowRadius: 18,
-        shadowOffset: { width: 0, height: 8 },
-      }}>
+          marginHorizontal:16,marginBottom:16,padding:17,
+          borderRadius:22,
+          backgroundColor:'#101D4B',
+          borderWidth:1,borderColor:'#284995'
+        }}>
           <View style={{flexDirection:'row',justifyContent:'space-between',alignItems:'center'}}>
             <Text style={{color:'#FFFFFF',fontSize:18,fontWeight:'900'}}>
               AGOSTO 2026
@@ -4250,29 +4243,10 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
           activeOpacity={0.85}
           onPress={() => setScreen('calendar')}
           style={{
-        marginHorizontal: 16,
-        marginBottom: 16,
-        padding: 18,
-        borderRadius: 23,
-
-        backgroundColor: turnoInCorso
-          ? '#07160F'
-          : '#09182C',
-
-        borderWidth: 1.5,
-
-        borderColor: turnoInCorso
-          ? '#5AF47C'
-          : '#42CFFF',
-
-        shadowColor: turnoInCorso
-          ? '#5AF47C'
-          : '#42CFFF',
-
-        shadowOpacity: turnoInCorso ? 0.32 : 0.18,
-        shadowRadius: 17,
-        shadowOffset: { width: 0, height: 7 },
-      }}
+            marginHorizontal:16,marginBottom:14,padding:17,
+            borderRadius:20,backgroundColor:'#07110E',
+            borderWidth:1.5,borderColor:'#46E764'
+          }}
         >
           <View style={{flexDirection:'row',justifyContent:'space-between'}}>
             <View style={{flex:1}}>
@@ -4294,30 +4268,11 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
             </View>
 
             <View style={{
-          width: 64,
-          height: 64,
-          borderRadius: 32,
-
-          borderWidth: 2,
-
-          borderColor: turnoInCorso
-            ? '#5AF47C'
-            : '#42CFFF',
-
-          alignItems: 'center',
-          justifyContent: 'center',
-
-          backgroundColor: turnoInCorso
-            ? 'rgba(90,244,124,0.10)'
-            : 'rgba(66,207,255,0.09)',
-
-          shadowColor: turnoInCorso
-            ? '#5AF47C'
-            : '#42CFFF',
-
-          shadowOpacity: 0.30,
-          shadowRadius: 13,
-        }}>
+              width:62,height:62,borderRadius:31,
+              borderWidth:2,borderColor:'#43ED63',
+              alignItems:'center',justifyContent:'center',
+              backgroundColor:'rgba(46,255,85,0.08)'
+            }}>
               <Ionicons name="time-outline" size={37} color="#43ED63" />
             </View>
           </View>
@@ -4328,20 +4283,12 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
           activeOpacity={0.85}
           onPress={() => setScreen('stipendio')}
           style={{
-        marginHorizontal: 16,
-        marginBottom: 15,
-        backgroundColor: '#0B1930',
-        borderRadius: 20,
-        borderWidth: 1,
-        borderColor: '#3B6EA5',
-        padding: 16,
-        flexDirection: 'row',
-        alignItems: 'center',
-        shadowColor: '#3FCFFF',
-        shadowOpacity: 0.14,
-        shadowRadius: 14,
-        shadowOffset: { width: 0, height: 6 },
-      }}
+            marginHorizontal:16,marginBottom:14,
+            backgroundColor:'#0D1428',borderRadius:17,
+            borderWidth:1,borderColor:'#222E4C',
+            padding:15,flexDirection:'row',
+            alignItems:'center'
+          }}
         >
           <Ionicons name="wallet-outline" size={25} color="#55E86E" />
           <View style={{flex:1,marginLeft:13}}>
@@ -4357,18 +4304,10 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
 
         {/* COLLEGA */}
         <View style={{
-        marginHorizontal: 16,
-        marginBottom: 18,
-        padding: 17,
-        borderRadius: 21,
-        backgroundColor: '#0C1728',
-        borderWidth: 1,
-        borderColor: '#2B4568',
-        shadowColor: '#45CFFF',
-        shadowOpacity: 0.09,
-        shadowRadius: 12,
-        shadowOffset: { width: 0, height: 5 },
-      }}>
+          marginHorizontal:16,marginBottom:18,padding:16,
+          borderRadius:19,backgroundColor:'#101725',
+          borderWidth:1,borderColor:'#1E2B3E'
+        }}>
           <Text style={{color:'#4BE66B',fontSize:12,fontWeight:'900',marginBottom:10}}>
             IN SERVIZIO CON TE
           </Text>
@@ -4386,21 +4325,15 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
 
         {/* ACCESSI RAPIDI */}
       <View style={{
-        marginHorizontal: 16,
-        marginBottom: 20,
-        paddingVertical: 12,
-        paddingHorizontal: 8,
-        borderRadius: 24,
-        backgroundColor: '#081426',
-        borderWidth: 1,
-        borderColor: '#365170',
-        flexDirection: 'row',
-        gap: 6,
-
-        shadowColor: '#4E74FF',
-        shadowOpacity: 0.18,
-        shadowRadius: 17,
-        shadowOffset: { width: 0, height: 6 },
+        marginHorizontal:16,
+        marginBottom:20,
+        padding:10,
+        borderRadius:20,
+        backgroundColor:'#0C1222',
+        borderWidth:1,
+        borderColor:'#222C42',
+        flexDirection:'row',
+        gap:6
       }}>
 
         <TouchableOpacity
@@ -4408,22 +4341,10 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
             setEditingId(null);
             setScreen('turni');
           }}
-          style={{
-        flex: 1,
-        alignItems: 'center',
-        justifyContent: 'center',
-        paddingVertical: 11,
-        borderRadius: 17,
-      }}
+          style={{flex:1,alignItems:'center',justifyContent:'center',paddingVertical:10}}
         >
-          <Ionicons name="calendar-outline" size={26} color="#7FDBFF" />
-          <Text style={{
-          color: '#D9F5FF',
-          fontSize: 9.5,
-          fontWeight: '900',
-          marginTop: 7,
-          letterSpacing: 0.25,
-        }}>TURNI</Text>
+          <Ionicons name="calendar-outline" size={24} color="#9D86FF" />
+          <Text style={{color:'#FFFFFF',fontSize:9,fontWeight:'800',marginTop:5}}>TURNI</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -4431,22 +4352,10 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
             setEditingId(null);
             setScreen('calendar');
           }}
-          style={{
-        flex: 1,
-        alignItems: 'center',
-        justifyContent: 'center',
-        paddingVertical: 11,
-        borderRadius: 17,
-      }}
+          style={{flex:1,alignItems:'center',justifyContent:'center',paddingVertical:10}}
         >
-          <Ionicons name="calendar-number-outline" size={26} color="#7FDBFF" />
-          <Text style={{
-          color: '#D9F5FF',
-          fontSize: 9.5,
-          fontWeight: '900',
-          marginTop: 7,
-          letterSpacing: 0.25,
-        }}>CALENDARIO</Text>
+          <Ionicons name="calendar-number-outline" size={24} color="#FFFFFF" />
+          <Text style={{color:'#FFFFFF',fontSize:9,fontWeight:'800',marginTop:5}}>CALENDARIO</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -4454,22 +4363,10 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
             setScreen('colleghi');
             aggiornaColleghi();
           }}
-          style={{
-        flex: 1,
-        alignItems: 'center',
-        justifyContent: 'center',
-        paddingVertical: 11,
-        borderRadius: 17,
-      }}
+          style={{flex:1,alignItems:'center',justifyContent:'center',paddingVertical:10}}
         >
-          <Ionicons name="people-outline" size={26} color="#7FDBFF" />
-          <Text style={{
-          color: '#D9F5FF',
-          fontSize: 9.5,
-          fontWeight: '900',
-          marginTop: 7,
-          letterSpacing: 0.25,
-        }}>COLLEGHI</Text>
+          <Ionicons name="people-outline" size={24} color="#FFFFFF" />
+          <Text style={{color:'#FFFFFF',fontSize:9,fontWeight:'800',marginTop:5}}>COLLEGHI</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -4483,22 +4380,10 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
               Alert.alert('Errore', e?.message || 'Impossibile caricare le conversazioni.');
             }
           }}
-          style={{
-        flex: 1,
-        alignItems: 'center',
-        justifyContent: 'center',
-        paddingVertical: 11,
-        borderRadius: 17,
-      }}
+          style={{flex:1,alignItems:'center',justifyContent:'center',paddingVertical:10}}
         >
-          <Ionicons name="chatbubble-ellipses-outline" size={26} color="#7FDBFF" />
-          <Text style={{
-          color: '#D9F5FF',
-          fontSize: 9.5,
-          fontWeight: '900',
-          marginTop: 7,
-          letterSpacing: 0.25,
-        }}>CHAT</Text>
+          <Ionicons name="chatbubble-ellipses-outline" size={24} color="#FFFFFF" />
+          <Text style={{color:'#FFFFFF',fontSize:9,fontWeight:'800',marginTop:5}}>CHAT</Text>
         </TouchableOpacity>
 
       </View>
@@ -4683,70 +4568,10 @@ function Calendar({
               : null;
 
           const oggiCalendario = new Date();
-
           const eOggi =
             Number(day) === oggiCalendario.getDate() &&
             Number(mese) === oggiCalendario.getMonth() &&
             Number(anno) === oggiCalendario.getFullYear();
-
-          const prossimiTurni = records
-            .filter((r) => {
-              if (
-                r.tipo !== 'turno' ||
-                !r.inizio
-              ) {
-                return false;
-              }
-
-              const [h, m] = String(r.inizio)
-                .split(':')
-                .map(Number);
-
-              const dataTurno = new Date(
-                anno,
-                mese,
-                Number(r.giorno),
-                h,
-                m,
-                0
-              );
-
-              return dataTurno > oggiCalendario;
-            })
-            .sort((a, b) => {
-              const [ha, ma] = String(a.inizio).split(':').map(Number);
-              const [hb, mb] = String(b.inizio).split(':').map(Number);
-
-              const da = new Date(
-                anno,
-                mese,
-                Number(a.giorno),
-                ha,
-                ma,
-                0
-              );
-
-              const db = new Date(
-                anno,
-                mese,
-                Number(b.giorno),
-                hb,
-                mb,
-                0
-              );
-
-              return da - db;
-            });
-
-          const prossimoTurno =
-            prossimiTurni.length > 0
-              ? prossimiTurni[0]
-              : null;
-
-          const eProssimo =
-            !eOggi &&
-            prossimoTurno &&
-            Number(day) === Number(prossimoTurno.giorno);
 
           return (
             <TouchableOpacity
@@ -4769,24 +4594,16 @@ function Calendar({
                   flex: 1,
                   borderRadius: 14,
                   borderWidth:
-                    eOggi
-                      ? 2.5
-                      : eProssimo
-                      ? 2
-                      : 1,
+                    eOggi ? 2.5 : 1,
                   borderColor:
                     eOggi
                       ? '#6FE8FF'
-                      : eProssimo
-                      ? '#FFD166'
                       : record
                       ? bordo
                       : '#26354D',
                   backgroundColor:
                     eOggi
                       ? '#10395A'
-                      : eProssimo
-                      ? '#3A3018'
                       : record
                       ? sfondo
                       : '#111D32',
@@ -4797,24 +4614,18 @@ function Calendar({
                   shadowColor:
                     eOggi
                       ? '#5EDBFF'
-                      : eProssimo
-                      ? '#FFD166'
                       : record
                       ? colore
                       : '#000000',
                   shadowOpacity:
                     eOggi
                       ? 0.75
-                      : eProssimo
-                      ? 0.50
                       : record
                       ? 0.20
                       : 0.04,
                   shadowRadius:
                     eOggi
                       ? 16
-                      : eProssimo
-                      ? 12
                       : record
                       ? 7
                       : 2,

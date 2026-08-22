@@ -1,0 +1,437 @@
+  return (
+    <Screen>
+      <View
+        style={
+          styles.header
+        }
+      >
+        <TouchableOpacity
+          style={{
+            flex: 1,
+          }}
+          onPress={
+            apriProfilo
+          }
+        >
+          <Text
+            style={
+              styles.welcome
+            }
+          >
+            Buon servizio,{' '}
+            {profilo.nome} 👋
+          </Text>
+
+          <Text
+            style={
+              styles.company
+            }
+          >
+            {profilo.azienda}{' '}
+            •{' '}
+            {profilo.ruolo}
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={
+            styles.avatar
+          }
+          onPress={
+            apriProfilo
+          }
+        >
+          {fotoProfilo ? (
+            <Image
+              source={{
+                uri:
+                  fotoProfilo,
+              }}
+              style={
+                styles.avatarImage
+              }
+            />
+          ) : (
+            <Text
+              style={
+                styles.avatarText
+              }
+            >
+              {iniziali}
+            </Text>
+          )}
+        </TouchableOpacity>
+      </View>
+
+      <View
+        style={{
+          backgroundColor: '#102a52',
+          borderRadius: 24,
+          padding: 20,
+          marginBottom: 18,
+          borderWidth: 1,
+          borderColor: '#243657',
+          shadowColor: '#000',
+          shadowOpacity: 0.30,
+          shadowRadius: 14,
+          shadowOffset: { width: 0, height: 8 },
+          elevation: 8,
+        }}
+      >
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+          <View>
+            <Text style={{ color: '#ffffff', fontSize: 15, fontWeight: '900', letterSpacing: 0.5 }}>
+              PANORAMICA MENSILE
+            </Text>
+            <Text style={{ color: 'white', fontSize: 29, fontWeight: '900', marginTop: 4 }}>
+              {MESI[mese]} {anno}
+            </Text>
+          </View>
+
+          <View style={{
+            backgroundColor: '#0C1222',
+            borderRadius: 14,
+            paddingHorizontal: 11,
+            paddingVertical: 7,
+            borderWidth: 1,
+            borderColor: '#243657',
+          }}>
+            <Text style={{ color: '#8bc7ff', fontSize: 11, fontWeight: '800' }}>
+              IN CORSO
+            </Text>
+          </View>
+        </View>
+
+        <View style={{
+          height: 1,
+          backgroundColor: '#315f9e',
+          marginVertical: 17,
+          opacity: 0.7,
+        }} />
+
+        <View style={{ flexDirection: 'row' }}>
+          <View style={{ flex: 1 }}>
+            <Text style={{ color: 'white', fontSize: 23, fontWeight: '900' }}>
+              {statistiche.ore}h
+            </Text>
+            <Text style={{ color: '#9fb2d9', fontSize: 11, marginTop: 2 }}>ORE TOTALI</Text>
+          </View>
+
+          <View style={{ width: 1, backgroundColor: '#315f9e', marginHorizontal: 12 }} />
+
+          <View style={{ flex: 1 }}>
+            <Text style={{ color: '#65d6ff', fontSize: 23, fontWeight: '900' }}>
+              {statistiche.extraOre}h
+            </Text>
+            <Text style={{ color: '#9fb2d9', fontSize: 11, marginTop: 2 }}>EXTRA</Text>
+          </View>
+
+          <View style={{ width: 1, backgroundColor: '#315f9e', marginHorizontal: 12 }} />
+
+          <View style={{ flex: 1 }}>
+            <Text style={{ color: 'white', fontSize: 23, fontWeight: '900' }}>
+              {statistiche.giorni}
+            </Text>
+            <Text style={{ color: '#9fb2d9', fontSize: 11, marginTop: 2 }}>GIORNI</Text>
+          </View>
+        </View>
+      </View>
+
+      
+          <View
+            style={{
+              backgroundColor: '#07101F',
+              borderRadius: 20,
+              padding: 18,
+              marginBottom: 14,
+            }}
+          >
+            <TouchableOpacity
+  onPress={() => setScreen('stipendio')}
+  style={{
+    backgroundColor: '#162f72',
+    borderRadius: 28,
+    padding: 22,
+    marginBottom: 14,
+    borderWidth: 2,
+    borderColor: '#5271ff',
+  }}
+>
+  <Text style={{
+    color: '#5a8cff',
+    fontSize: 11,
+    fontWeight: '900',
+    marginBottom: 8,
+  }}>
+    💰 STIPENDIO
+  </Text>
+
+  <Text style={{
+    color: 'white',
+    fontSize: 21,
+    fontWeight: '900',
+  }}>
+    Stipendio stimato
+  </Text>
+
+  <Text style={{
+    color: '#9fb2d9',
+    fontSize: 14,
+    marginTop: 6,
+  }}>
+    Calcola quanto stai maturando questo mese →
+  </Text>
+</TouchableOpacity>
+
+          <Text
+              style={{
+                color: '#45E36F',
+                fontSize: 11,
+                fontWeight: '900',
+                marginBottom: 8,
+              }}
+            >
+              TURNO DI OGGI
+            </Text>
+
+            <Text
+              style={{
+                color: 'white',
+                fontSize: 20,
+                fontWeight: '800',
+              }}
+            >
+              {turnoOggi
+                ? `${turnoOggi.inizio || '--:--'} – ${turnoOggi.fine || '--:--'}`
+                : 'Nessun turno oggi'}
+            </Text>
+
+            <Text
+              style={{
+                color: '#9fb2d9',
+                fontSize: 13,
+                marginTop: 6,
+              }}
+            >
+              {turnoOggi
+                ? `📍 ${turnoOggi.luogo || 'Luogo non indicato'}`
+                : 'Giornata libera'}
+            </Text>
+        {turnoOggi && (
+          <TouchableOpacity onPress={() => modificaGiorno(turnoOggi)} style={{ marginTop: 12 }}>
+            <Text style={{ color: "#5a8cff", fontWeight: "800" }}>GESTISCI TURNO ›</Text>
+          </TouchableOpacity>
+        )}
+          </View>
+
+<View
+        style={{
+          backgroundColor: '#07101F',
+          borderRadius: 20,
+          padding: 18,
+          marginBottom: 22,
+        }}
+      >
+        <Text
+          style={{
+            color: '#45E36F',
+            fontSize: 11,
+            fontWeight: '900',
+            marginBottom: 8,
+          }}
+        >
+          IN SERVIZIO CON TE
+        </Text>
+
+        {loadingServizio ? (
+          <ActivityIndicator />
+        ) : colleghiInServizio.length === 0 ? (
+          <Text style={{ color: '#9fb2d9' }}>
+            Nessun collega collegato in servizio oggi
+          </Text>
+        ) : (
+          colleghiInServizio.map((c, index) => (
+            <View
+                key={`${c.altro_user_id}-${index}`}
+              style={{
+                paddingVertical: 8,
+                borderBottomWidth:
+                  index < colleghiInServizio.length - 1 ? 1 : 0,
+                borderBottomColor: '#203b6a',
+              }}
+            >
+              <Text
+                style={{
+                  color: 'white',
+                  fontWeight: '800',
+                  fontSize: 16,
+                }}
+              >
+                👤 {c.profilo?.nome || 'Collega'} {c.profilo?.cognome || ''}
+              </Text>
+
+              <Text
+                style={{
+                  color: '#9fb2d9',
+                  fontSize: 12,
+                  marginTop: 3,
+                }}
+              >
+                {[c.profilo?.azienda, c.profilo?.sede]
+                  .filter(Boolean)
+                  .join(' · ')}
+              </Text>
+
+              {c.insieme_da && c.insieme_a && (
+                <Text
+                  style={{
+                    color: '#35e58b',
+                    fontWeight: '700',
+                    fontSize: 12,
+                    marginTop: 5,
+                  }}
+                >
+                  🟢 Con te dalle {c.insieme_da} alle {c.insieme_a}
+                </Text>
+              )}
+        <TouchableOpacity onPress={() => { setCollegaSelezionato(c); setScreen("profiloCollega"); }} style={{ marginTop: 8, alignSelf: "flex-start", paddingVertical: 6, paddingHorizontal: 12, borderRadius: 12, backgroundColor: "#284cff" }}><Text style={{ color: "white", fontSize: 12, fontWeight: "900" }}>VEDI ›</Text></TouchableOpacity>
+            </View>
+          ))
+        )}
+
+        <TouchableOpacity
+          onPress={aggiornaColleghiInServizioOggi}
+          style={{ marginTop: 12 }}
+        >
+          <Text
+            style={{
+              color: '#45E36F',
+              fontWeight: '800',
+              fontSize: 12,
+            }}
+          >
+            ↻ Aggiorna
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      <Text
+        style={
+          styles.section
+        }
+      >
+        Il tuo servizio
+      </Text>
+
+      <View
+        style={{
+          flexDirection: 'row',
+          flexWrap: 'wrap',
+          justifyContent: 'space-between',
+          marginTop: 4,
+        }}
+      >
+        <HomeServiceCard
+          icon="calendar-outline"
+          title="I miei turni"
+          subtitle="Servizi, riposi e programmazione"
+          onPress={() => {
+            setEditingId(null);
+            setScreen('turni');
+          }}
+        />
+
+        <HomeServiceCard
+          icon="calendar-number-outline"
+          title="Calendario"
+          subtitle="Consulta e modifica le giornate"
+          onPress={() => {
+            setEditingId(null);
+            setScreen('calendar');
+          }}
+        />
+
+        <HomeServiceCard
+          icon="person-outline"
+          title="Il mio profilo"
+          subtitle="Azienda, sede e informazioni personali"
+          onPress={apriProfilo}
+        />
+
+        <HomeServiceCard
+          icon="people-outline"
+          title="I miei colleghi"
+          subtitle="Colleghi e contatti di servizio"
+          onPress={() => {
+            setScreen('colleghi');
+            aggiornaColleghi();
+          }}
+        />
+
+        <HomeServiceCard
+          icon="chatbubble-ellipses-outline"
+          title="Chat"
+          subtitle="Messaggi con i tuoi colleghi"
+          wide
+          onPress={async () => {
+            try {
+              await aggiornaColleghi();
+              const ids = await colleghiConConversazione();
+              setChatColleghiIds(ids);
+              setScreen('listaChat');
+            } catch (e) {
+              Alert.alert('Errore', e?.message || 'Impossibile caricare le conversazioni.');
+            }
+          }}
+        />
+      </View>
+
+      <TouchableOpacity
+        style={
+          styles.saveButton
+        }
+        onPress={() => {
+          setEditingId(
+            null
+          );
+
+          setScreen(
+            'calendar'
+          );
+        }}
+      >
+        <Text
+          style={
+            styles.saveText
+          }
+        >
+          ＋ INSERISCI GIORNATA
+        </Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        style={
+          styles.syncButton
+        }
+        onPress={() =>
+          caricaTurni()
+        }
+      >
+        <Text
+          style={
+            styles.syncText
+          }
+        >
+          ↻ Sincronizza database
+        </Text>
+      </TouchableOpacity>
+
+      <Text
+        style={
+          styles.footer
+        }
+      >
+        VIGILANZA GPG TEST LIVE • DATABASE ONLINE
+      </Text>
+    </Screen>
+  );
