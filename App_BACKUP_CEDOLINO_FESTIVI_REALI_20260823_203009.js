@@ -1795,8 +1795,6 @@ useEffect(() => {
   const [cedolinoDomenicali, setCedolinoDomenicali] = useState('');
   const [cedolinoRiposo, setCedolinoRiposo] = useState('');
   const [cedolinoNotturno, setCedolinoNotturno] = useState('');
-  const [cedolinoFestivi, setCedolinoFestivi] = useState('');
-
 
 
   const [loadingServizio, setLoadingServizio] = useState(false);
@@ -2687,100 +2685,6 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
       ),
     0
   );
-
-  // ===== FESTIVI NAZIONALI ITALIANI =====
-  function dataPasqua(anno) {
-    const a = anno % 19;
-    const b = Math.floor(anno / 100);
-    const c = anno % 100;
-    const d = Math.floor(b / 4);
-    const e = b % 4;
-    const f = Math.floor((b + 8) / 25);
-    const g = Math.floor((b - f + 1) / 3);
-    const h = (19 * a + b - d - g + 15) % 30;
-    const i = Math.floor(c / 4);
-    const k = c % 4;
-    const l = (32 + 2 * e + 2 * i - h - k) % 7;
-    const m = Math.floor((a + 11 * h + 22 * l) / 451);
-
-    const mesePasqua = Math.floor((h + l - 7 * m + 114) / 31);
-    const giornoPasqua =
-      ((h + l - 7 * m + 114) % 31) + 1;
-
-    return new Date(anno, mesePasqua - 1, giornoPasqua);
-  }
-
-  function isFestivoNazionaleItaliano(anno, mese, giorno) {
-    const mmgg =
-      String(mese).padStart(2, '0') +
-      '-' +
-      String(giorno).padStart(2, '0');
-
-    const festeFisse = new Set([
-      '01-01', // Capodanno
-      '01-06', // Epifania
-      '04-25', // Liberazione
-      '05-01', // Festa dei lavoratori
-      '06-02', // Festa della Repubblica
-      '08-15', // Ferragosto
-      '11-01', // Tutti i Santi
-      '12-08', // Immacolata
-      '12-25', // Natale
-      '12-26', // Santo Stefano
-    ]);
-
-    if (festeFisse.has(mmgg)) {
-      return true;
-    }
-
-    const data = new Date(
-      Number(anno),
-      Number(mese) - 1,
-      Number(giorno)
-    );
-
-    const pasqua = dataPasqua(Number(anno));
-
-    const pasquetta = new Date(pasqua);
-    pasquetta.setDate(pasquetta.getDate() + 1);
-
-    const stessaData = (a, b) =>
-      a.getFullYear() === b.getFullYear() &&
-      a.getMonth() === b.getMonth() &&
-      a.getDate() === b.getDate();
-
-    return (
-      stessaData(data, pasqua) ||
-      stessaData(data, pasquetta)
-    );
-  }
-
-  const oreFestiveMese = giornateStipendioMese.reduce(
-    (totale, turno) => {
-      if (
-        turno.tipo !== 'turno' ||
-        !turno.anno ||
-        !turno.mese ||
-        !turno.giorno
-      ) {
-        return totale;
-      }
-
-      if (
-        !isFestivoNazionaleItaliano(
-          Number(turno.anno),
-          Number(turno.mese),
-          Number(turno.giorno)
-        )
-      ) {
-        return totale;
-      }
-
-      return totale + Number(turno.ore || 0);
-    },
-    0
-  );
-
 
 
   function turnoRapido(
@@ -4535,11 +4439,6 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
                 ced: cedolinoNotturno,
                 tariffa: tariffaPiantonamentoNotturno,
               },
-              {
-                app: Number(oreFestiveMese || 0),
-                ced: cedolinoFestivi,
-                tariffa: null,
-              },
             ];
 
             const compilate = righeControllo.filter(
@@ -4793,13 +4692,6 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
                 value: cedolinoNotturno,
                 setValue: setCedolinoNotturno,
                 tariffa: tariffaPiantonamentoNotturno,
-              },
-              {
-                label: 'FESTIVI',
-                app: Number(oreFestiveMese || 0),
-                value: cedolinoFestivi,
-                setValue: setCedolinoFestivi,
-                tariffa: null,
               },
             ].map((riga) => {
               const ced = Number(String(riga.value || '').replace(',', '.'));
@@ -5096,7 +4988,7 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
                   marginTop: 4,
                 }}
               >
-                {oreFestiveMese.toFixed(1)} h
+                In arrivo
               </Text>
 
               <Text
@@ -5108,7 +5000,7 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
                   marginTop: 6,
                 }}
               >
-                Ore festive registrate
+                Controllo separato dei festivi
               </Text>
             </View>
           </View>
@@ -5999,10 +5891,10 @@ if (screen === 'configuraStipendio') {
     return (
       <KeyboardAvoidingView
         style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={0}
       >
-        <SafeAreaView style={[styles.safe, { flex: 1, backgroundColor: '#0B1E2D' }]}>
+        <Screen>
         {/* BACK CHAT PREMIUM */}
       <View
         style={{
@@ -6017,23 +5909,7 @@ if (screen === 'configuraStipendio') {
           marginBottom: 12,
         }}
       >
-        <TouchableOpacity
-          activeOpacity={0.75}
-          onPress={() => setScreen('listaChat')}
-          style={{
-            width: 38,
-            height: 38,
-            alignItems: 'center',
-            justifyContent: 'center',
-            marginBottom: 10,
-          }}
-        >
-          <Ionicons
-            name="chevron-back"
-            size={28}
-            color="#FFFFFF"
-          />
-        </TouchableOpacity>
+        <Back onPress={() => setScreen('listaChat')} />
       </View>
 
         <View style={{
@@ -6086,7 +5962,6 @@ if (screen === 'configuraStipendio') {
             {/* AVATAR CHAT INTERNA */}
         <View
           style={{
-              display: 'none',
               width: 38,
               height: 38,
               borderRadius: 19,
@@ -6104,7 +5979,6 @@ if (screen === 'configuraStipendio') {
         >
           <View
             style={{
-              display: 'none',
               width: 48,
               height: 48,
               borderRadius: 24,
@@ -6154,7 +6028,6 @@ if (screen === 'configuraStipendio') {
           {/* NOME CHAT FORZATO */}
           <View
             style={{
-          display: 'none',
               flex: 1,
               justifyContent: 'center',
               minWidth: 0,
@@ -6208,7 +6081,6 @@ if (screen === 'configuraStipendio') {
       {/* LINEA NEON HEADER CHAT */}
       <View
         style={{
-          display: 'none',
           height: 1,
           backgroundColor: '#53D8FF',
           opacity: 0.24,
@@ -6498,7 +6370,7 @@ if (screen === 'configuraStipendio') {
             </Text>
           </TouchableOpacity>
         </View>
-        </SafeAreaView>
+        </Screen>
       </KeyboardAvoidingView>
     );
   }

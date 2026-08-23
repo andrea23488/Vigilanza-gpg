@@ -1788,17 +1788,6 @@ useEffect(() => {
   };
 
   const [fotoCollegaAperta, setFotoCollegaAperta] = useState(false);
-
-  // ===== CONTROLLO CEDOLINO =====
-  const [cedolinoOre, setCedolinoOre] = useState('');
-  const [cedolinoExtra, setCedolinoExtra] = useState('');
-  const [cedolinoDomenicali, setCedolinoDomenicali] = useState('');
-  const [cedolinoRiposo, setCedolinoRiposo] = useState('');
-  const [cedolinoNotturno, setCedolinoNotturno] = useState('');
-  const [cedolinoFestivi, setCedolinoFestivi] = useState('');
-
-
-
   const [loadingServizio, setLoadingServizio] = useState(false);
   const [loadingColleghi, setLoadingColleghi] = useState(false);
   const [collegaIdDraft, setCollegaIdDraft] = useState("");
@@ -2621,167 +2610,6 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
 
     return 'Pomeriggio';
   }
-
-  // ===== ORE NOTTURNE REALI: FASCIA 21:00 - 05:00 =====
-  function calcolaOreNotturneTurno(start, end) {
-    if (!start || !end) return 0;
-
-    const parseMinuti = (orario) => {
-      const [h, m] = String(orario).split(':').map(Number);
-
-      if (Number.isNaN(h) || Number.isNaN(m)) {
-        return null;
-      }
-
-      return h * 60 + m;
-    };
-
-    let inizioMin = parseMinuti(start);
-    let fineMin = parseMinuti(end);
-
-    if (inizioMin === null || fineMin === null) {
-      return 0;
-    }
-
-    // Turno che supera la mezzanotte
-    if (fineMin <= inizioMin) {
-      fineMin += 24 * 60;
-    }
-
-    const sovrapposizione = (a1, a2, b1, b2) =>
-      Math.max(0, Math.min(a2, b2) - Math.max(a1, b1));
-
-    // Fascia notte del giorno iniziale: 21:00 -> 24:00
-    let minutiNotte = sovrapposizione(
-      inizioMin,
-      fineMin,
-      21 * 60,
-      24 * 60
-    );
-
-    // Fascia notte del giorno iniziale: 00:00 -> 05:00
-    minutiNotte += sovrapposizione(
-      inizioMin,
-      fineMin,
-      0,
-      5 * 60
-    );
-
-    // Fascia notte del giorno successivo per i turni oltre mezzanotte
-    minutiNotte += sovrapposizione(
-      inizioMin,
-      fineMin,
-      24 * 60,
-      29 * 60
-    );
-
-    return minutiNotte / 60;
-  }
-
-  const oreNotturneMese = giornateStipendioMese.reduce(
-    (totale, turno) =>
-      totale +
-      calcolaOreNotturneTurno(
-        turno.inizio,
-        turno.fine
-      ),
-    0
-  );
-
-  // ===== FESTIVI NAZIONALI ITALIANI =====
-  function dataPasqua(anno) {
-    const a = anno % 19;
-    const b = Math.floor(anno / 100);
-    const c = anno % 100;
-    const d = Math.floor(b / 4);
-    const e = b % 4;
-    const f = Math.floor((b + 8) / 25);
-    const g = Math.floor((b - f + 1) / 3);
-    const h = (19 * a + b - d - g + 15) % 30;
-    const i = Math.floor(c / 4);
-    const k = c % 4;
-    const l = (32 + 2 * e + 2 * i - h - k) % 7;
-    const m = Math.floor((a + 11 * h + 22 * l) / 451);
-
-    const mesePasqua = Math.floor((h + l - 7 * m + 114) / 31);
-    const giornoPasqua =
-      ((h + l - 7 * m + 114) % 31) + 1;
-
-    return new Date(anno, mesePasqua - 1, giornoPasqua);
-  }
-
-  function isFestivoNazionaleItaliano(anno, mese, giorno) {
-    const mmgg =
-      String(mese).padStart(2, '0') +
-      '-' +
-      String(giorno).padStart(2, '0');
-
-    const festeFisse = new Set([
-      '01-01', // Capodanno
-      '01-06', // Epifania
-      '04-25', // Liberazione
-      '05-01', // Festa dei lavoratori
-      '06-02', // Festa della Repubblica
-      '08-15', // Ferragosto
-      '11-01', // Tutti i Santi
-      '12-08', // Immacolata
-      '12-25', // Natale
-      '12-26', // Santo Stefano
-    ]);
-
-    if (festeFisse.has(mmgg)) {
-      return true;
-    }
-
-    const data = new Date(
-      Number(anno),
-      Number(mese) - 1,
-      Number(giorno)
-    );
-
-    const pasqua = dataPasqua(Number(anno));
-
-    const pasquetta = new Date(pasqua);
-    pasquetta.setDate(pasquetta.getDate() + 1);
-
-    const stessaData = (a, b) =>
-      a.getFullYear() === b.getFullYear() &&
-      a.getMonth() === b.getMonth() &&
-      a.getDate() === b.getDate();
-
-    return (
-      stessaData(data, pasqua) ||
-      stessaData(data, pasquetta)
-    );
-  }
-
-  const oreFestiveMese = giornateStipendioMese.reduce(
-    (totale, turno) => {
-      if (
-        turno.tipo !== 'turno' ||
-        !turno.anno ||
-        !turno.mese ||
-        !turno.giorno
-      ) {
-        return totale;
-      }
-
-      if (
-        !isFestivoNazionaleItaliano(
-          Number(turno.anno),
-          Number(turno.mese),
-          Number(turno.giorno)
-        )
-      ) {
-        return totale;
-      }
-
-      return totale + Number(turno.ore || 0);
-    },
-    0
-  );
-
-
 
   function turnoRapido(
     start,
@@ -4498,657 +4326,63 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
             </Text>
           </View>
 
-          
-          {/* ===== CONFRONTO CEDOLINO V2 ===== */}
-          
-          {/* ===== VERDETTO CEDOLINO ===== */}
-          {(() => {
-            const righeControllo = [
-              {
-                app: Number(oreStipendioMese || 0),
-                ced: cedolinoOre,
-                tariffa: null,
-              },
-              {
-                app: Number(extraStipendioMese || 0),
-                ced: cedolinoExtra,
-                tariffa: tariffaStraordinario30,
-              },
-              {
-                app: Number(oreDomenicaliMese || 0),
-                ced: cedolinoDomenicali,
-                tariffa: tariffaDomenicale,
-              },
-              {
-                app: giornateStipendioMese.reduce(
-                  (tot, t) =>
-                    t.riposo_lavorato === true
-                      ? tot + Math.max(0, Number(t.ore || 0) - Number(t.extra || 0))
-                      : tot,
-                  0
-                ),
-                ced: cedolinoRiposo,
-                tariffa: tariffaRiposoLavorato,
-              },
-              {
-                app: Number(oreNotturneMese || 0),
-                ced: cedolinoNotturno,
-                tariffa: tariffaPiantonamentoNotturno,
-              },
-              {
-                app: Number(oreFestiveMese || 0),
-                ced: cedolinoFestivi,
-                tariffa: null,
-              },
-            ];
-
-            const compilate = righeControllo.filter(
-              (r) => String(r.ced || '').trim() !== ''
-            );
-
-            const differenze = compilate.map((r) => {
-              const ced = Number(String(r.ced).replace(',', '.'));
-              return Number.isNaN(ced) ? null : ced - r.app;
-            }).filter((v) => v !== null);
-
-            const vociDiverse = differenze.filter(
-              (d) => Math.abs(d) >= 0.11
-            ).length;
-
-            const tutteCompilate =
-              compilate.length === righeControllo.length;
-
-            const totaleScarto = differenze.reduce(
-              (tot, d) => tot + Math.abs(d),
-              0
-            );
-
-            const totaleEconomicoMancante = righeControllo.reduce(
-              (tot, r) => {
-                if (!r.tariffa || String(r.ced || '').trim() === '') {
-                  return tot;
-                }
-
-                const ced = Number(String(r.ced).replace(',', '.'));
-
-                if (Number.isNaN(ced)) {
-                  return tot;
-                }
-
-                const oreMancanti = Math.max(0, r.app - ced);
-
-                return tot + oreMancanti * r.tariffa;
-              },
-              0
-            );
-
-            const tuttoOk =
-              tutteCompilate &&
-              vociDiverse === 0;
-
-            const nessunDato =
-              compilate.length === 0;
-
-            const colore =
-              tuttoOk
-                ? '#69E9BF'
-                : vociDiverse > 0
-                ? '#FFD06A'
-                : '#76DFFF';
-
-            const bordo =
-              tuttoOk
-                ? 'rgba(105,233,191,0.42)'
-                : vociDiverse > 0
-                ? 'rgba(255,208,106,0.42)'
-                : 'rgba(118,223,255,0.34)';
-
-            const sfondo =
-              tuttoOk
-                ? 'rgba(21,70,61,0.48)'
-                : vociDiverse > 0
-                ? 'rgba(76,55,20,0.48)'
-                : 'rgba(17,55,86,0.52)';
-
-            const icona =
-              tuttoOk
-                ? 'shield-checkmark-outline'
-                : vociDiverse > 0
-                ? 'alert-circle-outline'
-                : 'document-text-outline';
-
-            const titolo =
-              nessunDato
-                ? 'INSERISCI I DATI DEL CEDOLINO'
-                : tuttoOk
-                ? 'CEDOLINO COERENTE'
-                : vociDiverse > 0
-                ? `${vociDiverse} ${vociDiverse === 1 ? 'VOCE DA VERIFICARE' : 'VOCI DA VERIFICARE'}`
-                : 'CONTROLLO IN CORSO';
-
-            const testo =
-              nessunDato
-                ? 'Compila i valori riportati sul cedolino per iniziare il confronto.'
-                : tuttoOk
-                ? 'Le voci inserite coincidono con quanto registrato dall’app.'
-                : vociDiverse > 0
-                ? `Scarto complessivo rilevato: ${totaleScarto.toFixed(1)} ore.${totaleEconomicoMancante > 0 ? ` Possibile importo non riconosciuto: circa € ${totaleEconomicoMancante.toFixed(2)}.` : ''} Controlla le righe evidenziate.`
-                : `${compilate.length} di ${righeControllo.length} voci controllate. Completa il cedolino per il verdetto finale.`;
-
-            return (
-              <View
-                style={{
-                  marginTop: 16,
-                  marginBottom: 2,
-                  padding: 17,
-                  borderRadius: 22,
-                  backgroundColor: sfondo,
-                  borderWidth: 1,
-                  borderColor: bordo,
-
-                  shadowColor: colore,
-                  shadowOpacity: 0.16,
-                  shadowRadius: 14,
-                  shadowOffset: { width: 0, height: 5 },
-                }}
-              >
-                <View
-                  style={{
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                  }}
-                >
-                  <View
-                    style={{
-                      width: 44,
-                      height: 44,
-                      borderRadius: 15,
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      backgroundColor: 'rgba(5,19,38,0.38)',
-                      borderWidth: 1,
-                      borderColor: bordo,
-                      marginRight: 12,
-                    }}
-                  >
-                    <Ionicons
-                      name={icona}
-                      size={23}
-                      color={colore}
-                    />
-                  </View>
-
-                  <View style={{ flex: 1 }}>
-                    <Text
-                      style={{
-                        color: colore,
-                        fontSize: 10,
-                        fontWeight: '900',
-                        letterSpacing: 0.9,
-                      }}
-                    >
-                      VERDETTO CEDOLINO
-                    </Text>
-
-                    <Text
-                      style={{
-                        color: '#FFFFFF',
-                        fontSize: 18,
-                        fontWeight: '900',
-                        marginTop: 3,
-                      }}
-                    >
-                      {titolo}
-                    </Text>
-                  </View>
-                </View>
-
-                <Text
-                  style={{
-                    color: '#B3C6D9',
-                    fontSize: 11,
-                    lineHeight: 17,
-                    fontWeight: '700',
-                    marginTop: 11,
-                  }}
-                >
-                  {testo}
-                </Text>
-              </View>
-            );
-          })()}
-
-<View
+          <View
             style={{
               marginTop: 16,
-              padding: 17,
-              borderRadius: 24,
-              backgroundColor: 'rgba(10,31,62,0.96)',
+              padding: 18,
+              borderRadius: 22,
+              backgroundColor: 'rgba(12,32,62,0.94)',
               borderWidth: 1,
-              borderColor: 'rgba(89,211,255,0.30)',
+              borderColor: 'rgba(90,176,222,0.25)',
             }}
           >
             <Text
               style={{
-                color: '#79ECFF',
+                color: '#7EEBFF',
                 fontSize: 10,
                 fontWeight: '900',
-                letterSpacing: 1.1,
-                marginBottom: 5,
+                letterSpacing: 1,
+                marginBottom: 12,
               }}
             >
-              CONFRONTO DEL MESE
-            </Text>
-
-            <Text
-              style={{
-                color: '#8EA9C5',
-                fontSize: 11,
-                lineHeight: 16,
-                fontWeight: '700',
-                marginBottom: 15,
-              }}
-            >
-              A sinistra trovi i dati registrati dall'app. Inserisci a destra quelli riportati sul cedolino.
+              COSA CONTROLLEREMO
             </Text>
 
             {[
-              {
-                label: 'ORE LAVORATE',
-                app: Number(oreStipendioMese || 0),
-                value: cedolinoOre,
-                setValue: setCedolinoOre,
-                tariffa: null,
-              },
-              {
-                label: 'STRAORDINARIO',
-                app: Number(extraStipendioMese || 0),
-                value: cedolinoExtra,
-                setValue: setCedolinoExtra,
-                tariffa: tariffaStraordinario30,
-              },
-              {
-                label: 'DOMENICALI',
-                app: Number(oreDomenicaliMese || 0),
-                value: cedolinoDomenicali,
-                setValue: setCedolinoDomenicali,
-                tariffa: tariffaDomenicale,
-              },
-              {
-                label: 'RIPOSO LAVORATO',
-                app: giornateStipendioMese.reduce(
-                  (tot, t) =>
-                    t.riposo_lavorato === true
-                      ? tot + Math.max(0, Number(t.ore || 0) - Number(t.extra || 0))
-                      : tot,
-                  0
-                ),
-                value: cedolinoRiposo,
-                setValue: setCedolinoRiposo,
-                tariffa: tariffaRiposoLavorato,
-              },
-              {
-                label: 'NOTTURNO',
-                app: Number(oreNotturneMese || 0),
-                value: cedolinoNotturno,
-                setValue: setCedolinoNotturno,
-                tariffa: tariffaPiantonamentoNotturno,
-              },
-              {
-                label: 'FESTIVI',
-                app: Number(oreFestiveMese || 0),
-                value: cedolinoFestivi,
-                setValue: setCedolinoFestivi,
-                tariffa: null,
-              },
-            ].map((riga) => {
-              const ced = Number(String(riga.value || '').replace(',', '.'));
-              const compilato =
-                String(riga.value || '').trim() !== '' &&
-                !Number.isNaN(ced);
+              'Ore lavorate',
+              'Straordinario',
+              'Ore notturne',
+              'Domenicali',
+              'Festivi',
+              'Riposo lavorato',
+            ].map((voce) => (
+              <View
+                key={voce}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  marginBottom: 10,
+                }}
+              >
+                <Ionicons
+                  name="checkmark-circle-outline"
+                  size={18}
+                  color="#68E7C0"
+                />
 
-              const diff = compilato ? ced - riga.app : null;
-              const ok = compilato && Math.abs(diff) < 0.11;
-
-              const oreMancanti =
-                compilato && diff < -0.10
-                  ? Math.abs(diff)
-                  : 0;
-
-              const euroMancanti =
-                riga.tariffa && oreMancanti > 0
-                  ? oreMancanti * riga.tariffa
-                  : 0;
-
-              return (
-                <View
-                  key={riga.label}
+                <Text
                   style={{
-                    marginBottom: 7,
-                    paddingVertical: 11,
-                    paddingHorizontal: 13,
-                    borderRadius: 17,
-                    backgroundColor: 'rgba(18,45,82,0.82)',
-                    borderWidth: 1,
-                    borderColor:
-                      !compilato
-                        ? 'rgba(91,159,210,0.20)'
-                        : ok
-                        ? 'rgba(83,232,188,0.42)'
-                        : 'rgba(255,187,84,0.42)',
+                    color: '#FFFFFF',
+                    fontSize: 14,
+                    fontWeight: '800',
+                    marginLeft: 9,
                   }}
                 >
-                  <Text
-                    style={{
-                      color: '#A7C0D9',
-                      fontSize: 9,
-                      fontWeight: '900',
-                      letterSpacing: 0.8,
-                      marginBottom: 9,
-                    }}
-                  >
-                    {riga.label}
-                  </Text>
-
-                  <View
-                    style={{
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                    }}
-                  >
-                    <View style={{ flex: 1 }}>
-                      <Text
-                        style={{
-                          color: '#6F93B7',
-                          fontSize: 8,
-                          fontWeight: '900',
-                        }}
-                      >
-                        REGISTRATO
-                      </Text>
-
-                      <Text
-                        style={{
-                          color: '#FFFFFF',
-                          fontSize: 17,
-                          fontWeight: '900',
-                          marginTop: 2,
-                          letterSpacing: -0.2,
-                        }}
-                      >
-                        {riga.app.toFixed(1)} h
-                      </Text>
-                    </View>
-
-                    <View style={{ width: 116 }}>
-                      <Text
-                        style={{
-                          color: '#6F93B7',
-                          fontSize: 8,
-                          fontWeight: '900',
-                          marginBottom: 4,
-                        }}
-                      >
-                        CEDOLINO
-                      </Text>
-
-                      <TextInput
-                        value={riga.value}
-                        onChangeText={riga.setValue}
-                        keyboardType="decimal-pad"
-                        placeholder="0,0"
-                        placeholderTextColor="#52708E"
-                        style={{
-                          height: 37,
-                          borderRadius: 11,
-                          paddingHorizontal: 10,
-                          color: '#FFFFFF',
-                          fontSize: 15,
-                          fontWeight: '900',
-                          backgroundColor: 'rgba(3,16,35,0.76)',
-                          borderWidth: 1,
-                          borderColor: 'rgba(97,211,255,0.28)',
-                        }}
-                      />
-                    </View>
-                  </View>
-
-                  {compilato ? (
-                    <View
-                      style={{
-                        marginTop: 7,
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                      }}
-                    >
-                      <Ionicons
-                        name={ok ? 'checkmark-circle' : 'alert-circle'}
-                        size={16}
-                        color={ok ? '#61E7BC' : '#FFD06A'}
-                      />
-
-                      <Text
-                        style={{
-                          marginLeft: 6,
-                          color: ok ? '#78EDC7' : '#FFD785',
-                          fontSize: 10,
-                          fontWeight: '900',
-                        }}
-                      >
-                        {ok
-                          ? 'COINCIDE'
-                          : `DIFFERENZA ${diff > 0 ? '+' : ''}${diff.toFixed(1)} h`}
-                      </Text>
-
-                      {euroMancanti > 0 ? (
-                        <Text
-                          style={{
-                            color: '#FFD785',
-                            fontSize: 10,
-                            fontWeight: '800',
-                            marginTop: 5,
-                          }}
-                        >
-                          STIMA ECONOMICA: circa € {euroMancanti.toFixed(2)}
-                        </Text>
-                      ) : null}
-                    </View>
-                  ) : null}
-                </View>
-              );
-            })}
-
-            
-          {/* ===== MINI CARD NOTTURNO FESTIVI ===== */}
-          <View
-            style={{
-              flexDirection: 'row',
-              gap: 9,
-              marginTop: 12,
-              marginBottom: 14,
-            }}
-          >
-            <View
-              style={{
-                flex: 1,
-                minHeight: 105,
-                padding: 13,
-                borderRadius: 19,
-
-                backgroundColor: 'rgba(29,35,78,0.86)',
-                borderWidth: 1,
-                borderColor: 'rgba(128,118,255,0.34)',
-
-                shadowColor: '#8D7CFF',
-                shadowOpacity: 0.13,
-                shadowRadius: 10,
-                shadowOffset: { width: 0, height: 4 },
-              }}
-            >
-              <View
-                style={{
-                  width: 34,
-                  height: 34,
-                  borderRadius: 12,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  backgroundColor: 'rgba(128,118,255,0.14)',
-                  borderWidth: 1,
-                  borderColor: 'rgba(159,150,255,0.25)',
-                  marginBottom: 9,
-                }}
-              >
-                <Ionicons
-                  name="moon-outline"
-                  size={18}
-                  color="#B4AAFF"
-                />
+                  {voce}
+                </Text>
               </View>
-
-              <Text
-                style={{
-                  color: '#AAA0FF',
-                  fontSize: 9,
-                  fontWeight: '900',
-                  letterSpacing: 0.8,
-                }}
-              >
-                NOTTURNO
-              </Text>
-
-              <Text
-                style={{
-                  color: '#FFFFFF',
-                  fontSize: 19,
-                  fontWeight: '900',
-                  marginTop: 3,
-                }}
-              >
-                {oreNotturneMese.toFixed(1)} h
-              </Text>
-
-              <Text
-                style={{
-                  color: '#849AB5',
-                  fontSize: 9,
-                  lineHeight: 13,
-                  fontWeight: '700',
-                  marginTop: 5,
-                }}
-              >
-                Confronto cedolino attivo
-              </Text>
-            </View>
-
-            <View
-              style={{
-                flex: 1,
-                minHeight: 105,
-                padding: 13,
-                borderRadius: 19,
-
-                backgroundColor: 'rgba(18,49,70,0.84)',
-                borderWidth: 1,
-                borderColor: 'rgba(85,216,236,0.30)',
-
-                shadowColor: '#5EE5F7',
-                shadowOpacity: 0.11,
-                shadowRadius: 10,
-                shadowOffset: { width: 0, height: 4 },
-              }}
-            >
-              <View
-                style={{
-                  width: 34,
-                  height: 34,
-                  borderRadius: 12,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  backgroundColor: 'rgba(76,211,226,0.12)',
-                  borderWidth: 1,
-                  borderColor: 'rgba(91,224,239,0.23)',
-                  marginBottom: 9,
-                }}
-              >
-                <Ionicons
-                  name="calendar-outline"
-                  size={18}
-                  color="#72E7F3"
-                />
-              </View>
-
-              <Text
-                style={{
-                  color: '#72DDEA',
-                  fontSize: 9,
-                  fontWeight: '900',
-                  letterSpacing: 0.8,
-                }}
-              >
-                FESTIVI
-              </Text>
-
-              <Text
-                style={{
-                  color: '#FFFFFF',
-                  fontSize: 15,
-                  fontWeight: '900',
-                  marginTop: 4,
-                }}
-              >
-                {oreFestiveMese.toFixed(1)} h
-              </Text>
-
-              <Text
-                style={{
-                  color: '#849AB5',
-                  fontSize: 9,
-                  lineHeight: 13,
-                  fontWeight: '700',
-                  marginTop: 6,
-                }}
-              >
-                Ore festive registrate
-              </Text>
-            </View>
+            ))}
           </View>
-
-<View
-              style={{
-              display: 'none',
-                marginTop: 4,
-                padding: 13,
-                borderRadius: 17,
-                backgroundColor: 'rgba(65,48,103,0.38)',
-                borderWidth: 1,
-                borderColor: 'rgba(172,137,255,0.20)',
-              }}
-            >
-              <Text
-                style={{
-                  color: '#C7B9F6',
-                  fontSize: 11,
-                  lineHeight: 17,
-                  fontWeight: '700',
-                }}
-              >
-                🌙 Turni notturni registrati: {statistiche.notti}. Il confronto delle ore notturne verrà attivato dopo il calcolo preciso delle ore di fascia.
-              </Text>
-
-              <Text
-                style={{
-                  color: '#C7B9F6',
-                  fontSize: 11,
-                  lineHeight: 17,
-                  fontWeight: '700',
-                  marginTop: 7,
-                }}
-              >
-                🎉 Festivi: il motore attuale non li calcola ancora separatamente. Non vengono quindi stimati per evitare confronti errati.
-              </Text>
-            </View>
-          </View>
-
 
           <View
             style={{
@@ -5999,10 +5233,10 @@ if (screen === 'configuraStipendio') {
     return (
       <KeyboardAvoidingView
         style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={0}
       >
-        <SafeAreaView style={[styles.safe, { flex: 1, backgroundColor: '#0B1E2D' }]}>
+        <Screen>
         {/* BACK CHAT PREMIUM */}
       <View
         style={{
@@ -6017,23 +5251,7 @@ if (screen === 'configuraStipendio') {
           marginBottom: 12,
         }}
       >
-        <TouchableOpacity
-          activeOpacity={0.75}
-          onPress={() => setScreen('listaChat')}
-          style={{
-            width: 38,
-            height: 38,
-            alignItems: 'center',
-            justifyContent: 'center',
-            marginBottom: 10,
-          }}
-        >
-          <Ionicons
-            name="chevron-back"
-            size={28}
-            color="#FFFFFF"
-          />
-        </TouchableOpacity>
+        <Back onPress={() => setScreen('listaChat')} />
       </View>
 
         <View style={{
@@ -6086,7 +5304,6 @@ if (screen === 'configuraStipendio') {
             {/* AVATAR CHAT INTERNA */}
         <View
           style={{
-              display: 'none',
               width: 38,
               height: 38,
               borderRadius: 19,
@@ -6104,7 +5321,6 @@ if (screen === 'configuraStipendio') {
         >
           <View
             style={{
-              display: 'none',
               width: 48,
               height: 48,
               borderRadius: 24,
@@ -6154,7 +5370,6 @@ if (screen === 'configuraStipendio') {
           {/* NOME CHAT FORZATO */}
           <View
             style={{
-          display: 'none',
               flex: 1,
               justifyContent: 'center',
               minWidth: 0,
@@ -6208,7 +5423,6 @@ if (screen === 'configuraStipendio') {
       {/* LINEA NEON HEADER CHAT */}
       <View
         style={{
-          display: 'none',
           height: 1,
           backgroundColor: '#53D8FF',
           opacity: 0.24,
@@ -6498,7 +5712,7 @@ if (screen === 'configuraStipendio') {
             </Text>
           </TouchableOpacity>
         </View>
-        </SafeAreaView>
+        </Screen>
       </KeyboardAvoidingView>
     );
   }

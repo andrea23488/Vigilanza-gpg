@@ -6086,7 +6086,6 @@ if (screen === 'configuraStipendio') {
             {/* AVATAR CHAT INTERNA */}
         <View
           style={{
-              display: 'none',
               width: 38,
               height: 38,
               borderRadius: 19,

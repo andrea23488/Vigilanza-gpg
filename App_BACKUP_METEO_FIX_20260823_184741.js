@@ -1575,9 +1575,7 @@ useEffect(() => {
     const luogo = String(zona || '').trim();
 
     if (!luogo) {
-      setMeteoErrore(
-        'Inserisci una località per caricare il meteo.'
-      );
+      setMeteoErrore('Imposta prima la zona operativa nel profilo.');
       setMeteoServizio(null);
       return;
     }
@@ -1586,124 +1584,46 @@ useEffect(() => {
     setMeteoErrore('');
 
     try {
-      // 1. CERCA LA LOCALITÀ
       const geoUrl =
         'https://geocoding-api.open-meteo.com/v1/search?name=' +
         encodeURIComponent(luogo) +
         '&count=1&language=it&format=json';
 
-      console.log(
-        '🌍 METEO - ricerca località:',
-        luogo
-      );
-
       const geoResponse = await fetch(geoUrl);
-
-      if (!geoResponse.ok) {
-        throw new Error(
-          `Geocoding HTTP ${geoResponse.status}`
-        );
-      }
-
       const geoData = await geoResponse.json();
 
-      if (
-        !geoData?.results ||
-        !Array.isArray(geoData.results) ||
-        geoData.results.length === 0
-      ) {
-        throw new Error(
-          `Località "${luogo}" non trovata`
-        );
+      if (!geoData?.results?.length) {
+        throw new Error('Località non trovata');
       }
 
       const luogoTrovato = geoData.results[0];
 
-      const lat = Number(luogoTrovato.latitude);
-      const lon = Number(luogoTrovato.longitude);
-
-      if (
-        !Number.isFinite(lat) ||
-        !Number.isFinite(lon)
-      ) {
-        throw new Error(
-          'Coordinate della località non valide'
-        );
-      }
-
-      console.log(
-        '✅ METEO - località trovata:',
-        luogoTrovato.name,
-        lat,
-        lon
-      );
-
-      // 2. CARICA LE PREVISIONI
       const meteoUrl =
         'https://api.open-meteo.com/v1/forecast' +
-        `?latitude=${lat}` +
-        `&longitude=${lon}` +
+        '?latitude=' + luogoTrovato.latitude +
+        '&longitude=' + luogoTrovato.longitude +
         '&current=temperature_2m,apparent_temperature,precipitation,weather_code,wind_speed_10m' +
         '&hourly=temperature_2m,apparent_temperature,precipitation_probability,precipitation,weather_code,wind_speed_10m' +
         '&forecast_days=7' +
         '&timezone=auto';
 
       const response = await fetch(meteoUrl);
-
-      if (!response.ok) {
-        throw new Error(
-          `Meteo HTTP ${response.status}`
-        );
-      }
-
       const data = await response.json();
 
-      if (
-        !data ||
-        !data.current ||
-        data.current.temperature_2m === undefined
-      ) {
-        throw new Error(
-          'Il servizio meteo non ha restituito i dati correnti'
-        );
-      }
-
-      console.log(
-        '✅ METEO - temperatura:',
-        data.current.temperature_2m
-      );
-
-      // 3. MOSTRA SUBITO IL METEO
       setMeteoServizio({
         ...data,
         luogo: luogoTrovato,
       });
 
-      setMeteoErrore('');
-
-      // 4. SALVA LA LOCALITÀ SEPARATAMENTE.
-      // Un eventuale errore qui NON cancella il meteo.
-      try {
-        await salvaLocalitaMeteo(luogo);
-      } catch (salvaErrore) {
-        console.log(
-          '⚠️ Meteo caricato ma località non salvata:',
-          salvaErrore
-        );
-      }
-
+      await salvaLocalitaMeteo(luogo);
     } catch (e) {
-      console.log(
-        '❌ ERRORE METEO:',
-        e
+      console.log('Errore meteo:', e);
+
+      setMeteoErrore(
+        'Non riesco a recuperare il meteo per questa zona.'
       );
 
       setMeteoServizio(null);
-
-      setMeteoErrore(
-        e?.message ||
-        'Non riesco a recuperare il meteo per questa zona.'
-      );
     } finally {
       setMeteoLoading(false);
     }
@@ -1788,17 +1708,6 @@ useEffect(() => {
   };
 
   const [fotoCollegaAperta, setFotoCollegaAperta] = useState(false);
-
-  // ===== CONTROLLO CEDOLINO =====
-  const [cedolinoOre, setCedolinoOre] = useState('');
-  const [cedolinoExtra, setCedolinoExtra] = useState('');
-  const [cedolinoDomenicali, setCedolinoDomenicali] = useState('');
-  const [cedolinoRiposo, setCedolinoRiposo] = useState('');
-  const [cedolinoNotturno, setCedolinoNotturno] = useState('');
-  const [cedolinoFestivi, setCedolinoFestivi] = useState('');
-
-
-
   const [loadingServizio, setLoadingServizio] = useState(false);
   const [loadingColleghi, setLoadingColleghi] = useState(false);
   const [collegaIdDraft, setCollegaIdDraft] = useState("");
@@ -2621,167 +2530,6 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
 
     return 'Pomeriggio';
   }
-
-  // ===== ORE NOTTURNE REALI: FASCIA 21:00 - 05:00 =====
-  function calcolaOreNotturneTurno(start, end) {
-    if (!start || !end) return 0;
-
-    const parseMinuti = (orario) => {
-      const [h, m] = String(orario).split(':').map(Number);
-
-      if (Number.isNaN(h) || Number.isNaN(m)) {
-        return null;
-      }
-
-      return h * 60 + m;
-    };
-
-    let inizioMin = parseMinuti(start);
-    let fineMin = parseMinuti(end);
-
-    if (inizioMin === null || fineMin === null) {
-      return 0;
-    }
-
-    // Turno che supera la mezzanotte
-    if (fineMin <= inizioMin) {
-      fineMin += 24 * 60;
-    }
-
-    const sovrapposizione = (a1, a2, b1, b2) =>
-      Math.max(0, Math.min(a2, b2) - Math.max(a1, b1));
-
-    // Fascia notte del giorno iniziale: 21:00 -> 24:00
-    let minutiNotte = sovrapposizione(
-      inizioMin,
-      fineMin,
-      21 * 60,
-      24 * 60
-    );
-
-    // Fascia notte del giorno iniziale: 00:00 -> 05:00
-    minutiNotte += sovrapposizione(
-      inizioMin,
-      fineMin,
-      0,
-      5 * 60
-    );
-
-    // Fascia notte del giorno successivo per i turni oltre mezzanotte
-    minutiNotte += sovrapposizione(
-      inizioMin,
-      fineMin,
-      24 * 60,
-      29 * 60
-    );
-
-    return minutiNotte / 60;
-  }
-
-  const oreNotturneMese = giornateStipendioMese.reduce(
-    (totale, turno) =>
-      totale +
-      calcolaOreNotturneTurno(
-        turno.inizio,
-        turno.fine
-      ),
-    0
-  );
-
-  // ===== FESTIVI NAZIONALI ITALIANI =====
-  function dataPasqua(anno) {
-    const a = anno % 19;
-    const b = Math.floor(anno / 100);
-    const c = anno % 100;
-    const d = Math.floor(b / 4);
-    const e = b % 4;
-    const f = Math.floor((b + 8) / 25);
-    const g = Math.floor((b - f + 1) / 3);
-    const h = (19 * a + b - d - g + 15) % 30;
-    const i = Math.floor(c / 4);
-    const k = c % 4;
-    const l = (32 + 2 * e + 2 * i - h - k) % 7;
-    const m = Math.floor((a + 11 * h + 22 * l) / 451);
-
-    const mesePasqua = Math.floor((h + l - 7 * m + 114) / 31);
-    const giornoPasqua =
-      ((h + l - 7 * m + 114) % 31) + 1;
-
-    return new Date(anno, mesePasqua - 1, giornoPasqua);
-  }
-
-  function isFestivoNazionaleItaliano(anno, mese, giorno) {
-    const mmgg =
-      String(mese).padStart(2, '0') +
-      '-' +
-      String(giorno).padStart(2, '0');
-
-    const festeFisse = new Set([
-      '01-01', // Capodanno
-      '01-06', // Epifania
-      '04-25', // Liberazione
-      '05-01', // Festa dei lavoratori
-      '06-02', // Festa della Repubblica
-      '08-15', // Ferragosto
-      '11-01', // Tutti i Santi
-      '12-08', // Immacolata
-      '12-25', // Natale
-      '12-26', // Santo Stefano
-    ]);
-
-    if (festeFisse.has(mmgg)) {
-      return true;
-    }
-
-    const data = new Date(
-      Number(anno),
-      Number(mese) - 1,
-      Number(giorno)
-    );
-
-    const pasqua = dataPasqua(Number(anno));
-
-    const pasquetta = new Date(pasqua);
-    pasquetta.setDate(pasquetta.getDate() + 1);
-
-    const stessaData = (a, b) =>
-      a.getFullYear() === b.getFullYear() &&
-      a.getMonth() === b.getMonth() &&
-      a.getDate() === b.getDate();
-
-    return (
-      stessaData(data, pasqua) ||
-      stessaData(data, pasquetta)
-    );
-  }
-
-  const oreFestiveMese = giornateStipendioMese.reduce(
-    (totale, turno) => {
-      if (
-        turno.tipo !== 'turno' ||
-        !turno.anno ||
-        !turno.mese ||
-        !turno.giorno
-      ) {
-        return totale;
-      }
-
-      if (
-        !isFestivoNazionaleItaliano(
-          Number(turno.anno),
-          Number(turno.mese),
-          Number(turno.giorno)
-        )
-      ) {
-        return totale;
-      }
-
-      return totale + Number(turno.ore || 0);
-    },
-    0
-  );
-
-
 
   function turnoRapido(
     start,
@@ -4174,83 +3922,6 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
           </Text>
         </View>
 
-        {/* ===== CONTROLLO CEDOLINO ENTRY ===== */}
-        <TouchableOpacity
-          activeOpacity={0.84}
-          onPress={() => setScreen('controlloCedolino')}
-          style={{
-            marginTop: 4,
-            marginBottom: 16,
-            paddingVertical: 16,
-            paddingHorizontal: 17,
-            borderRadius: 22,
-
-            flexDirection: 'row',
-            alignItems: 'center',
-
-            backgroundColor: 'rgba(15,42,79,0.96)',
-            borderWidth: 1,
-            borderColor: 'rgba(89,225,255,0.48)',
-
-            shadowColor: '#50E4FF',
-            shadowOpacity: 0.20,
-            shadowRadius: 15,
-            shadowOffset: { width: 0, height: 6 },
-          }}
-        >
-          <View
-            style={{
-              width: 48,
-              height: 48,
-              borderRadius: 16,
-              alignItems: 'center',
-              justifyContent: 'center',
-              marginRight: 13,
-              backgroundColor: 'rgba(74,207,255,0.14)',
-              borderWidth: 1,
-              borderColor: 'rgba(103,231,255,0.36)',
-            }}
-          >
-            <Ionicons
-              name="document-text-outline"
-              size={25}
-              color="#74ECFF"
-            />
-          </View>
-
-          <View style={{ flex: 1 }}>
-            <Text
-              style={{
-                color: '#FFFFFF',
-                fontSize: 15,
-                fontWeight: '900',
-                letterSpacing: 0.2,
-              }}
-            >
-              CONTROLLA LA MIA BUSTA PAGA
-            </Text>
-
-            <Text
-              style={{
-                color: '#9DB9D5',
-                fontSize: 11,
-                fontWeight: '700',
-                marginTop: 4,
-                lineHeight: 15,
-              }}
-            >
-              Confronta il cedolino con i turni registrati
-            </Text>
-          </View>
-
-          <Ionicons
-            name="chevron-forward"
-            size={22}
-            color="#78E8FF"
-          />
-        </TouchableOpacity>
-
-
 
         <View
           style={{
@@ -4436,747 +4107,7 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
     );
   }
 
-  
-  if (screen === 'controlloCedolino') {
-    return (
-      <Screen>
-        <Back onPress={() => setScreen('stipendio')} />
-
-        <ScrollView
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={{
-            paddingBottom: 40,
-          }}
-        >
-          <View
-            style={{
-              marginTop: 10,
-              padding: 22,
-              borderRadius: 28,
-              backgroundColor: 'rgba(12,31,68,0.97)',
-              borderWidth: 1,
-              borderColor: 'rgba(102,226,255,0.45)',
-              shadowColor: '#59E3FF',
-              shadowOpacity: 0.24,
-              shadowRadius: 20,
-              shadowOffset: { width: 0, height: 8 },
-            }}
-          >
-            <Text
-              style={{
-                color: '#79ECFF',
-                fontSize: 10,
-                fontWeight: '900',
-                letterSpacing: 1.3,
-              }}
-            >
-              CONTROLLO CEDOLINO
-            </Text>
-
-            <Text
-              style={{
-                color: '#FFFFFF',
-                fontSize: 29,
-                lineHeight: 33,
-                fontWeight: '900',
-                marginTop: 6,
-              }}
-            >
-              Controlla la tua busta paga
-            </Text>
-
-            <Text
-              style={{
-                color: '#A9C0D9',
-                fontSize: 13,
-                lineHeight: 19,
-                fontWeight: '700',
-                marginTop: 8,
-              }}
-            >
-              Confronteremo ciò che hai realmente registrato nell'app con le voci presenti nel cedolino.
-            </Text>
-          </View>
-
-          
-          {/* ===== CONFRONTO CEDOLINO V2 ===== */}
-          
-          {/* ===== VERDETTO CEDOLINO ===== */}
-          {(() => {
-            const righeControllo = [
-              {
-                app: Number(oreStipendioMese || 0),
-                ced: cedolinoOre,
-                tariffa: null,
-              },
-              {
-                app: Number(extraStipendioMese || 0),
-                ced: cedolinoExtra,
-                tariffa: tariffaStraordinario30,
-              },
-              {
-                app: Number(oreDomenicaliMese || 0),
-                ced: cedolinoDomenicali,
-                tariffa: tariffaDomenicale,
-              },
-              {
-                app: giornateStipendioMese.reduce(
-                  (tot, t) =>
-                    t.riposo_lavorato === true
-                      ? tot + Math.max(0, Number(t.ore || 0) - Number(t.extra || 0))
-                      : tot,
-                  0
-                ),
-                ced: cedolinoRiposo,
-                tariffa: tariffaRiposoLavorato,
-              },
-              {
-                app: Number(oreNotturneMese || 0),
-                ced: cedolinoNotturno,
-                tariffa: tariffaPiantonamentoNotturno,
-              },
-              {
-                app: Number(oreFestiveMese || 0),
-                ced: cedolinoFestivi,
-                tariffa: null,
-              },
-            ];
-
-            const compilate = righeControllo.filter(
-              (r) => String(r.ced || '').trim() !== ''
-            );
-
-            const differenze = compilate.map((r) => {
-              const ced = Number(String(r.ced).replace(',', '.'));
-              return Number.isNaN(ced) ? null : ced - r.app;
-            }).filter((v) => v !== null);
-
-            const vociDiverse = differenze.filter(
-              (d) => Math.abs(d) >= 0.11
-            ).length;
-
-            const tutteCompilate =
-              compilate.length === righeControllo.length;
-
-            const totaleScarto = differenze.reduce(
-              (tot, d) => tot + Math.abs(d),
-              0
-            );
-
-            const totaleEconomicoMancante = righeControllo.reduce(
-              (tot, r) => {
-                if (!r.tariffa || String(r.ced || '').trim() === '') {
-                  return tot;
-                }
-
-                const ced = Number(String(r.ced).replace(',', '.'));
-
-                if (Number.isNaN(ced)) {
-                  return tot;
-                }
-
-                const oreMancanti = Math.max(0, r.app - ced);
-
-                return tot + oreMancanti * r.tariffa;
-              },
-              0
-            );
-
-            const tuttoOk =
-              tutteCompilate &&
-              vociDiverse === 0;
-
-            const nessunDato =
-              compilate.length === 0;
-
-            const colore =
-              tuttoOk
-                ? '#69E9BF'
-                : vociDiverse > 0
-                ? '#FFD06A'
-                : '#76DFFF';
-
-            const bordo =
-              tuttoOk
-                ? 'rgba(105,233,191,0.42)'
-                : vociDiverse > 0
-                ? 'rgba(255,208,106,0.42)'
-                : 'rgba(118,223,255,0.34)';
-
-            const sfondo =
-              tuttoOk
-                ? 'rgba(21,70,61,0.48)'
-                : vociDiverse > 0
-                ? 'rgba(76,55,20,0.48)'
-                : 'rgba(17,55,86,0.52)';
-
-            const icona =
-              tuttoOk
-                ? 'shield-checkmark-outline'
-                : vociDiverse > 0
-                ? 'alert-circle-outline'
-                : 'document-text-outline';
-
-            const titolo =
-              nessunDato
-                ? 'INSERISCI I DATI DEL CEDOLINO'
-                : tuttoOk
-                ? 'CEDOLINO COERENTE'
-                : vociDiverse > 0
-                ? `${vociDiverse} ${vociDiverse === 1 ? 'VOCE DA VERIFICARE' : 'VOCI DA VERIFICARE'}`
-                : 'CONTROLLO IN CORSO';
-
-            const testo =
-              nessunDato
-                ? 'Compila i valori riportati sul cedolino per iniziare il confronto.'
-                : tuttoOk
-                ? 'Le voci inserite coincidono con quanto registrato dall’app.'
-                : vociDiverse > 0
-                ? `Scarto complessivo rilevato: ${totaleScarto.toFixed(1)} ore.${totaleEconomicoMancante > 0 ? ` Possibile importo non riconosciuto: circa € ${totaleEconomicoMancante.toFixed(2)}.` : ''} Controlla le righe evidenziate.`
-                : `${compilate.length} di ${righeControllo.length} voci controllate. Completa il cedolino per il verdetto finale.`;
-
-            return (
-              <View
-                style={{
-                  marginTop: 16,
-                  marginBottom: 2,
-                  padding: 17,
-                  borderRadius: 22,
-                  backgroundColor: sfondo,
-                  borderWidth: 1,
-                  borderColor: bordo,
-
-                  shadowColor: colore,
-                  shadowOpacity: 0.16,
-                  shadowRadius: 14,
-                  shadowOffset: { width: 0, height: 5 },
-                }}
-              >
-                <View
-                  style={{
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                  }}
-                >
-                  <View
-                    style={{
-                      width: 44,
-                      height: 44,
-                      borderRadius: 15,
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      backgroundColor: 'rgba(5,19,38,0.38)',
-                      borderWidth: 1,
-                      borderColor: bordo,
-                      marginRight: 12,
-                    }}
-                  >
-                    <Ionicons
-                      name={icona}
-                      size={23}
-                      color={colore}
-                    />
-                  </View>
-
-                  <View style={{ flex: 1 }}>
-                    <Text
-                      style={{
-                        color: colore,
-                        fontSize: 10,
-                        fontWeight: '900',
-                        letterSpacing: 0.9,
-                      }}
-                    >
-                      VERDETTO CEDOLINO
-                    </Text>
-
-                    <Text
-                      style={{
-                        color: '#FFFFFF',
-                        fontSize: 18,
-                        fontWeight: '900',
-                        marginTop: 3,
-                      }}
-                    >
-                      {titolo}
-                    </Text>
-                  </View>
-                </View>
-
-                <Text
-                  style={{
-                    color: '#B3C6D9',
-                    fontSize: 11,
-                    lineHeight: 17,
-                    fontWeight: '700',
-                    marginTop: 11,
-                  }}
-                >
-                  {testo}
-                </Text>
-              </View>
-            );
-          })()}
-
-<View
-            style={{
-              marginTop: 16,
-              padding: 17,
-              borderRadius: 24,
-              backgroundColor: 'rgba(10,31,62,0.96)',
-              borderWidth: 1,
-              borderColor: 'rgba(89,211,255,0.30)',
-            }}
-          >
-            <Text
-              style={{
-                color: '#79ECFF',
-                fontSize: 10,
-                fontWeight: '900',
-                letterSpacing: 1.1,
-                marginBottom: 5,
-              }}
-            >
-              CONFRONTO DEL MESE
-            </Text>
-
-            <Text
-              style={{
-                color: '#8EA9C5',
-                fontSize: 11,
-                lineHeight: 16,
-                fontWeight: '700',
-                marginBottom: 15,
-              }}
-            >
-              A sinistra trovi i dati registrati dall'app. Inserisci a destra quelli riportati sul cedolino.
-            </Text>
-
-            {[
-              {
-                label: 'ORE LAVORATE',
-                app: Number(oreStipendioMese || 0),
-                value: cedolinoOre,
-                setValue: setCedolinoOre,
-                tariffa: null,
-              },
-              {
-                label: 'STRAORDINARIO',
-                app: Number(extraStipendioMese || 0),
-                value: cedolinoExtra,
-                setValue: setCedolinoExtra,
-                tariffa: tariffaStraordinario30,
-              },
-              {
-                label: 'DOMENICALI',
-                app: Number(oreDomenicaliMese || 0),
-                value: cedolinoDomenicali,
-                setValue: setCedolinoDomenicali,
-                tariffa: tariffaDomenicale,
-              },
-              {
-                label: 'RIPOSO LAVORATO',
-                app: giornateStipendioMese.reduce(
-                  (tot, t) =>
-                    t.riposo_lavorato === true
-                      ? tot + Math.max(0, Number(t.ore || 0) - Number(t.extra || 0))
-                      : tot,
-                  0
-                ),
-                value: cedolinoRiposo,
-                setValue: setCedolinoRiposo,
-                tariffa: tariffaRiposoLavorato,
-              },
-              {
-                label: 'NOTTURNO',
-                app: Number(oreNotturneMese || 0),
-                value: cedolinoNotturno,
-                setValue: setCedolinoNotturno,
-                tariffa: tariffaPiantonamentoNotturno,
-              },
-              {
-                label: 'FESTIVI',
-                app: Number(oreFestiveMese || 0),
-                value: cedolinoFestivi,
-                setValue: setCedolinoFestivi,
-                tariffa: null,
-              },
-            ].map((riga) => {
-              const ced = Number(String(riga.value || '').replace(',', '.'));
-              const compilato =
-                String(riga.value || '').trim() !== '' &&
-                !Number.isNaN(ced);
-
-              const diff = compilato ? ced - riga.app : null;
-              const ok = compilato && Math.abs(diff) < 0.11;
-
-              const oreMancanti =
-                compilato && diff < -0.10
-                  ? Math.abs(diff)
-                  : 0;
-
-              const euroMancanti =
-                riga.tariffa && oreMancanti > 0
-                  ? oreMancanti * riga.tariffa
-                  : 0;
-
-              return (
-                <View
-                  key={riga.label}
-                  style={{
-                    marginBottom: 7,
-                    paddingVertical: 11,
-                    paddingHorizontal: 13,
-                    borderRadius: 17,
-                    backgroundColor: 'rgba(18,45,82,0.82)',
-                    borderWidth: 1,
-                    borderColor:
-                      !compilato
-                        ? 'rgba(91,159,210,0.20)'
-                        : ok
-                        ? 'rgba(83,232,188,0.42)'
-                        : 'rgba(255,187,84,0.42)',
-                  }}
-                >
-                  <Text
-                    style={{
-                      color: '#A7C0D9',
-                      fontSize: 9,
-                      fontWeight: '900',
-                      letterSpacing: 0.8,
-                      marginBottom: 9,
-                    }}
-                  >
-                    {riga.label}
-                  </Text>
-
-                  <View
-                    style={{
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                    }}
-                  >
-                    <View style={{ flex: 1 }}>
-                      <Text
-                        style={{
-                          color: '#6F93B7',
-                          fontSize: 8,
-                          fontWeight: '900',
-                        }}
-                      >
-                        REGISTRATO
-                      </Text>
-
-                      <Text
-                        style={{
-                          color: '#FFFFFF',
-                          fontSize: 17,
-                          fontWeight: '900',
-                          marginTop: 2,
-                          letterSpacing: -0.2,
-                        }}
-                      >
-                        {riga.app.toFixed(1)} h
-                      </Text>
-                    </View>
-
-                    <View style={{ width: 116 }}>
-                      <Text
-                        style={{
-                          color: '#6F93B7',
-                          fontSize: 8,
-                          fontWeight: '900',
-                          marginBottom: 4,
-                        }}
-                      >
-                        CEDOLINO
-                      </Text>
-
-                      <TextInput
-                        value={riga.value}
-                        onChangeText={riga.setValue}
-                        keyboardType="decimal-pad"
-                        placeholder="0,0"
-                        placeholderTextColor="#52708E"
-                        style={{
-                          height: 37,
-                          borderRadius: 11,
-                          paddingHorizontal: 10,
-                          color: '#FFFFFF',
-                          fontSize: 15,
-                          fontWeight: '900',
-                          backgroundColor: 'rgba(3,16,35,0.76)',
-                          borderWidth: 1,
-                          borderColor: 'rgba(97,211,255,0.28)',
-                        }}
-                      />
-                    </View>
-                  </View>
-
-                  {compilato ? (
-                    <View
-                      style={{
-                        marginTop: 7,
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                      }}
-                    >
-                      <Ionicons
-                        name={ok ? 'checkmark-circle' : 'alert-circle'}
-                        size={16}
-                        color={ok ? '#61E7BC' : '#FFD06A'}
-                      />
-
-                      <Text
-                        style={{
-                          marginLeft: 6,
-                          color: ok ? '#78EDC7' : '#FFD785',
-                          fontSize: 10,
-                          fontWeight: '900',
-                        }}
-                      >
-                        {ok
-                          ? 'COINCIDE'
-                          : `DIFFERENZA ${diff > 0 ? '+' : ''}${diff.toFixed(1)} h`}
-                      </Text>
-
-                      {euroMancanti > 0 ? (
-                        <Text
-                          style={{
-                            color: '#FFD785',
-                            fontSize: 10,
-                            fontWeight: '800',
-                            marginTop: 5,
-                          }}
-                        >
-                          STIMA ECONOMICA: circa € {euroMancanti.toFixed(2)}
-                        </Text>
-                      ) : null}
-                    </View>
-                  ) : null}
-                </View>
-              );
-            })}
-
-            
-          {/* ===== MINI CARD NOTTURNO FESTIVI ===== */}
-          <View
-            style={{
-              flexDirection: 'row',
-              gap: 9,
-              marginTop: 12,
-              marginBottom: 14,
-            }}
-          >
-            <View
-              style={{
-                flex: 1,
-                minHeight: 105,
-                padding: 13,
-                borderRadius: 19,
-
-                backgroundColor: 'rgba(29,35,78,0.86)',
-                borderWidth: 1,
-                borderColor: 'rgba(128,118,255,0.34)',
-
-                shadowColor: '#8D7CFF',
-                shadowOpacity: 0.13,
-                shadowRadius: 10,
-                shadowOffset: { width: 0, height: 4 },
-              }}
-            >
-              <View
-                style={{
-                  width: 34,
-                  height: 34,
-                  borderRadius: 12,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  backgroundColor: 'rgba(128,118,255,0.14)',
-                  borderWidth: 1,
-                  borderColor: 'rgba(159,150,255,0.25)',
-                  marginBottom: 9,
-                }}
-              >
-                <Ionicons
-                  name="moon-outline"
-                  size={18}
-                  color="#B4AAFF"
-                />
-              </View>
-
-              <Text
-                style={{
-                  color: '#AAA0FF',
-                  fontSize: 9,
-                  fontWeight: '900',
-                  letterSpacing: 0.8,
-                }}
-              >
-                NOTTURNO
-              </Text>
-
-              <Text
-                style={{
-                  color: '#FFFFFF',
-                  fontSize: 19,
-                  fontWeight: '900',
-                  marginTop: 3,
-                }}
-              >
-                {oreNotturneMese.toFixed(1)} h
-              </Text>
-
-              <Text
-                style={{
-                  color: '#849AB5',
-                  fontSize: 9,
-                  lineHeight: 13,
-                  fontWeight: '700',
-                  marginTop: 5,
-                }}
-              >
-                Confronto cedolino attivo
-              </Text>
-            </View>
-
-            <View
-              style={{
-                flex: 1,
-                minHeight: 105,
-                padding: 13,
-                borderRadius: 19,
-
-                backgroundColor: 'rgba(18,49,70,0.84)',
-                borderWidth: 1,
-                borderColor: 'rgba(85,216,236,0.30)',
-
-                shadowColor: '#5EE5F7',
-                shadowOpacity: 0.11,
-                shadowRadius: 10,
-                shadowOffset: { width: 0, height: 4 },
-              }}
-            >
-              <View
-                style={{
-                  width: 34,
-                  height: 34,
-                  borderRadius: 12,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  backgroundColor: 'rgba(76,211,226,0.12)',
-                  borderWidth: 1,
-                  borderColor: 'rgba(91,224,239,0.23)',
-                  marginBottom: 9,
-                }}
-              >
-                <Ionicons
-                  name="calendar-outline"
-                  size={18}
-                  color="#72E7F3"
-                />
-              </View>
-
-              <Text
-                style={{
-                  color: '#72DDEA',
-                  fontSize: 9,
-                  fontWeight: '900',
-                  letterSpacing: 0.8,
-                }}
-              >
-                FESTIVI
-              </Text>
-
-              <Text
-                style={{
-                  color: '#FFFFFF',
-                  fontSize: 15,
-                  fontWeight: '900',
-                  marginTop: 4,
-                }}
-              >
-                {oreFestiveMese.toFixed(1)} h
-              </Text>
-
-              <Text
-                style={{
-                  color: '#849AB5',
-                  fontSize: 9,
-                  lineHeight: 13,
-                  fontWeight: '700',
-                  marginTop: 6,
-                }}
-              >
-                Ore festive registrate
-              </Text>
-            </View>
-          </View>
-
-<View
-              style={{
-              display: 'none',
-                marginTop: 4,
-                padding: 13,
-                borderRadius: 17,
-                backgroundColor: 'rgba(65,48,103,0.38)',
-                borderWidth: 1,
-                borderColor: 'rgba(172,137,255,0.20)',
-              }}
-            >
-              <Text
-                style={{
-                  color: '#C7B9F6',
-                  fontSize: 11,
-                  lineHeight: 17,
-                  fontWeight: '700',
-                }}
-              >
-                🌙 Turni notturni registrati: {statistiche.notti}. Il confronto delle ore notturne verrà attivato dopo il calcolo preciso delle ore di fascia.
-              </Text>
-
-              <Text
-                style={{
-                  color: '#C7B9F6',
-                  fontSize: 11,
-                  lineHeight: 17,
-                  fontWeight: '700',
-                  marginTop: 7,
-                }}
-              >
-                🎉 Festivi: il motore attuale non li calcola ancora separatamente. Non vengono quindi stimati per evitare confronti errati.
-              </Text>
-            </View>
-          </View>
-
-
-          <View
-            style={{
-              marginTop: 14,
-              padding: 16,
-              borderRadius: 18,
-              backgroundColor: 'rgba(43,33,75,0.56)',
-              borderWidth: 1,
-              borderColor: 'rgba(171,132,255,0.22)',
-            }}
-          >
-            <Text
-              style={{
-                color: '#C8B9FF',
-                fontSize: 12,
-                lineHeight: 18,
-                fontWeight: '700',
-              }}
-            >
-              Nel prossimo passaggio collegheremo automaticamente i dati del mese registrati nell'app e inseriremo i valori del cedolino da confrontare.
-            </Text>
-          </View>
-        </ScrollView>
-      </Screen>
-    );
-  }
-
-if (screen === 'configuraStipendio') {
+  if (screen === 'configuraStipendio') {
     return (
       <Screen>
         <Back onPress={() => setScreen('stipendio')} />
@@ -5999,10 +4930,10 @@ if (screen === 'configuraStipendio') {
     return (
       <KeyboardAvoidingView
         style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={0}
       >
-        <SafeAreaView style={[styles.safe, { flex: 1, backgroundColor: '#0B1E2D' }]}>
+        <Screen>
         {/* BACK CHAT PREMIUM */}
       <View
         style={{
@@ -6017,23 +4948,7 @@ if (screen === 'configuraStipendio') {
           marginBottom: 12,
         }}
       >
-        <TouchableOpacity
-          activeOpacity={0.75}
-          onPress={() => setScreen('listaChat')}
-          style={{
-            width: 38,
-            height: 38,
-            alignItems: 'center',
-            justifyContent: 'center',
-            marginBottom: 10,
-          }}
-        >
-          <Ionicons
-            name="chevron-back"
-            size={28}
-            color="#FFFFFF"
-          />
-        </TouchableOpacity>
+        <Back onPress={() => setScreen('listaChat')} />
       </View>
 
         <View style={{
@@ -6086,7 +5001,6 @@ if (screen === 'configuraStipendio') {
             {/* AVATAR CHAT INTERNA */}
         <View
           style={{
-              display: 'none',
               width: 38,
               height: 38,
               borderRadius: 19,
@@ -6104,7 +5018,6 @@ if (screen === 'configuraStipendio') {
         >
           <View
             style={{
-              display: 'none',
               width: 48,
               height: 48,
               borderRadius: 24,
@@ -6154,7 +5067,6 @@ if (screen === 'configuraStipendio') {
           {/* NOME CHAT FORZATO */}
           <View
             style={{
-          display: 'none',
               flex: 1,
               justifyContent: 'center',
               minWidth: 0,
@@ -6208,7 +5120,6 @@ if (screen === 'configuraStipendio') {
       {/* LINEA NEON HEADER CHAT */}
       <View
         style={{
-          display: 'none',
           height: 1,
           backgroundColor: '#53D8FF',
           opacity: 0.24,
@@ -6498,7 +5409,7 @@ if (screen === 'configuraStipendio') {
             </Text>
           </TouchableOpacity>
         </View>
-        </SafeAreaView>
+        </Screen>
       </KeyboardAvoidingView>
     );
   }
@@ -10513,33 +9424,26 @@ if (screen === 'configuraStipendio') {
         <View
           style={{
             marginTop: 8,
-            paddingHorizontal: 22,
-            paddingVertical: 22,
-            shadowColor: '#63E6FF',
-          shadowOpacity: 0.28,
-          shadowRadius: 22,
-          shadowOffset: { width: 0, height: 10 },
-
-          borderRadius: 30,
+            paddingHorizontal: 20,
+            paddingVertical: 18,
+            borderRadius: 26,
             marginBottom: 18,
 
-            backgroundColor: 'rgba(12,28,66,0.98)',
+            backgroundColor: 'rgba(12,31,68,0.94)',
 
             borderWidth: 1,
-            borderColor: 'rgba(105,231,255,0.58)',
+            borderColor: 'rgba(94,212,255,0.28)',
 
             shadowColor: '#4CDFFF',
-            shadowOpacity: 0.30,
-            shadowRadius: 24,
-            shadowOffset: { width: 0, height: 10 },
-          
-          elevation: 10,
-        }}
+            shadowOpacity: 0.12,
+            shadowRadius: 15,
+            shadowOffset: { width: 0, height: 6 },
+          }}
         >
           <Text
             style={{
               color: '#6EE6FF',
-              fontSize: 11,
+              fontSize: 10,
               fontWeight: '900',
               letterSpacing: 1.3,
             }}
@@ -10550,12 +9454,7 @@ if (screen === 'configuraStipendio') {
           <Text
             style={{
               color: '#FFFFFF',
-              fontSize: 31,
-              lineHeight: 34,
-              letterSpacing: -0.6,
-              textShadowColor: 'rgba(113,230,255,0.38)',
-              textShadowOffset: { width: 0, height: 0 },
-              textShadowRadius: 12,
+              fontSize: 27,
               fontWeight: '900',
               marginTop: 6,
             }}
@@ -10563,94 +9462,7 @@ if (screen === 'configuraStipendio') {
             Condizioni operative
           </Text>
 
-          
-        {/* ===== METEO LIVE HERO ===== */}
-        {meteoServizio?.current ? (
           <View
-            style={{
-              marginTop: 18,
-              marginBottom: 7,
-              flexDirection: 'row',
-              alignItems: 'center',
-            }}
-          >
-            <View
-              style={{
-                width: 72,
-                height: 72,
-                borderRadius: 24,
-                alignItems: 'center',
-                justifyContent: 'center',
-                marginRight: 16,
-
-                backgroundColor: 'rgba(74,203,255,0.13)',
-                borderWidth: 1,
-                borderColor: 'rgba(111,235,255,0.55)',
-
-                shadowColor: '#64E9FF',
-                shadowOpacity: 0.42,
-                shadowRadius: 20,
-                shadowOffset: { width: 0, height: 5 },
-              }}
-            >
-              <Ionicons
-                name={iconaMeteo(codiceMeteo)}
-                size={39}
-                color="#C9FAFF"
-              />
-            </View>
-
-            <View style={{ flex: 1 }}>
-              <View
-                style={{
-                  flexDirection: 'row',
-                  alignItems: 'flex-start',
-                }}
-              >
-                <Text
-                  style={{
-                    color: '#FFFFFF',
-                    fontSize: 58,
-                    lineHeight: 61,
-                    fontWeight: '900',
-                    letterSpacing: -2,
-
-                    textShadowColor: 'rgba(89,227,255,0.50)',
-                    textShadowOffset: { width: 0, height: 0 },
-                    textShadowRadius: 16,
-                  }}
-                >
-                  {Math.round(meteoServizio.current.temperature_2m)}
-                </Text>
-
-                <Text
-                  style={{
-                    color: '#A9F2FF',
-                    fontSize: 22,
-                    fontWeight: '900',
-                    marginTop: 7,
-                    marginLeft: 2,
-                  }}
-                >
-                  °
-                </Text>
-              </View>
-
-              <Text
-                style={{
-                  color: '#E6FAFF',
-                  fontSize: 15,
-                  fontWeight: '900',
-                  marginTop: -3,
-                }}
-              >
-                {descrizioneMeteo(codiceMeteo)}
-              </Text>
-            </View>
-          </View>
-        ) : null}
-
-<View
             style={{
               flexDirection: 'row',
               alignItems: 'center',
@@ -10666,7 +9478,7 @@ if (screen === 'configuraStipendio') {
             <Text
               style={{
                 color: '#A7C0D9',
-                fontSize: 13,
+                fontSize: 12,
                 fontWeight: '700',
                 marginLeft: 5,
                 flex: 1,
@@ -10681,9 +9493,9 @@ if (screen === 'configuraStipendio') {
         {/* ===== PROSSIMO SERVIZIO ===== */}
         <View
           style={{
-            marginBottom: 8,
-            padding: 14,
-            borderRadius: 22,
+            marginBottom: 18,
+            padding: 18,
+            borderRadius: 26,
 
             backgroundColor: 'rgba(9,27,59,0.96)',
 
@@ -10692,7 +9504,7 @@ if (screen === 'configuraStipendio') {
 
             shadowColor: '#54DFFF',
             shadowOpacity: 0.14,
-            shadowRadius: 11,
+            shadowRadius: 14,
             shadowOffset: { width: 0, height: 5 },
           }}
         >
@@ -10784,7 +9596,7 @@ if (screen === 'configuraStipendio') {
                 <Text
                   style={{
                     color: '#DDE8FF',
-                    fontSize: 15,
+                    fontSize: 13,
                     fontWeight: '900',
                     marginLeft: 7,
                   }}
@@ -11016,7 +9828,7 @@ if (screen === 'configuraStipendio') {
                         marginLeft: 8,
 
                         color: '#DDE7EE',
-                        fontSize: 12,
+                        fontSize: 10,
                         fontWeight: '800',
                         lineHeight: 15,
                       }}
@@ -11030,19 +9842,19 @@ if (screen === 'configuraStipendio') {
                       flexDirection: 'row',
                       alignItems: 'center',
 
-                      marginTop: 11,
+                      marginTop: 9,
                     }}
                   >
                     <Ionicons
                       name="navigate-outline"
-                      size={16}
+                      size={15}
                       color="#70CFC0"
                     />
 
                     <Text
                       style={{
                         color: '#7996AE',
-                        fontSize: 10.5,
+                        fontSize: 9.5,
                         fontWeight: '700',
                         marginLeft: 5,
                       }}
@@ -11061,14 +9873,14 @@ if (screen === 'configuraStipendio') {
 
                     <Ionicons
                       name="thermometer-outline"
-                      size={16}
+                      size={15}
                       color="#9EAFFF"
                     />
 
                     <Text
                       style={{
                         color: '#7996AE',
-                        fontSize: 10.5,
+                        fontSize: 9.5,
                         fontWeight: '700',
                         marginLeft: 4,
                       }}
@@ -11121,7 +9933,7 @@ if (screen === 'configuraStipendio') {
             <Text
               style={{
                 color: '#748DA6',
-                fontSize: 12,
+                fontSize: 10,
                 lineHeight: 15,
                 fontWeight: '700',
               }}
@@ -11176,8 +9988,6 @@ if (screen === 'configuraStipendio') {
 
             <View
               style={{
-            display: 'none',
-
                 marginBottom: 14,
                 padding: meteoServizio ? 11 : 15,
                 borderRadius: 22,
@@ -11202,7 +10012,7 @@ if (screen === 'configuraStipendio') {
               {!meteoServizio && recentiMeteo.length > 0 ? (
                 <View
                   style={{
-                    marginBottom: 0,
+                    marginBottom: 10,
                   }}
                 >
                   <Text
@@ -11351,9 +10161,8 @@ if (screen === 'configuraStipendio') {
                   )
                 }
                 style={{
-            display: 'none',
                   minHeight: 44,
-                  marginBottom: 0,
+                  marginBottom: 10,
 
                   borderRadius: 16,
 
@@ -11380,7 +10189,7 @@ if (screen === 'configuraStipendio') {
                 <Text
                   style={{
                     color: '#DFFFFA',
-                    fontSize: 12,
+                    fontSize: 10,
                     fontWeight: '900',
                     letterSpacing: 0.45,
                     marginLeft: 7,
@@ -11396,23 +10205,23 @@ if (screen === 'configuraStipendio') {
               onPress={() => caricaMeteoServizio(zonaMeteoEffettiva)}
               disabled={meteoLoading}
               style={{
-                minHeight: 48,
-                borderRadius: 17,
+                minHeight: 56,
+                borderRadius: 19,
 
                 alignItems: 'center',
                 justifyContent: 'center',
 
-                backgroundColor: 'rgba(28,116,158,0.88)',
+                backgroundColor: 'rgba(22,139,176,0.96)',
 
                 borderWidth: 1,
-                borderColor: 'rgba(105,225,255,0.55)',
+                borderColor: 'rgba(109,232,255,0.78)',
 
                 shadowColor: '#52DFFF',
-                shadowOpacity: 0.16,
-                shadowRadius: 9,
+                shadowOpacity: 0.24,
+                shadowRadius: 12,
                 shadowOffset: { width: 0, height: 5 },
 
-                marginBottom: 11,
+                marginBottom: 17,
               }}
             >
               <Text
@@ -11458,19 +10267,14 @@ if (screen === 'configuraStipendio') {
               <>
                 <View
                   style={{
-              display: 'none',
                     padding: 20,
                     borderRadius: 26,
                     marginBottom: 12,
 
-                    backgroundColor: 'rgba(9,24,52,0.96)',
-          shadowColor: '#52DFFF',
-          shadowOpacity: 0.22,
-          shadowRadius: 18,
-          shadowOffset: { width: 0, height: 8 },
+                    backgroundColor: 'rgba(10,29,61,0.96)',
 
                     borderWidth: 1,
-                    borderColor: 'rgba(104,232,255,0.34)',
+                    borderColor: 'rgba(91,207,255,0.38)',
                   }}
                 >
                   <View
@@ -11510,12 +10314,7 @@ if (screen === 'configuraStipendio') {
                       <Text
                         style={{
                           color: '#FFFFFF',
-                          fontSize: 54,
-              lineHeight: 56,
-              letterSpacing: -1,
-              textShadowColor: 'rgba(82,223,255,0.45)',
-              textShadowOffset: { width: 0, height: 0 },
-              textShadowRadius: 14,
+                          fontSize: 36,
                           fontWeight: '900',
                         }}
                       >
@@ -11527,7 +10326,7 @@ if (screen === 'configuraStipendio') {
                       <Text
                         style={{
                           color: '#A8C3DA',
-                          fontSize: 15,
+                          fontSize: 13,
                           fontWeight: '800',
                         }}
                       >
@@ -11539,9 +10338,9 @@ if (screen === 'configuraStipendio') {
                   <Text
                     style={{
                       color: '#718EA9',
-                      fontSize: 12,
+                      fontSize: 10,
                       fontWeight: '700',
-                      marginTop: 8,
+                      marginTop: 14,
                     }}
                   >
                     {[
@@ -11555,20 +10354,17 @@ if (screen === 'configuraStipendio') {
 
                 <View
                   style={{
-            display: 'none',
                     flexDirection: 'row',
                     flexWrap: 'wrap',
                     justifyContent: 'space-between',
-          marginTop: 12,
                   }}
                 >
                   <View
                     style={{
-                      width: '31.8%',
-                      paddingVertical: 13,
-              paddingHorizontal: 12,
-                      borderRadius: 18,
-                      marginBottom: 0,
+                      width: '48.5%',
+                      padding: 15,
+                      borderRadius: 20,
+                      marginBottom: 10,
 
                       backgroundColor: 'rgba(12,31,63,0.94)',
                       borderWidth: 1,
@@ -11608,11 +10404,10 @@ if (screen === 'configuraStipendio') {
 
                   <View
                     style={{
-                      width: '31.8%',
-                      paddingVertical: 13,
-              paddingHorizontal: 12,
-                      borderRadius: 18,
-                      marginBottom: 0,
+                      width: '48.5%',
+                      padding: 15,
+                      borderRadius: 20,
+                      marginBottom: 10,
 
                       backgroundColor: 'rgba(12,31,63,0.94)',
                       borderWidth: 1,
@@ -11651,9 +10446,8 @@ if (screen === 'configuraStipendio') {
                   <View
                     style={{
                       width: '100%',
-                      paddingVertical: 13,
-              paddingHorizontal: 12,
-                      borderRadius: 18,
+                      padding: 15,
+                      borderRadius: 20,
 
                       backgroundColor: 'rgba(12,31,63,0.94)',
                       borderWidth: 1,
@@ -11706,16 +10500,16 @@ if (screen === 'configuraStipendio') {
 
         <View
           style={{
-            marginTop: 10,
-            paddingHorizontal: 12,
-            paddingVertical: 9,
-            borderRadius: 14,
+            marginTop: 16,
+            paddingHorizontal: 14,
+            paddingVertical: 12,
+            borderRadius: 17,
 
             flexDirection: 'row',
 
-            backgroundColor: 'rgba(10,26,48,0.34)',
+            backgroundColor: 'rgba(10,26,48,0.52)',
             borderWidth: 1,
-            borderColor: 'rgba(91,169,214,0.14)',
+            borderColor: 'rgba(78,112,145,0.16)',
           }}
         >
           <Ionicons
@@ -16611,40 +15405,40 @@ if (screen === 'profiloCollega') {
             <Ionicons name="calendar-outline" size={23} color="#C9B6FF" />
           </View>
 
-          <View style={{flexDirection:'row',marginTop:10,gap:8}}>
-            <View style={{flex:1,backgroundColor:'#0B1638',borderRadius:15,padding:9}}>
+          <View style={{flexDirection:'row',marginTop:16,gap:8}}>
+            <View style={{flex:1,backgroundColor:'#0B1638',borderRadius:15,padding:12}}>
               <Ionicons name="time-outline" size={24} color="#9FB1FF" />
-              <Text style={{color:'white',fontSize:23,fontWeight:'900',marginTop:5}}>
+              <Text style={{color:'white',fontSize:23,fontWeight:'900',marginTop:9}}>
                 169,5h
               </Text>
               <Text style={{color:'#B8C1DA',fontSize:10,fontWeight:'800'}}>LAVORATE</Text>
             </View>
 
-            <View style={{flex:1,backgroundColor:'#0B1638',borderRadius:15,padding:9}}>
+            <View style={{flex:1,backgroundColor:'#0B1638',borderRadius:15,padding:12}}>
               <Ionicons name="star-outline" size={24} color="#FFD24A" />
-              <Text style={{color:'white',fontSize:23,fontWeight:'900',marginTop:5}}>
+              <Text style={{color:'white',fontSize:23,fontWeight:'900',marginTop:9}}>
                 38h
               </Text>
               <Text style={{color:'#B8C1DA',fontSize:10,fontWeight:'800'}}>EXTRA</Text>
             </View>
 
-            <View style={{flex:1,backgroundColor:'#0B1638',borderRadius:15,padding:9}}>
+            <View style={{flex:1,backgroundColor:'#0B1638',borderRadius:15,padding:12}}>
               <Ionicons name="calendar-number-outline" size={24} color="#FFB7EA" />
-              <Text style={{color:'white',fontSize:23,fontWeight:'900',marginTop:5}}>
+              <Text style={{color:'white',fontSize:23,fontWeight:'900',marginTop:9}}>
                 19
               </Text>
               <Text style={{color:'#B8C1DA',fontSize:10,fontWeight:'800'}}>GIORNI</Text>
             </View>
           </View>
 
-          <View style={{flexDirection:'row',justifyContent:'space-between',marginTop:10}}>
+          <View style={{flexDirection:'row',justifyContent:'space-between',marginTop:16}}>
             <Text style={{color:'#AEB9D6',fontSize:11,fontWeight:'800'}}>AVANZAMENTO MESE</Text>
             <Text style={{color:'#FFFFFF',fontSize:12,fontWeight:'900'}}>
                 {Math.round((new Date().getDate() / new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate()) * 100)}%
               </Text>
           </View>
 
-          <View style={{height:6,borderRadius:10,backgroundColor:'#19264A',marginTop:4,overflow:'hidden'}}>
+          <View style={{height:6,borderRadius:10,backgroundColor:'#19264A',marginTop:7,overflow:'hidden'}}>
               <View style={{
                 height:'100%',
                 width:`${Math.round((new Date().getDate() / new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate()) * 100)}%`,
@@ -16995,96 +15789,7 @@ if (screen === 'profiloCollega') {
           <Ionicons name="chevron-forward" size={24} color="#FFFFFF" />
         </TouchableOpacity>
 
-  
-      {/* ===== STRUMENTI HOME ALTO ===== */}
-      <TouchableOpacity
-        activeOpacity={0.84}
-        onPress={() => setScreen('strumenti')}
-        style={{
-          marginHorizontal: 16,
-          marginBottom: 15,
-          minHeight: 64,
-          paddingHorizontal: 17,
-          paddingVertical: 13,
-
-          flexDirection: 'row',
-          alignItems: 'center',
-
-          borderRadius: 20,
-
-          backgroundColor: 'rgba(16,38,78,0.94)',
-
-          borderWidth: 1,
-          borderColor: 'rgba(91,218,255,0.45)',
-
-          shadowColor: '#49DFFF',
-          shadowOpacity: 0.16,
-          shadowRadius: 12,
-          shadowOffset: {
-            width: 0,
-            height: 5,
-          },
-
-          elevation: 6,
-        }}
-      >
-        <View
-          style={{
-            width: 42,
-            height: 42,
-            borderRadius: 14,
-            alignItems: 'center',
-            justifyContent: 'center',
-
-            backgroundColor: 'rgba(73,183,255,0.15)',
-            borderWidth: 1,
-            borderColor: 'rgba(99,229,255,0.34)',
-          }}
-        >
-          <Ionicons
-            name="briefcase-outline"
-            size={23}
-            color="#72E7FF"
-          />
-        </View>
-
-        <View
-          style={{
-            flex: 1,
-            marginLeft: 13,
-          }}
-        >
-          <Text
-            style={{
-              color: '#FFFFFF',
-              fontSize: 14,
-              fontWeight: '900',
-              letterSpacing: 0.35,
-            }}
-          >
-            STRUMENTI
-          </Text>
-
-          <Text
-            style={{
-              color: '#8FABC8',
-              fontSize: 10.5,
-              fontWeight: '700',
-              marginTop: 3,
-            }}
-          >
-            Meteo, documenti, emergenze e utility
-          </Text>
-        </View>
-
-        <Ionicons
-          name="chevron-forward"
-          size={19}
-          color="#77BFD9"
-        />
-      </TouchableOpacity>
-
-      {/* COLLEGA */}
+        {/* COLLEGA */}
         <View style={{
         marginHorizontal: 16,
         marginBottom: 18,
@@ -17277,14 +15982,13 @@ if (screen === 'profiloCollega') {
       </View>
 
         {/* ===== STRUMENTI / CENTRO OPERATIVO ===== */}
-        {false && (
-<TouchableOpacity
+        <TouchableOpacity
           onPress={() => setScreen('strumenti')}
           activeOpacity={0.84}
           style={{
             width: '100%',
             minHeight: 64,
-            marginTop: -8,
+            marginTop: 12,
             paddingHorizontal: 17,
             paddingVertical: 13,
 
@@ -17361,7 +16065,6 @@ if (screen === 'profiloCollega') {
             color="#77BFD9"
           />
         </TouchableOpacity>
-)}
 
       </ScrollView>
     </Screen>

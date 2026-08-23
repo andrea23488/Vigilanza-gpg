@@ -6002,7 +6002,7 @@ if (screen === 'configuraStipendio') {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         keyboardVerticalOffset={0}
       >
-        <SafeAreaView style={[styles.safe, { flex: 1, backgroundColor: '#0B1E2D' }]}>
+        <Screen>
         {/* BACK CHAT PREMIUM */}
       <View
         style={{
@@ -6017,23 +6017,7 @@ if (screen === 'configuraStipendio') {
           marginBottom: 12,
         }}
       >
-        <TouchableOpacity
-          activeOpacity={0.75}
-          onPress={() => setScreen('listaChat')}
-          style={{
-            width: 38,
-            height: 38,
-            alignItems: 'center',
-            justifyContent: 'center',
-            marginBottom: 10,
-          }}
-        >
-          <Ionicons
-            name="chevron-back"
-            size={28}
-            color="#FFFFFF"
-          />
-        </TouchableOpacity>
+        <Back onPress={() => setScreen('listaChat')} />
       </View>
 
         <View style={{
@@ -6086,7 +6070,6 @@ if (screen === 'configuraStipendio') {
             {/* AVATAR CHAT INTERNA */}
         <View
           style={{
-              display: 'none',
               width: 38,
               height: 38,
               borderRadius: 19,
@@ -6104,7 +6087,6 @@ if (screen === 'configuraStipendio') {
         >
           <View
             style={{
-              display: 'none',
               width: 48,
               height: 48,
               borderRadius: 24,
@@ -6154,7 +6136,6 @@ if (screen === 'configuraStipendio') {
           {/* NOME CHAT FORZATO */}
           <View
             style={{
-          display: 'none',
               flex: 1,
               justifyContent: 'center',
               minWidth: 0,
@@ -6208,7 +6189,6 @@ if (screen === 'configuraStipendio') {
       {/* LINEA NEON HEADER CHAT */}
       <View
         style={{
-          display: 'none',
           height: 1,
           backgroundColor: '#53D8FF',
           opacity: 0.24,
@@ -6498,7 +6478,7 @@ if (screen === 'configuraStipendio') {
             </Text>
           </TouchableOpacity>
         </View>
-        </SafeAreaView>
+        </Screen>
       </KeyboardAvoidingView>
     );
   }
