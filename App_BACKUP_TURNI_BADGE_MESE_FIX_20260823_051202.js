@@ -7,15 +7,13 @@ import {
   eliminaMessaggio,
   eliminaConversazione,
   colleghiConConversazione,
-  caricaRiepilogoConversazioni,
-  segnaMessaggiComeLetti,
 } from './chatApi';
 import { caricaTurniUtente, creaTurnoUtente, aggiornaTurnoUtente, eliminaTurnoUtente } from './turniApi';
 import { supabase } from './supabase';
 import { caricaProfiloUtente, salvaProfiloUtente, caricaFotoProfilo, eliminaFotoProfiloCloud } from './profiliApi';
 import { caricaColleghi, aggiungiCollega, rimuoviCollega, accettaCollega, rifiutaCollega } from './colleghiApi';
 import { caricaColleghiInServizio } from './servizioApi';
-import React, { useRef, useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 
 import {
   SafeAreaView,
@@ -97,75 +95,6 @@ export default function App() {
   const [chatMessaggi, setChatMessaggi] = useState([]);
   const [chatMioId, setChatMioId] = useState(null);
   const [chatLoading, setChatLoading] = useState(false);
-  const chatScrollRef = useRef(null);
-
-  useEffect(() => {
-    if (screen !== 'listaChat') return;
-
-    let attivo = true;
-
-    const caricaRiepilogo = async () => {
-      try {
-        const dati = await caricaRiepilogoConversazioni();
-
-        if (attivo) {
-          setRiepilogoChat(dati || {});
-        }
-      } catch (error) {
-        console.log('Errore riepilogo chat:', error);
-      }
-    };
-
-    caricaRiepilogo();
-
-    return () => {
-      attivo = false;
-    };
-  }, [screen]);
-
-    /* ===== LIVE LISTA CHAT ===== */
-  useEffect(() => {
-    if (screen !== 'listaChat') return;
-
-    let attivo = true;
-
-    const aggiornaListaChat = async () => {
-      try {
-        const [riepilogo, idsConversazioni] = await Promise.all([
-          caricaRiepilogoConversazioni(),
-          colleghiConConversazione(),
-        ]);
-
-        if (!attivo) return;
-
-        setRiepilogoChat(riepilogo || {});
-        setChatColleghiIds(idsConversazioni || []);
-      } catch (error) {
-        console.log('Errore aggiornamento live chat:', error);
-      }
-    };
-
-    aggiornaListaChat();
-
-    const timer = setInterval(() => {
-      aggiornaListaChat();
-    }, 4000);
-
-    return () => {
-      attivo = false;
-      clearInterval(timer);
-    };
-  }, [screen]);
-
-useEffect(() => {
-    if (screen !== 'chatCollega') return;
-
-    const timer = setTimeout(() => {
-      chatScrollRef.current?.scrollToEnd({ animated: true });
-    }, 120);
-
-    return () => clearTimeout(timer);
-  }, [screen, chatMessaggi.length]);
 
   useEffect(() => {
     if (screen !== 'chatCollega') return;
@@ -173,12 +102,6 @@ useEffect(() => {
     const destinatarioId = collegaSelezionato?.altro_user_id;
 
     if (!destinatarioId) return;
-
-    segnaMessaggiComeLetti(destinatarioId)
-      .catch((error) => {
-        console.log('Errore lettura messaggi:', error);
-      });
-
 
     let attivo = true;
 
@@ -256,7 +179,6 @@ useEffect(() => {
   }, []);
   const [colleghi, setColleghi] = useState([]);
   const [chatColleghiIds, setChatColleghiIds] = useState([]);
-  const [riepilogoChat, setRiepilogoChat] = useState({});
   const [colleghiInServizio, setColleghiInServizio] = useState([]);
   const [collegaSelezionato, setCollegaSelezionato] = useState(null);
   const [loadingServizio, setLoadingServizio] = useState(false);
@@ -442,26 +364,7 @@ const mediaOreGiornata =
     PROFILO_DEFAULT.sede
   );
 
-  const [matricolaDraft, setMatricolaDraft] = useState('');
-
-
-  const [
-    inServizioDalDraft,
-    setInServizioDalDraft,
-  ] = useState(
-    PROFILO_DEFAULT.in_servizio_dal || ''
-  );
-
-    /* SYNC MATRICOLA SAFE */
   useEffect(() => {
-    setMatricolaDraft(
-      profilo?.codice_gpg
-        ? String(profilo.codice_gpg)
-        : ''
-    );
-  }, [profilo?.codice_gpg]);
-
-useEffect(() => {
       caricaProfiloLocale();
       aggiornaColleghiInServizioOggi();
 
@@ -517,11 +420,6 @@ useEffect(() => {
       setAziendaDraft(nuovoProfilo.azienda);
       setRuoloDraft(nuovoProfilo.ruolo);
       setSedeDraft(nuovoProfilo.sede);
-    setInServizioDalDraft(
-      nuovoProfilo.in_servizio_dal
-        ? String(nuovoProfilo.in_servizio_dal)
-        : ''
-    );
       setFotoProfilo(nuovoProfilo.foto_url);
 
       return nuovoProfilo;
@@ -1549,11 +1447,6 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
         azienda: aziendaDraft.trim(),
         ruolo: ruoloDraft.trim(),
         sede: sedeDraft.trim(),
-      codice_gpg: matricolaDraft.trim(),
-      in_servizio_dal:
-        inServizioDalDraft.trim() === ''
-          ? null
-          : Number(inServizioDalDraft.trim()),
       };
 
       const salvato = await salvaProfiloUtente(profiloDaSalvare);
@@ -1564,13 +1457,7 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
         azienda: salvato.azienda || "",
         ruolo: salvato.ruolo || "",
         sede: salvato.sede || "",
-      in_servizio_dal:
-        salvato.in_servizio_dal ?? null,
-            codice_gpg:
-        salvato.codice_gpg ||
-        profilo?.codice_gpg ||
-        "",
-};
+      };
 
       setProfilo(nuovoProfilo);
       setNomeDraft(nuovoProfilo.nome);
@@ -1722,68 +1609,21 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
             <Text style={{ color: 'white', fontSize: 28 }}>‹</Text>
           </TouchableOpacity>
 
-          <View
-        style={{
-          backgroundColor: '#171F55',
-          borderRadius: 24,
-          padding: 20,
-          marginBottom: 22,
-          borderWidth: 1.3,
-          borderColor: '#7180FF',
-          shadowColor: '#6174FF',
-          shadowOpacity: 0.24,
-          shadowRadius: 17,
-          shadowOffset: { width: 0, height: 8 },
-        }}
-      >
-        <Text
-          style={{
-            color: '#84DFFF',
-            fontSize: 10,
-            fontWeight: '900',
-            letterSpacing: 1.5,
-            marginBottom: 5,
-          }}
-        >
-          RETE OPERATIVA
-        </Text>
+          <Text style={{ color: 'white', fontSize: 30, fontWeight: '800' }}>
+            I miei colleghi
+          </Text>
 
-        <Text
-          style={{
-            color: '#FFFFFF',
-            fontSize: 30,
-            fontWeight: '900',
-            letterSpacing: -0.5,
-          }}
-        >
-          I miei colleghi
-        </Text>
-
-        <Text
-          style={{
-            color: '#C8D7F4',
-            fontSize: 13,
-            fontWeight: '700',
-            marginTop: 6,
-          }}
-        >
-          Colleghi e contatti di servizio
-        </Text>
-      </View>
+          <Text style={{ color: '#9fb2d9', marginTop: 6, marginBottom: 25 }}>
+            Colleghi e contatti di servizio
+          </Text>
 
           <View
             style={{
-        backgroundColor: '#09182C',
-        borderRadius: 21,
-        padding: 17,
-        marginBottom: 22,
-        borderWidth: 1,
-        borderColor: '#2D5278',
-        shadowColor: '#48D6FF',
-        shadowOpacity: 0.10,
-        shadowRadius: 12,
-        shadowOffset: { width: 0, height: 5 },
-      }}
+              backgroundColor: '#07101F',
+              borderRadius: 18,
+              padding: 16,
+              marginBottom: 22,
+            }}
           >
             <Text style={{ color: 'white', fontWeight: '700', marginBottom: 10 }}>
               Aggiungi collega
@@ -1796,19 +1636,14 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
               placeholderTextColor="#7184aa"
               autoCapitalize="none"
               style={{
-          backgroundColor: '#0D2038',
-          color: '#FFFFFF',
-          borderWidth: 1.2,
-          borderColor: '#37658E',
-          borderRadius: 15,
-          paddingVertical: 14,
-          paddingHorizontal: 15,
-          marginBottom: 12,
-          fontWeight: '700',
-          shadowColor: '#48D6FF',
-          shadowOpacity: 0.06,
-          shadowRadius: 8,
-        }}
+                backgroundColor: '#091936',
+                color: 'white',
+                borderWidth: 1,
+                borderColor: '#31538d',
+                borderRadius: 12,
+                padding: 14,
+                marginBottom: 12,
+              }}
             />
 
             <TouchableOpacity
@@ -1823,19 +1658,11 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
                 }
               }}
               style={{
-          backgroundColor: '#1368E8',
-          paddingVertical: 15,
-          paddingHorizontal: 16,
-          borderRadius: 16,
-          alignItems: 'center',
-          justifyContent: 'center',
-          borderWidth: 1.2,
-          borderColor: '#58DFFF',
-          shadowColor: '#42CFFF',
-          shadowOpacity: 0.25,
-          shadowRadius: 12,
-          shadowOffset: { width: 0, height: 6 },
-        }}
+                backgroundColor: '#2377ff',
+                padding: 14,
+                borderRadius: 12,
+                alignItems: 'center',
+              }}
             >
               <Text style={{ color: 'white', fontWeight: '800' }}>
                 + AGGIUNGI COLLEGA
@@ -1845,27 +1672,7 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
 
           <TouchableOpacity
             onPress={aggiornaColleghi}
-            style={{
-          backgroundColor: 'rgba(32, 30, 92, 0.96)',
-
-          borderRadius: 30,
-
-          paddingHorizontal: 19,
-          paddingVertical: 18,
-
-          marginHorizontal: 2,
-          marginBottom: 17,
-
-          borderWidth: 1.5,
-          borderColor: '#5BE7FF',
-
-          shadowColor: '#55E6FF',
-          shadowOpacity: 0.62,
-          shadowRadius: 22,
-          shadowOffset: { width: 0, height: 7 },
-
-          elevation: 11,
-        }}
+            style={{ marginBottom: 18 }}
           >
             <Text style={{ color: '#45E36F', fontWeight: '700' }}>
               ↻ Aggiorna elenco
@@ -1899,25 +1706,18 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
                       <View
                         key={c.id}
                         style={{
-                backgroundColor: '#0B1930',
-                borderRadius: 20,
-                padding: 17,
-                marginBottom: 13,
-                borderWidth: 1.2,
-                borderColor: '#375A82',
-                shadowColor: '#4A7CFF',
-                shadowOpacity: 0.13,
-                shadowRadius: 12,
-                shadowOffset: { width: 0, height: 6 },
-              }}
+                          backgroundColor: '#07101F',
+                          borderRadius: 16,
+                          padding: 16,
+                          marginBottom: 12,
+                        }}
                       >
                         <Text
                           style={{
-                  color: '#FFFFFF',
-                  fontWeight: '900',
-                  fontSize: 19,
-                  letterSpacing: -0.2,
-                }}
+                            color: 'white',
+                            fontWeight: '800',
+                            fontSize: 17,
+                          }}
                         >
                           👤 {c.profilo?.nome || 'Collega'} {c.profilo?.cognome || ''}
                         </Text>
@@ -1950,18 +1750,12 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
                               }
                             }}
                             style={{
-                flex: 1,
-                backgroundColor: '#176C47',
-                paddingVertical: 12,
-                borderRadius: 13,
-                alignItems: 'center',
-                justifyContent: 'center',
-                borderWidth: 1,
-                borderColor: '#55E894',
-                shadowColor: '#55E894',
-                shadowOpacity: 0.16,
-                shadowRadius: 8,
-              }}
+                              flex: 1,
+                              backgroundColor: '#1d9b55',
+                              padding: 12,
+                              borderRadius: 10,
+                              alignItems: 'center',
+                            }}
                           >
                             <Text style={{ color: 'white', fontWeight: '800' }}>
                               ✓ ACCETTA
@@ -1978,15 +1772,12 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
                               }
                             }}
                             style={{
-                flex: 1,
-                backgroundColor: '#4A2029',
-                paddingVertical: 12,
-                borderRadius: 13,
-                alignItems: 'center',
-                justifyContent: 'center',
-                borderWidth: 1,
-                borderColor: '#D45E72',
-              }}
+                              flex: 1,
+                              backgroundColor: '#b93646',
+                              padding: 12,
+                              borderRadius: 10,
+                              alignItems: 'center',
+                            }}
                           >
                             <Text style={{ color: 'white', fontWeight: '800' }}>
                               ✕ RIFIUTA
@@ -2033,20 +1824,17 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
                   .filter((c) => c.stato === 'accettato')
                   .map((c) => (
                     <View
-                  
+                  onTouchEnd={() => {
+                    setCollegaSelezionato(c);
+                    setScreen('profiloCollega');
+                  }}
                       key={c.id}
                       style={{
-                backgroundColor: '#111B49',
-                borderRadius: 22,
-                padding: 18,
-                marginBottom: 14,
-                borderWidth: 1.5,
-                borderColor: '#7180FF',
-                shadowColor: '#6174FF',
-                shadowOpacity: 0.28,
-                shadowRadius: 16,
-                shadowOffset: { width: 0, height: 7 },
-              }}
+                        backgroundColor: '#07101F',
+                        borderRadius: 16,
+                        padding: 16,
+                        marginBottom: 12,
+                      }}
                     >
                       <Text
                         style={{
@@ -2081,78 +1869,33 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
                         </Text>
                       ) : null}
 
-                      <View
-              style={{
-                flexDirection: 'row',
-                gap: 8,
-                marginTop: 14,
-                marginBottom: 8,
-              }}
-            >
-              {/* PROFILO COLLEGA */}
-              <TouchableOpacity
-                activeOpacity={0.82}
-                onPress={() => {
-                  setCollegaSelezionato(c);
-                  setScreen('profiloCollega');
-                }}
-                style={{
-                  flex: 1,
-                  backgroundColor: '#192B55',
-                  borderRadius: 16,
-                  paddingVertical: 13,
-                  paddingHorizontal: 10,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  borderWidth: 1.2,
-                  borderColor: '#7180FF',
-                }}
-              >
-                <Text
-                  style={{
-                    color: '#FFFFFF',
-                    fontWeight: '900',
-                    fontSize: 13,
-                  }}
-                >
-                  👤 PROFILO
-                </Text>
-              </TouchableOpacity>
-
-              {/* CHAT PRIVATA */}
-              <TouchableOpacity
-                activeOpacity={0.82}
-                onPress={() => {
-                  setCollegaSelezionato(c);
-                  setChatMessaggio('');
-                  setScreen('chatCollega');
-                }}
-                style={{
-                  flex: 1,
-                  backgroundColor: '#0D7FA3',
-                  borderRadius: 16,
-                  paddingVertical: 13,
-                  paddingHorizontal: 10,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  borderWidth: 1.2,
-                  borderColor: '#72E7FF',
-                  shadowColor: '#45DFFF',
-                  shadowOpacity: 0.20,
-                  shadowRadius: 9,
-                }}
-              >
-                <Text
-                  style={{
-                    color: '#FFFFFF',
-                    fontWeight: '900',
-                    fontSize: 13,
-                  }}
-                >
-                  💬 CHAT
-                </Text>
-              </TouchableOpacity>
-            </View>
+                      <TouchableOpacity
+                    onPress={() => {
+                      setCollegaSelezionato(c);
+                      setChatMessaggio('');
+                      setScreen('chatCollega');
+                    }}
+                    style={{
+                      backgroundColor: '#284cff',
+                      borderRadius: 12,
+                      paddingVertical: 12,
+                      paddingHorizontal: 16,
+                      alignItems: 'center',
+                      marginTop: 12,
+                      marginBottom: 8,
+                    }}
+                  >
+                    <Text
+                      style={{
+                        color: 'white',
+                        fontWeight: '900',
+                        fontSize: 14,
+                      }}
+                    >
+                      👤 PROFILO
+                    </Text>
+                    {/* APRI CHAT PRIVATA */}
+                  </TouchableOpacity>
 
                   <TouchableOpacity
                         onPress={async () => {
@@ -2163,23 +1906,13 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
                             Alert.alert('Errore', error.message);
                           }
                         }}
-                        style={{
-                marginTop: 7,
-                alignSelf: 'flex-start',
-                paddingVertical: 7,
-                paddingHorizontal: 11,
-                borderRadius: 11,
-                backgroundColor: '#2A151D',
-                borderWidth: 1,
-                borderColor: '#713443',
-              }}
+                        style={{ marginTop: 12 }}
                       >
                         <Text
                           style={{
-                  color: '#FF8FA3',
-                  fontWeight: '900',
-                  fontSize: 13,
-                }}
+                            color: '#ff6969',
+                            fontWeight: '700',
+                          }}
                         >
                           Rimuovi
                         </Text>
@@ -2882,204 +2615,27 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
 
               }}
               style={{
-          backgroundColor: '#1B2058',
-
-          borderRadius: 28,
-          paddingHorizontal: 18,
-          paddingVertical: 17,
-          marginBottom: 16,
-
-          borderWidth: 1.15,
-          borderColor: '#6CDFF4',
-
-          shadowColor: '#53DFF7',
-          shadowOpacity: 0.42,
-          shadowRadius: 18,
-          shadowOffset: { width: 0, height: 7 },
-
-          elevation: 9,
-        }}
-            >
-        {/* CONTENUTO CHAT CARD DEFINITIVO */}
-
-        <View
-          style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-          }}
-        >
-          {/* AVATAR */}
-          <View
-            style={{
-              width: 48,
-              height: 48,
-              borderRadius: 24,
-              backgroundColor: '#203D78',
-              borderWidth: 1.4,
-              borderColor: '#6DEAFF',
-              alignItems: 'center',
-              justifyContent: 'center',
-              marginRight: 13,
-
-              shadowColor: '#59E8FF',
-              shadowOpacity: 0.55,
-              shadowRadius: 12,
-              shadowOffset: { width: 0, height: 3 },
-            }}
-          >
-            <Text
-              style={{
-                color: '#ECFDFF',
-                fontSize: 14,
-                fontWeight: '900',
-                letterSpacing: 0.6,
-
-                textShadowColor: '#5DEBFF',
-                textShadowOffset: { width: 0, height: 0 },
-                textShadowRadius: 7,
+                backgroundColor: '#102968',
+                borderRadius: 16,
+                padding: 16,
+                marginBottom: 12
               }}
             >
-              {`${c.profilo?.nome?.charAt(0) || ''}${c.profilo?.cognome?.charAt(0) || ''}`.toUpperCase() || 'GPG'}
-            </Text>
-          </View>
-
-          {/* NOME + AZIENDA */}
-          <View
-            style={{
-              flex: 1,
-              minWidth: 0,
-              justifyContent: 'center',
-            }}
-          >
-            <Text
-              numberOfLines={1}
-              ellipsizeMode="tail"
-              style={{
-                color: '#FFFFFF',
+              <Text style={{
+                color: 'white',
                 fontSize: 18,
-                fontWeight: '900',
-                letterSpacing: -0.35,
-
-                textShadowColor: 'rgba(92,235,255,0.25)',
-                textShadowOffset: { width: 0, height: 0 },
-                textShadowRadius: 8,
-              }}
-            >
-              {c.profilo?.nome || 'Collega'} {c.profilo?.cognome || ''}
-            </Text>
-
-            <Text
-              numberOfLines={1}
-              ellipsizeMode="tail"
-              style={{
-                color: '#9CC7E4',
-                fontSize: 10.5,
-                fontWeight: '700',
-                marginTop: 3,
-              }}
-            >
-              {[c.profilo?.azienda, c.profilo?.codice_gpg]
-                .filter(Boolean)
-                .join(' · ')}
-            </Text>
-          </View>
-
-          {/* ORARIO */}
-          <Text
-            style={{
-              color: '#A9DDEB',
-              fontSize: 9.5,
-              fontWeight: '800',
-              marginLeft: 10,
-              alignSelf: 'center',
-              opacity: 0.92,
-            }}
-          >
-            {riepilogoChat[c.altro_user_id]?.created_at
-              ? new Date(
-                  riepilogoChat[c.altro_user_id].created_at
-                ).toLocaleTimeString('it-IT', {
-                  hour: '2-digit',
-                  minute: '2-digit',
-                })
-              : ''}
-          </Text>
-        </View>
-
-        {/* ULTIMO MESSAGGIO */}
-        <View
-          style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            width: '100%',
-            marginTop: 12,
-            paddingTop: 10,
-            borderTopWidth: 1,
-            borderTopColor: 'rgba(108,223,244,0.14)',
-          }}
-        >
-          <Text
-            numberOfLines={1}
-            ellipsizeMode="tail"
-            style={{
-              flex: 1,
-              minWidth: 0,
-
-              color:
-                (riepilogoChat[c.altro_user_id]?.nonLetti || 0) > 0
-                  ? '#F4FDFF'
-                  : '#A7BAD0',
-
-              fontSize: 12.5,
-
-              fontWeight:
-                (riepilogoChat[c.altro_user_id]?.nonLetti || 0) > 0
-                  ? '800'
-                  : '500',
-            }}
-          >
-            {riepilogoChat[c.altro_user_id]?.ultimoMessaggio ||
-              'Nessun messaggio recente'}
-          </Text>
-
-          {(riepilogoChat[c.altro_user_id]?.nonLetti || 0) > 0 ? (
-            <View
-              style={{
-                minWidth: 22,
-                height: 22,
-                borderRadius: 11,
-                paddingHorizontal: 6,
-                marginLeft: 10,
-
-                backgroundColor: '#5CEAFF',
-                borderWidth: 1,
-                borderColor: '#D2FBFF',
-
-                alignItems: 'center',
-                justifyContent: 'center',
-
-                shadowColor: '#5CEAFF',
-                shadowOpacity: 0.75,
-                shadowRadius: 8,
-              }}
-            >
-              <Text
-                style={{
-                  color: '#082239',
-                  fontSize: 10,
-                  fontWeight: '900',
-                }}
-              >
-                {Math.min(
-                  riepilogoChat[c.altro_user_id]?.nonLetti || 0,
-                  99
-                )}
+                fontWeight: '800'
+              }}>
+                👤 {c.profilo?.nome || ''} {c.profilo?.cognome || ''}
               </Text>
-            </View>
-          ) : null}
-        </View>
 
-      </TouchableOpacity>
+              <Text style={{
+                color: '#9fb2d9',
+                marginTop: 5
+              }}>
+                {c.profilo?.azienda || 'Collega'}
+              </Text>
+            </TouchableOpacity>
           ))
         )}
       </Screen>
@@ -3089,7 +2645,7 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
 
   if (screen === 'listaChat') {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: '#080D22' }}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: '#07142f' }}>
         <ScrollView
           contentContainerStyle={{
             padding: 22,
@@ -3114,95 +2670,15 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
             💬 Chat
           </Text>
 
-          <View
-        style={{
-        backgroundColor: 'rgba(44,38,108,0.72)',
-        borderRadius: 30,
-        paddingHorizontal: 21,
-        paddingVertical: 20,
-        marginBottom: 22,
-
-        borderWidth: 1.2,
-        borderColor: 'rgba(133,119,255,0.90)',
-
-        shadowColor: '#776BFF',
-        shadowOpacity: 0.62,
-        shadowRadius: 28,
-        shadowOffset: { width: 0, height: 7 },
-
-        elevation: 12,
-      }}
-      >
-        <Text
-          style={{
-            color: '#84DFFF',
-            fontSize: 10,
-            fontWeight: '900',
-            letterSpacing: 1.5,
-            marginBottom: 5,
-          }}
-        >
-          MESSAGGI
-        </Text>
-
-        <Text
-          style={{
-              color: '#FFFFFF',
-              fontSize: 27,
-              fontWeight: '900',
-              letterSpacing: -0.8,
-
-              textShadowColor: '#5DE8FF',
-              textShadowOffset: { width: 0, height: 0 },
-              textShadowRadius: 16,
+          <Text
+            style={{
+              color: '#9fb2d9',
+              fontSize: 15,
+              marginBottom: 24
             }}
-        >
-          Le tue conversazioni
-        </Text>
-
-            {/* STATISTICHE HEADER CHAT */}
-            <Text
-              style={{
-                color: '#AEEAFF',
-                fontSize: 11.5,
-                fontWeight: '800',
-                marginTop: 7,
-                letterSpacing: 0.35,
-
-                textShadowColor: 'rgba(83,216,255,0.22)',
-                textShadowOffset: { width: 0, height: 0 },
-                textShadowRadius: 7,
-              }}
-            >
-              {`${chatColleghiIds.length} ${
-                chatColleghiIds.length === 1
-                  ? 'conversazione'
-                  : 'conversazioni'
-              } · ${Object.values(riepilogoChat || {}).reduce(
-                (tot, chat) => tot + (chat?.nonLetti || 0),
-                0
-              )} non ${
-                Object.values(riepilogoChat || {}).reduce(
-                  (tot, chat) => tot + (chat?.nonLetti || 0),
-                  0
-                ) === 1
-                  ? 'letto'
-                  : 'letti'
-              }`}
-            </Text>
-
-
-        <Text
-          style={{
-              color: '#8192A6',
-              fontSize: 12,
-              fontWeight: '500',
-              marginTop: 5,
-            }}
-        >
-          Conversazioni con i tuoi colleghi
-        </Text>
-      </View>
+          >
+            Conversazioni con i tuoi colleghi
+          </Text>
 
           {colleghi.length === 0 ? (
             <Text style={{ color: '#9fb2d9', fontSize: 16 }}>
@@ -3211,17 +2687,6 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
           ) : (
             colleghi
               .filter((c) => chatColleghiIds.includes(c.altro_user_id))
-    .sort((a, b) => {
-      const dataA = riepilogoChat[a.altro_user_id]?.created_at
-        ? new Date(riepilogoChat[a.altro_user_id].created_at).getTime()
-        : 0;
-
-      const dataB = riepilogoChat[b.altro_user_id]?.created_at
-        ? new Date(riepilogoChat[b.altro_user_id].created_at).getTime()
-        : 0;
-
-      return dataB - dataA;
-    })
               .map((c) => (
               <TouchableOpacity
                 key={c.id}
@@ -3231,240 +2696,48 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
                   setScreen('chatCollega');
                 }}
                 style={{
-          backgroundColor: '#FF00AA',
-          borderRadius: 34,
-          paddingHorizontal: 20,
-          paddingVertical: 20,
-          marginBottom: 18,
-          borderWidth: 4,
-          borderColor: '#00FFFF',
-          shadowColor: '#00FFFF',
-          shadowOpacity: 1,
-          shadowRadius: 25,
-          shadowOffset: { width: 0, height: 0 },
-          elevation: 15,
-        }}
+                  backgroundColor: '#07101F',
+                  borderRadius: 18,
+                  padding: 16,
+                  marginBottom: 12,
+                  borderWidth: 1,
+                  borderColor: '#284cff'
+                }}
               >
-                {/* AVATAR CONVERSAZIONE */}
-        <View
-          style={{
-              width: 50,
-              height: 50,
-              borderRadius: 25,
-
-              backgroundColor:
-                (riepilogoChat[c.altro_user_id]?.nonLetti || 0) > 0
-                  ? 'rgba(37,112,154,0.90)'
-                  : 'rgba(69,60,142,0.86)',
-
-              borderWidth: 1.4,
-
-              borderColor:
-                (riepilogoChat[c.altro_user_id]?.nonLetti || 0) > 0
-                  ? '#82F3FF'
-                  : '#A296FF',
-
-              alignItems: 'center',
-              justifyContent: 'center',
-              marginRight: 14,
-
-              shadowColor:
-                (riepilogoChat[c.altro_user_id]?.nonLetti || 0) > 0
-                  ? '#5DEBFF'
-                  : '#8C7CFF',
-
-              shadowOpacity: 0.78,
-              shadowRadius: 15,
-              shadowOffset: { width: 0, height: 4 },
-
-              elevation: 10,
-            }}
-        >
-          <View
-            style={{
-              width: 38,
-              height: 38,
-              borderRadius: 19,
-              backgroundColor: '#102A46',
-              borderWidth: 1,
-              borderColor: '#2A6C91',
-              alignItems: 'center',
-              justifyContent: 'center',
-              marginRight: 10,
-            }}
-          >
-            <Text
-              style={{
-                color: '#FFFFFF',
-                fontSize: 18,
-                fontWeight: '900',
-                letterSpacing: -0.35,
-
-                textShadowColor:
-                  (riepilogoChat[c.altro_user_id]?.nonLetti || 0) > 0
-                    ? 'rgba(93,235,255,0.40)'
-                    : 'rgba(140,124,255,0.24)',
-
-                textShadowOffset: { width: 0, height: 0 },
-                textShadowRadius: 10,
-              }}
-            >
-              {`${c.profilo?.nome?.charAt(0) || ''}${c.profilo?.cognome?.charAt(0) || ''}`.toUpperCase() || 'GPG'}
-            </Text>
-          </View>
-
-          <View style={{ flex: 1 }}>
-            <Text
-              numberOfLines={1}
-              style={{
-                color: '#FFFFFF',
-                fontSize: 16.5,
-                fontWeight: '900',
-                letterSpacing: -0.25,
-              }}
-            >
-              {c.profilo?.nome || 'Collega'} {c.profilo?.cognome || ''}
-            </Text>
-          </View>
-        </View>
+                <Text
+                  style={{
+                    color: 'white',
+                    fontSize: 18,
+                    fontWeight: '800'
+                  }}
+                >
+                  👤 {c.profilo?.nome || ''} {c.profilo?.cognome || ''}
+                </Text>
 
                 <Text
                   style={{
-            color: '#9CCDE9',
-            fontSize: 10.5,
-            fontWeight: '600',
-            marginTop: 4,
-            letterSpacing: 0.2,
-          }}
+                    color: '#9fb2d9',
+                    marginTop: 5,
+                    fontSize: 14
+                  }}
                 >
                   {[c.profilo?.azienda, c.profilo?.codice_gpg]
                     .filter(Boolean)
                     .join(' · ')}
                 </Text>
 
-            {(() => {
-              const r = riepilogoChat[c.altro_user_id];
-
-              if (!r) {
-                return (
-                  <Text
-                    style={{
-                      color: '#6F89A9',
-                      fontSize: 12,
-                      marginTop: 9,
-                    }}
-                  >
-                    Nessun messaggio recente
-                  </Text>
-                );
-              }
-
-              const ora = r.created_at
-                ? new Date(r.created_at).toLocaleTimeString('it-IT', {
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  })
-                : '';
-
-              return (
-                <View
-                  style={{
-                    marginTop: 8,
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                  }}
-                >
-                  <Text
-                    numberOfLines={1}
-                    style={{
-                      flex: 1,
-                      color:
-                        r.nonLetti > 0
-                          ? '#F4FDFF'
-                          : '#A4B7C9',
-
-                      fontSize: 13,
-
-                      fontWeight:
-                        r.nonLetti > 0
-                          ? '700'
-                          : '500',
-
-                      marginRight: 8,
-                      marginTop: 3,
-                    }}
-                  >
-                    {r.ultimoMessaggio || 'Messaggio'}
-                  </Text>
-
-                  <View
-                    style={{
-                      alignItems: 'flex-end',
-                      gap: 5,
-                    }}
-                  >
-                    
-
-                    {r.nonLetti > 0 ? (
-                      <View
-                        style={{
-                          minWidth: 22,
-                          height: 22,
-                          borderRadius: 11,
-                          paddingHorizontal: 6,
-                          backgroundColor: '#5CEAFF',
-                          borderWidth: 1,
-                          borderColor: '#C6FAFF',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-
-                          shadowColor: '#5CEAFF',
-                          shadowOpacity: 0.70,
-                          shadowRadius: 9,
-                        }}
-                      >
-                        <Text
-                          style={{
-                            color: '#062033',
-                            fontSize: 10,
-                            fontWeight: '900',
-                          }}
-                        >
-                          {r.nonLetti}
-                        </Text>
-                      </View>
-                    ) : null}
-                  </View>
-                </View>
-              );
-            })()}
-
-
                 {c.profilo?.sede ? (
                   <Text
                     style={{
                       color: '#9fb2d9',
                       marginTop: 3,
-                      fontSize: 12.5
+                      fontSize: 13
                     }}
                   >
                     📍 {c.profilo.sede}
                   </Text>
                 ) : null}
-              
-
-        {/* SEPARATORE CONVERSAZIONE */}
-        <View
-          style={{
-            height: 1,
-            backgroundColor: '#315378',
-            marginLeft: 54,
-            marginRight: 4,
-            opacity: 0.35,
-          }}
-        />
-</TouchableOpacity>
+              </TouchableOpacity>
             ))
           )}
         </ScrollView>
@@ -3473,8 +2746,6 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
   }
 
   if (screen === 'chatCollega') {
-    const mioFallback = false;
-
     const c = collegaSelezionato;
     const p = c?.profilo || {};
 
@@ -3485,22 +2756,7 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
         keyboardVerticalOffset={0}
       >
         <Screen>
-        {/* BACK CHAT PREMIUM */}
-      <View
-        style={{
-          alignSelf: 'flex-start',
-          backgroundColor: '#0B1E2D',
-          borderRadius: 15,
-          borderWidth: 1,
-          borderColor: '#315276',
-          shadowColor: '#42CFFF',
-          shadowOpacity: 0.12,
-          shadowRadius: 9,
-          marginBottom: 12,
-        }}
-      >
         <Back onPress={() => setScreen('listaChat')} />
-      </View>
 
         <View style={{
           flexDirection: 'row',
@@ -3537,171 +2793,37 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
             </View>
           )}
 
-          <View style={{
-        backgroundColor: '#0D1728',
-        borderRadius: 22,
-        padding: 16,
-        marginBottom: 18,
-        borderWidth: 1.2,
-        borderColor: '#29435F',
-        shadowColor: '#1B6FFF',
-        shadowOpacity: 0.04,
-        shadowRadius: 14,
-        shadowOffset: { width: 0, height: 6 },
-      }}>
-            {/* AVATAR CHAT INTERNA */}
-        <View
-          style={{
-              width: 38,
-              height: 38,
-              borderRadius: 19,
-              backgroundColor: '#102A46',
-              borderWidth: 1.2,
-              borderColor: '#53D8FF',
-              alignItems: 'center',
-              justifyContent: 'center',
-              marginRight: 10,
-              shadowColor: '#53D8FF',
-              shadowOpacity: 0.22,
-              shadowRadius: 8,
-              shadowOffset: { width: 0, height: 2 },
-            }}
-        >
-          <View
-            style={{
-              width: 48,
-              height: 48,
-              borderRadius: 24,
-              backgroundColor: '#183554',
-              borderWidth: 1,
-              borderColor: '#315B80',
-              alignItems: 'center',
-              justifyContent: 'center',
-              marginRight: 13,
-            }}
-          >
-            <Text
-              style={{
-                color: '#A9ECFF',
-                fontSize: 13,
-                fontWeight: '900',
-                letterSpacing: 0.5,
-              }}
-            >
-              {`${p.nome?.charAt(0) || ''}${p.cognome?.charAt(0) || ''}`.toUpperCase() || 'GPG'}
-            </Text>
-          </View>
-
-          <View style={{
-        backgroundColor: 'transparent',
-        borderRadius: 0,
-        paddingHorizontal: 2,
-        paddingVertical: 8,
-        marginBottom: 8,
-        borderWidth: 0,
-        shadowOpacity: 0,
-      }}>
-            <Text
-              numberOfLines={1}
-              style={{
-                color: '#F6F8FB',
-                fontSize: 18.5,
-                fontWeight: '900',
-                letterSpacing: -0.3,
-              }}
-            >
+          <View style={{ flex: 1 }}>
+            <Text style={{
+              color: 'white',
+              fontSize: 20,
+              fontWeight: '900',
+            }}>
               {p.nome || 'Collega'} {p.cognome || ''}
             </Text>
-          </View>
-        </View>
-
-          {/* NOME CHAT FORZATO */}
-          <View
-            style={{
-              flex: 1,
-              justifyContent: 'center',
-              minWidth: 0,
-              marginLeft: 0,
-            }}
-          >
-            <Text
-              numberOfLines={1}
-              ellipsizeMode="tail"
-              style={{
-                color: '#FFFFFF',
-                fontSize: 17,
-                fontWeight: '900',
-                letterSpacing: -0.25,
-              }}
-            >
-              {`${p.nome || 'Collega'} ${p.cognome || ''}`.trim()}
-            </Text>
-
-            <Text
-              numberOfLines={1}
-              ellipsizeMode="tail"
-              style={{
-                color: '#83B9DD',
-                fontSize: 10,
-                fontWeight: '600',
-                marginTop: 2,
-              }}
-            >
-              {[p.azienda, p.sede].filter(Boolean).join(' · ')}
-            </Text>
-          </View>
-
-
-            {/* BADGE COLLEGATO CHAT */}
-            
-
 
             <Text style={{
-              color: '#9BAFC4',
+              color: '#9fb2d9',
               fontSize: 12,
-              fontWeight: '700',
-              marginTop: 4,
+              marginTop: 3,
             }}>
               {[p.azienda, p.sede].filter(Boolean).join(' · ')}
             </Text>
           </View>
         </View>
 
-        
-      {/* LINEA NEON HEADER CHAT */}
-      <View
-        style={{
-          height: 1,
-          backgroundColor: '#53D8FF',
-          opacity: 0.24,
-          marginHorizontal: 4,
-          marginBottom: 8,
-          shadowColor: '#53D8FF',
-          shadowOpacity: 0.25,
-          shadowRadius: 6,
-        }}
-      />
-<ScrollView
+        <ScrollView
           style={{
-          flex: 1,
-          backgroundColor: '#10283A',
-          borderRadius: 14,
-          marginBottom: 10,
-          borderWidth: 0,
-          shadowOpacity: 0,
-          overflow: 'hidden',
-        }}
+            flex: 1,
+            backgroundColor: '#0b1938',
+            borderRadius: 20,
+            marginBottom: 14,
+          }}
           contentContainerStyle={{
-          paddingHorizontal: 10,
-          paddingTop: 14,
-          paddingBottom: 18,
-        }}
-        
-        ref={chatScrollRef}
-        onContentSizeChange={() => {
-          chatScrollRef.current?.scrollToEnd({ animated: true });
-        }}
-      >
+            padding: 14,
+            flexGrow: 1,
+          }}
+        >
           {chatLoading ? (
             <ActivityIndicator />
           ) : chatMessaggi.length === 0 ? (
@@ -3720,88 +2842,19 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
               </Text>
 
               <Text style={{
-                color: mioFallback ? '#BFD4F2' : '#73869A',
-                fontSize: 8.5,
-                marginTop: 5,
-                alignSelf: 'flex-end',
-                fontWeight: '600',
-                letterSpacing: 0.2,
+                color: '#7184aa',
+                fontSize: 13,
+                marginTop: 10,
+                textAlign: 'center',
               }}>
                 Nessun messaggio. Scrivi il primo.
               </Text>
             </View>
           ) : (
-            chatMessaggi.map((m, index) => {
+            chatMessaggi.map((m) => {
               const mio = m.mittente_id === chatMioId;
 
-              return (<React.Fragment key={m.id}>
-              {/* SEPARATORE DATA CHAT */}
-              {(() => {
-                const d = new Date(m.created_at);
-
-                const prev = index > 0
-                  ? new Date(chatMessaggi[index - 1]?.created_at)
-                  : null;
-
-                const stessaGiornata =
-                  prev &&
-                  d.getDate() === prev.getDate() &&
-                  d.getMonth() === prev.getMonth() &&
-                  d.getFullYear() === prev.getFullYear();
-
-                if (stessaGiornata) return null;
-
-                const oggi = new Date();
-                const ieri = new Date();
-                ieri.setDate(ieri.getDate() - 1);
-
-                const eOggi =
-                  d.getDate() === oggi.getDate() &&
-                  d.getMonth() === oggi.getMonth() &&
-                  d.getFullYear() === oggi.getFullYear();
-
-                const eIeri =
-                  d.getDate() === ieri.getDate() &&
-                  d.getMonth() === ieri.getMonth() &&
-                  d.getFullYear() === ieri.getFullYear();
-
-                const etichetta = eOggi
-                  ? 'OGGI'
-                  : eIeri
-                  ? 'IERI'
-                  : d.toLocaleDateString('it-IT', {
-                      day: '2-digit',
-                      month: 'short',
-                    }).toUpperCase();
-
-                return (
-                  <View
-                    style={{
-                      alignSelf: 'center',
-                      marginTop: 10,
-                      marginBottom: 14,
-                      paddingHorizontal: 6,
-                      paddingVertical: 2,
-                      borderRadius: 0,
-                      backgroundColor: 'transparent',
-                      borderWidth: 0,
-                    }}
-                  >
-                    <Text
-                      style={{
-                        color: '#61778D',
-                        fontSize: 8.5,
-                        fontWeight: '800',
-                        letterSpacing: 1.0,
-                      }}
-                    >
-                      {etichetta}
-                    </Text>
-                  </View>
-                );
-              })()}
-
-              
+              return (
                 <TouchableOpacity
                   key={m.id}
             activeOpacity={0.85}
@@ -3828,40 +2881,28 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
               );
             }}
                   style={{
-              alignSelf: mio ? 'flex-end' : 'flex-start',
-              backgroundColor: mio ? '#1D6FD8' : '#152230',
-              borderRadius: 19,
-              borderTopRightRadius: mio ? 6 : 19,
-              borderTopLeftRadius: mio ? 19 : 6,
-              paddingHorizontal: 13,
-              paddingVertical: 10,
-              marginBottom: 12,
-              maxWidth: '76%',
-              borderWidth: 1,
-              borderColor: mio ? '#347ED9' : '#26394B',
-              shadowColor: '#000000',
-              shadowOpacity: 0.05,
-              shadowRadius: 5,
-              shadowOffset: { width: 0, height: 2 },
-            }}
+                    alignSelf: mio ? 'flex-end' : 'flex-start',
+                    backgroundColor: mio ? '#284cff' : '#10234d',
+                    borderRadius: 16,
+                    paddingHorizontal: 14,
+                    paddingVertical: 10,
+                    marginBottom: 8,
+                    maxWidth: '82%',
+                  }}
                 >
                   <Text style={{
-                color: '#F2F6FA',
-                fontSize: 14,
-                lineHeight: 19,
-                fontWeight: '500',
-                letterSpacing: 0.05,
-              }}>
+                    color: 'white',
+                    fontSize: 15,
+                  }}>
                     {m.testo}
                   </Text>
 
                   <Text style={{
-                color: mio ? '#D2E2F2' : '#8798AA',
-                fontSize: 9,
-                marginTop: 5,
-                alignSelf: 'flex-end',
-                fontWeight: '700',
-              }}>
+                    color: mio ? '#d8e0ff' : '#7184aa',
+                    fontSize: 10,
+                    marginTop: 5,
+                    alignSelf: 'flex-end',
+                  }}>
                     {new Date(m.created_at).toLocaleTimeString(
                       'it-IT',
                       {
@@ -3871,24 +2912,15 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
                     )}
                   </Text>
                 </TouchableOpacity>
-              
-              </React.Fragment>);
+              );
             })
           )}
         </ScrollView>
 
         <View style={{
           flexDirection: 'row',
+          gap: 10,
           alignItems: 'center',
-          gap: 8,
-          backgroundColor: 'transparent',
-          borderRadius: 0,
-          paddingHorizontal: 0,
-          paddingTop: 6,
-          paddingBottom: 2,
-          marginTop: 2,
-          borderWidth: 0,
-          shadowOpacity: 0,
         }}>
           <TextInput
             value={chatMessaggio}
@@ -3896,19 +2928,13 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
             placeholder="Scrivi un messaggio..."
             placeholderTextColor="#7184aa"
             style={{
-            flex: 1,
-            minHeight: 46,
-            maxHeight: 105,
-            backgroundColor: '#111C29',
-            color: '#F5F7FA',
-            borderRadius: 22,
-            borderWidth: 1,
-            borderColor: '#23384B',
-            paddingHorizontal: 16,
-            paddingVertical: 11,
-            fontSize: 14,
-            fontWeight: '500',
-          }}
+              flex: 1,
+              backgroundColor: '#07101F',
+              color: 'white',
+              borderRadius: 16,
+              paddingHorizontal: 16,
+              paddingVertical: 14,
+            }}
           />
 
           <TouchableOpacity
@@ -3939,17 +2965,12 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
               }
             }}
             style={{
-              width: 44,
-              height: 44,
-              borderRadius: 22,
-              backgroundColor: '#1769E0',
+              width: 52,
+              height: 52,
+              borderRadius: 26,
+              backgroundColor: '#284cff',
               alignItems: 'center',
               justifyContent: 'center',
-              borderWidth: 0,
-              shadowColor: '#1769E0',
-              shadowOpacity: 0.10,
-              shadowRadius: 6,
-              shadowOffset: { width: 0, height: 3 },
             }}
           >
             <Text style={{
@@ -4256,7 +3277,7 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
           DATI PERSONALI
         </Text>
 
-        <Field profile
+        <Field
           label="NOME"
           value={
             nomeDraft
@@ -4266,7 +3287,7 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
           }
         />
 
-        <Field profile
+        <Field
           label="COGNOME"
           value={
             cognomeDraft
@@ -4276,9 +3297,15 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
           }
         />
 
-        
+        <Text
+          style={
+            styles.profileSectionTitle
+          }
+        >
+          AZIENDA
+        </Text>
 
-        <Field profile
+        <Field
           label="AZIENDA"
           value={
             aziendaDraft
@@ -4287,73 +3314,6 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
             setAziendaDraft
           }
         />
-
-      {/* MATRICOLA PROFILO */}
-      <View style={styles.profileFieldWrap}>
-        <Text style={styles.profileFieldLabel}>
-          MATRICOLA
-        </Text>
-
-        <View
-          style={[
-            styles.profileFieldInput,
-            {
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-            },
-          ]}
-        >
-          <View style={{ flex: 1, minWidth: 0 }}>
-            <TextInput
-              value={matricolaDraft}
-              onChangeText={setMatricolaDraft}
-              placeholder="Inserisci matricola"
-              placeholderTextColor="#7899B8"
-              autoCapitalize="characters"
-              autoCorrect={false}
-              style={{
-                color: '#FFFFFF',
-                fontSize: 15,
-                fontWeight: '800',
-                letterSpacing: 0.4,
-                padding: 0,
-                margin: 0,
-              }}
-            />
-
-            <Text
-              style={{
-                color: '#7899B8',
-                fontSize: 9,
-                fontWeight: '600',
-                marginTop: 3,
-              }}
-            >
-              Matricola professionale
-            </Text>
-          </View>
-
-          <View
-            style={{
-              width: 34,
-              height: 34,
-              borderRadius: 17,
-              backgroundColor: 'rgba(92,234,255,0.10)',
-              borderWidth: 1,
-              borderColor: 'rgba(92,234,255,0.45)',
-              alignItems: 'center',
-              justifyContent: 'center',
-              shadowColor: '#5CEAFF',
-              shadowOpacity: 0.22,
-              shadowRadius: 7,
-            }}
-          >
-            <Text style={{ fontSize: 15 }}>🛡️</Text>
-          </View>
-        </View>
-      </View>
-
 
         <Text
           style={
@@ -4439,7 +3399,7 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
           </TouchableOpacity>
         </View>
 
-        <Field profile
+        <Field
           label="SEDE / ZONA"
           value={
             sedeDraft
@@ -4449,193 +3409,7 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
           }
         />
 
-      <Field
-        profile
-        label="IN SERVIZIO DAL"
-        value={inServizioDalDraft}
-        onChange={(testo) => {
-          const soloNumeri = testo.replace(/\D/g, '').slice(0, 4);
-          setInServizioDalDraft(soloNumeri);
-        }}
-        keyboardType="number-pad"
-      />
-
-
-        
-      {/* PANNELLO IDENTITA PROFESSIONALE */}
-      <View
-        style={{
-          marginTop: 8,
-          marginBottom: 8,
-          padding: 16,
-          borderRadius: 26,
-          backgroundColor: 'rgba(22, 28, 74, 0.88)',
-          borderWidth: 1.2,
-          borderColor: 'rgba(111, 111, 255, 0.72)',
-
-          shadowColor: '#706CFF',
-          shadowOpacity: 0.25,
-          shadowRadius: 16,
-          shadowOffset: { width: 0, height: 6 },
-        }}
-      >
-        <Text
-          style={{
-            color: '#8FE8FF',
-            fontSize: 10,
-            fontWeight: '900',
-            letterSpacing: 1.25,
-            marginBottom: 12,
-
-            textShadowColor: 'rgba(92,235,255,0.30)',
-            textShadowOffset: { width: 0, height: 0 },
-            textShadowRadius: 7,
-          }}
-        >
-          IDENTITÀ PROFESSIONALE
-        </Text>
-
-        <View
-          style={{
-            flexDirection: 'row',
-            gap: 8,
-          }}
-        >
-          {/* CODICE */}
-          <View
-            style={{
-              flex: 1,
-              minHeight: 82,
-              padding: 11,
-              borderRadius: 19,
-              backgroundColor: 'rgba(37, 49, 111, 0.78)',
-              borderWidth: 1,
-              borderColor: 'rgba(92,234,255,0.46)',
-
-              shadowColor: '#5CEAFF',
-              shadowOpacity: 0.15,
-              shadowRadius: 8,
-            }}
-          >
-            <Text style={{ fontSize: 16 }}>🛡️</Text>
-
-            <Text
-              style={{
-                color: '#7FA5C2',
-                fontSize: 8,
-                fontWeight: '800',
-                marginTop: 7,
-                letterSpacing: 0.5,
-              }}
-            >
-              MATRICOLA
-            </Text>
-
-            <Text
-              numberOfLines={1}
-              style={{
-                color: '#FFFFFF',
-                fontSize: 11,
-                fontWeight: '900',
-                marginTop: 3,
-              }}
-            >
-              {profilo?.codice_gpg || '—'}
-            </Text>
-          </View>
-
-          {/* SEDE */}
-          <View
-            style={{
-              flex: 1,
-              minHeight: 82,
-              padding: 11,
-              borderRadius: 19,
-              backgroundColor: 'rgba(43, 38, 105, 0.78)',
-              borderWidth: 1,
-              borderColor: 'rgba(135,122,255,0.55)',
-
-              shadowColor: '#8075FF',
-              shadowOpacity: 0.14,
-              shadowRadius: 8,
-            }}
-          >
-            <Text style={{ fontSize: 16 }}>📍</Text>
-
-            <Text
-              style={{
-                color: '#8C91C7',
-                fontSize: 8,
-                fontWeight: '800',
-                marginTop: 7,
-                letterSpacing: 0.5,
-              }}
-            >
-              SEDE / ZONA
-            </Text>
-
-            <Text
-              numberOfLines={1}
-              ellipsizeMode="tail"
-              style={{
-                color: '#FFFFFF',
-                fontSize: 11,
-                fontWeight: '900',
-                marginTop: 3,
-              }}
-            >
-              {sedeDraft || '—'}
-            </Text>
-          </View>
-
-          {/* ANZIANITÀ */}
-          <View
-            style={{
-              flex: 1,
-              minHeight: 82,
-              padding: 11,
-              borderRadius: 19,
-              backgroundColor: 'rgba(29, 58, 99, 0.78)',
-              borderWidth: 1,
-              borderColor: 'rgba(92,198,255,0.45)',
-
-              shadowColor: '#5CCAFF',
-              shadowOpacity: 0.14,
-              shadowRadius: 8,
-            }}
-          >
-            <Text style={{ fontSize: 16 }}>📅</Text>
-
-            <Text
-              style={{
-                color: '#7CAAC8',
-                fontSize: 8,
-                fontWeight: '800',
-                marginTop: 7,
-                letterSpacing: 0.45,
-              }}
-            >
-              IN SERVIZIO
-            </Text>
-
-            <Text
-              numberOfLines={1}
-              style={{
-                color: '#FFFFFF',
-                fontSize: 11,
-                fontWeight: '900',
-                marginTop: 3,
-              }}
-            >
-              {inServizioDalDraft
-                ? `Dal ${inServizioDalDraft}`
-                : '—'}
-            </Text>
-          </View>
-        </View>
-      </View>
-
-<TouchableOpacity
+        <TouchableOpacity
           style={
             styles.saveButton
           }
@@ -4653,30 +3427,7 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
         </TouchableOpacity>
 
           <TouchableOpacity
-            style={{
-          minHeight: 52,
-
-          marginTop: 12,
-          marginBottom: 8,
-
-          paddingHorizontal: 16,
-          paddingVertical: 13,
-
-          borderRadius: 20,
-
-          backgroundColor: 'rgba(67, 25, 43, 0.38)',
-
-          borderWidth: 1,
-          borderColor: 'rgba(255, 100, 126, 0.38)',
-
-          alignItems: 'center',
-          justifyContent: 'center',
-
-          shadowColor: '#FF657E',
-          shadowOpacity: 0.10,
-          shadowRadius: 8,
-          shadowOffset: { width: 0, height: 4 },
-        }}
+            style={{ backgroundColor: "#c62828", padding: 16, borderRadius: 12, marginTop: 14, alignItems: "center" }}
             onPress={logout}
           >
             <Text style={{ color: "white", fontWeight: "700", fontSize: 16 }}>
@@ -5014,198 +3765,12 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
             }
           >
             {modifica
-              ? 'DETTAGLIO TURNO'
+              ? 'MODIFICA TURNO ESISTENTE'
               : 'NUOVO TURNO'}
           </Text>
         </View>
 
-        
-      {/* RIEPILOGO DETTAGLIO TURNO */}
-      {modifica && (
-        <View
-          style={{
-            backgroundColor: '#0B1930',
-            borderRadius: 22,
-            padding: 17,
-            marginBottom: 18,
-            borderWidth: 1.3,
-            borderColor: '#4E72FF',
-            shadowColor: '#536BFF',
-            shadowOpacity: 0.22,
-            shadowRadius: 16,
-            shadowOffset: { width: 0, height: 7 },
-          }}
-        >
-          <Text
-            style={{
-              color: '#79DFFF',
-              fontSize: 10,
-              fontWeight: '900',
-              letterSpacing: 1.2,
-            }}
-          >
-            RIEPILOGO TURNO
-          </Text>
-
-          <View
-            style={{
-              flexDirection: 'row',
-              justifyContent: 'space-between',
-              alignItems: 'flex-end',
-              marginTop: 10,
-            }}
-          >
-            <View style={{ flex: 1 }}>
-              <Text
-                style={{
-                  color: '#FFFFFF',
-                  fontSize: 27,
-                  fontWeight: '900',
-                }}
-              >
-                {inizio || '--:--'} - {fine || '--:--'}
-              </Text>
-
-              <Text
-                style={{
-                  color: '#B9C8DF',
-                  fontSize: 13,
-                  fontWeight: '700',
-                  marginTop: 5,
-                }}
-              >
-                📍 {luogo || 'Luogo non indicato'}
-              </Text>
-            </View>
-
-            {(() => {
-              const [hi, mi] = String(inizio || '00:00')
-                .split(':')
-                .map(Number);
-
-              const [hf, mf] = String(fine || '00:00')
-                .split(':')
-                .map(Number);
-
-              let minuti = (hf * 60 + mf) - (hi * 60 + mi);
-
-              if (minuti <= 0) {
-                minuti += 24 * 60;
-              }
-
-              const oreDurata = Math.floor(minuti / 60);
-              const minDurata = minuti % 60;
-
-              return (
-                <View
-                  style={{
-                    paddingHorizontal: 11,
-                    paddingVertical: 8,
-                    borderRadius: 14,
-                    backgroundColor: 'rgba(69,215,255,0.09)',
-                    borderWidth: 1,
-                    borderColor: '#45D7FF',
-                    alignItems: 'center',
-                  }}
-                >
-                  <Text
-                    style={{
-                      color: '#78E7FF',
-                      fontSize: 9,
-                      fontWeight: '900',
-                    }}
-                  >
-                    DURATA
-                  </Text>
-
-                  <Text
-                    style={{
-                      color: '#FFFFFF',
-                      fontSize: 17,
-                      fontWeight: '900',
-                      marginTop: 2,
-                    }}
-                  >
-                    {minDurata === 0
-                      ? `${oreDurata}h`
-                      : `${oreDurata}h ${minDurata}m`}
-                  </Text>
-                </View>
-              );
-            })()}
-          </View>
-
-          <View
-            style={{
-              flexDirection: 'row',
-              marginTop: 14,
-              gap: 8,
-            }}
-          >
-            <View
-              style={{
-                flex: 1,
-                padding: 10,
-                borderRadius: 13,
-                backgroundColor: '#10213A',
-              }}
-            >
-              <Text
-                style={{
-                  color: '#8399B8',
-                  fontSize: 9,
-                  fontWeight: '900',
-                }}
-              >
-                GIORNO
-              </Text>
-
-              <Text
-                style={{
-                  color: '#FFFFFF',
-                  fontSize: 15,
-                  fontWeight: '900',
-                  marginTop: 3,
-                }}
-              >
-                {String(giorno).padStart(2, '0')} {MESI[mese].toUpperCase()}
-              </Text>
-            </View>
-
-            <View
-              style={{
-                flex: 1,
-                padding: 10,
-                borderRadius: 13,
-                backgroundColor: '#10213A',
-              }}
-            >
-              <Text
-                style={{
-                  color: '#8399B8',
-                  fontSize: 9,
-                  fontWeight: '900',
-                }}
-              >
-                EXTRA
-              </Text>
-
-              <Text
-                style={{
-                  color: Number(extra || 0) > 0 ? '#FFD166' : '#FFFFFF',
-                  fontSize: 15,
-                  fontWeight: '900',
-                  marginTop: 3,
-                }}
-              >
-                {Number(extra || 0) > 0 ? `${extra}h` : '0h'}
-              </Text>
-            </View>
-          </View>
-        </View>
-      )}
-
-<Text
+        <Text
           style={
             styles.label
           }
@@ -5528,30 +4093,7 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
       return fineMinuti <= inizioMinuti;
     }).length;
     return (
-      <Screen
-      showScrollTop
-      contentOffset={{
-        x: 0,
-        y: (() => {
-          const adesso = new Date();
-
-          if (
-            Number(mese) !== adesso.getMonth() ||
-            Number(anno) !== adesso.getFullYear()
-          ) {
-            return 0;
-          }
-
-          const indice = ordinati.findIndex(
-            (t) => Number(t.giorno) === adesso.getDate()
-          );
-
-          if (indice < 0) return 0;
-
-          return Math.max(0, 170 + indice * 126);
-        })(),
-      }}
-    >
+      <Screen>
         <Back
           onPress={
             tornaHome
@@ -5559,88 +4101,36 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
         />
 
         <View style={{
-        marginHorizontal: 16,
-        marginTop: 8,
-        marginBottom: 18,
-        padding: 20,
-        borderRadius: 24,
-        backgroundColor: '#171F55',
-        borderWidth: 1.3,
-        borderColor: '#7180FF',
-        shadowColor: '#6174FF',
-        shadowOpacity: 0.28,
-        shadowRadius: 18,
-        shadowOffset: { width: 0, height: 8 },
-        overflow: 'hidden',
-      }}>
+          marginBottom: 18,
+          padding: 18,
+          borderRadius: 22,
+          backgroundColor: '#101A33',
+          borderWidth: 1,
+          borderColor: 'rgba(130,160,255,0.22)',
+        }}>
           <Text style={{
-        color: '#84DFFF',
-        fontSize: 10,
-        fontWeight: '900',
-        letterSpacing: 1.5,
-        marginBottom: 5,
-      }}>
+            color: '#8FA8FF',
+            fontSize: 12,
+            fontWeight: '800',
+            letterSpacing: 1.2,
+            marginBottom: 5,
+          }}>
             AREA PERSONALE
           </Text>
 
           <Text style={{
-        color: '#FFFFFF',
-        fontSize: 30,
-        fontWeight: '900',
-        letterSpacing: -0.5,
-        paddingRight: 100,
-      }}>
+            color: '#FFFFFF',
+            fontSize: 28,
+            fontWeight: '900',
+          }}>
             I miei turni
           </Text>
 
-      {/* BADGE TURNI HEADER */}
-      <View
-        style={{
-          position: 'absolute',
-          top: 20,
-          right: 18,
-          paddingHorizontal: 11,
-          paddingVertical: 7,
-          borderRadius: 14,
-          backgroundColor: 'rgba(89,222,255,0.11)',
-          borderWidth: 1,
-          borderColor: '#55DFFF',
-          shadowColor: '#55DFFF',
-          shadowOpacity: 0.24,
-          shadowRadius: 9,
-          alignItems: 'center',
-        }}
-      >
-        <Text
-          style={{
-            color: '#9AECFF',
-            fontSize: 9,
-            fontWeight: '900',
-            letterSpacing: 0.8,
-          }}
-        >
-          TURNI
-        </Text>
-
-        <Text
-          style={{
-            color: '#FFFFFF',
-            fontSize: 17,
-            fontWeight: '900',
-            marginTop: 1,
-          }}
-        >
-          {turniLavorati.length}
-        </Text>
-      </View>
-
-
           <Text style={{
-        color: '#C8D7F4',
-        fontSize: 13,
-        fontWeight: '700',
-        marginTop: 6,
-      }}>
+            color: '#8997B2',
+            fontSize: 13,
+            marginTop: 5,
+          }}>
             {MESI[mese]} {anno} · riepilogo attività
           </Text>
         </View>
@@ -5654,77 +4144,24 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
           {anno}
         </Text>
         <View style={{ backgroundColor: "#07152E", borderRadius: 16, borderWidth: 1, borderColor: "rgba(72,132,255,0.30)", marginTop: 14, marginBottom: 16, paddingVertical: 16, paddingHorizontal: 8 }}>
-          <View style={{
-        flexDirection: 'row',
-        alignItems: 'stretch',
-        justifyContent: 'space-between',
-        gap: 5,
-
-        backgroundColor: '#09172D',
-        borderRadius: 20,
-        borderWidth: 1.2,
-        borderColor: '#3D5F8E',
-
-        marginTop: 12,
-        marginBottom: 14,
-
-        paddingVertical: 7,
-        paddingHorizontal: 6,
-
-        shadowColor: '#45CFFF',
-        shadowOpacity: 0.10,
-        shadowRadius: 10,
-        shadowOffset: { width: 0, height: 4 },
-      }}>
-            <View style={{
-          flex: 1,
-          alignItems: 'center',
-          justifyContent: 'center',
-          paddingVertical: 8,
-          marginHorizontal: 2,
-          borderRadius: 14,
-          backgroundColor: 'rgba(43,73,125,0.22)',
-        }}>
-              <Ionicons name="calendar-outline" size={23} color="#5EDBFF" />
+          <View style={{ flexDirection: "row", justifyContent: "space-around" }}>
+            <View style={{ flex: 1, alignItems: "center" }}>
+              <Ionicons name="calendar-outline" size={22} color="#AFC8F5" />
               <Text style={{ color: "#8997B2", fontSize: 10, marginTop: 6 }}>GIORNI LAVORATI</Text>
               <Text style={{ color: "#FFFFFF", fontSize: 18, fontWeight: "800", marginTop: 2 }}>{turniLavorati.length}</Text>
             </View>
-            <View style={{
-          flex: 1,
-          alignItems: 'center',
-          justifyContent: 'center',
-          paddingVertical: 8,
-          marginHorizontal: 2,
-          borderRadius: 14,
-          backgroundColor: 'rgba(43,73,125,0.22)',
-        }}>
-              <Ionicons name="time-outline" size={23} color="#79E4FF" />
+            <View style={{ flex: 1, alignItems: "center" }}>
+              <Ionicons name="time-outline" size={22} color="#AFC8F5" />
               <Text style={{ color: "#8997B2", fontSize: 10, marginTop: 6 }}>ORE TOTALI</Text>
               <Text style={{ color: "#FFFFFF", fontSize: 18, fontWeight: "800", marginTop: 2 }}>{oreTotali}h</Text>
             </View>
-            <View style={{
-          flex: 1,
-          alignItems: 'center',
-          justifyContent: 'center',
-          paddingVertical: 8,
-          marginHorizontal: 2,
-          borderRadius: 14,
-          backgroundColor: 'rgba(43,73,125,0.22)',
-        }}>
+            <View style={{ flex: 1, alignItems: "center" }}>
               <Ionicons name="star" size={22} color="#AFC8F5" />
               <Text style={{ color: "#8997B2", fontSize: 10, marginTop: 6 }}>STRAORD.</Text>
               <Text style={{ color: "#FFFFFF", fontSize: 18, fontWeight: "800", marginTop: 2 }}>{oreStraordinari}h</Text>
             </View>
-            <View style={{
-          flex: 1,
-          alignItems: 'center',
-          justifyContent: 'center',
-          paddingVertical: 8,
-          marginHorizontal: 2,
-          borderRadius: 14,
-          backgroundColor: 'rgba(43,73,125,0.22)',
-        }}>
-              <Ionicons name="moon-outline" size={23} color="#A98BFF" />
+            <View style={{ flex: 1, alignItems: "center" }}>
+              <Ionicons name="moon-outline" size={22} color="#AFC8F5" />
               <Text style={{ color: "#8997B2", fontSize: 10, marginTop: 6 }}>NOTTI</Text>
               <Text style={{ color: "#FFFFFF", fontSize: 18, fontWeight: "800", marginTop: 2 }}>{giornateStipendioMese.filter((t) => {
   if (!t.inizio || !t.fine) return false;
@@ -5766,70 +4203,7 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
           </View>
         ) : (
           ordinati.map(
-            (t) => (<React.Fragment key={String(t.id)}>
-                {/* SEPARATORE DA OGGI V1 */}
-                {(() => {
-                  const adessoSep = new Date();
-
-                  const eOggiSep =
-                    Number(t.giorno) === adessoSep.getDate() &&
-                    Number(mese) === adessoSep.getMonth() &&
-                    Number(anno) === adessoSep.getFullYear();
-
-                  if (!eOggiSep) return null;
-
-                  return (
-                    <View
-                      style={{
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        marginTop: 12,
-                        marginBottom: 12,
-                        gap: 9,
-                      }}
-                    >
-                      <View
-                        style={{
-                          flex: 1,
-                          height: 1,
-                          backgroundColor: '#315A78',
-                        }}
-                      />
-
-                      <View
-                        style={{
-                          paddingHorizontal: 11,
-                          paddingVertical: 5,
-                          borderRadius: 11,
-                          backgroundColor: 'rgba(77,216,255,0.10)',
-                          borderWidth: 1,
-                          borderColor: '#45D7FF',
-                        }}
-                      >
-                        <Text
-                          style={{
-                            color: '#7BE7FF',
-                            fontSize: 9.5,
-                            fontWeight: '900',
-                            letterSpacing: 1,
-                          }}
-                        >
-                          DA OGGI IN POI
-                        </Text>
-                      </View>
-
-                      <View
-                        style={{
-                          flex: 1,
-                          height: 1,
-                          backgroundColor: '#315A78',
-                        }}
-                      />
-                    </View>
-                  );
-                })()}
-
-                
+            (t) => (
               <TouchableOpacity
           key={String(t.id)}
           style={[
@@ -5898,7 +4272,7 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
 
                   const eOggi =
                     giornoCard === adesso.getDate() &&
-                    Number(mese) === adesso.getMonth() &&
+                    Number(mese) === adesso.getMonth() + 1 &&
                     Number(anno) === adesso.getFullYear();
 
                   const futuri = ordinati
@@ -5911,7 +4285,7 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
 
                       const dataX = new Date(
                         Number(anno),
-                        Number(mese),
+                        Number(mese) - 1,
                         Number(x.giorno),
                         hh || 0,
                         mm || 0,
@@ -5931,7 +4305,7 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
 
                       const da = new Date(
                         Number(anno),
-                        Number(mese),
+                        Number(mese) - 1,
                         Number(a.giorno),
                         ha || 0,
                         ma || 0
@@ -5939,7 +4313,7 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
 
                       const db = new Date(
                         Number(anno),
-                        Number(mese),
+                        Number(mese) - 1,
                         Number(b.giorno),
                         hb || 0,
                         mb || 0
@@ -6010,71 +4384,7 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
             </Text>
           </View>
 
-          
-                {/* DURATA TURNO V1 */}
-                {t.tipo === 'turno' && (() => {
-                  const [hi, mi] = String(t.inizio || '00:00')
-                    .split(':')
-                    .map(Number);
-
-                  const [hf, mf] = String(t.fine || '00:00')
-                    .split(':')
-                    .map(Number);
-
-                  let minuti =
-                    (hf * 60 + mf) -
-                    (hi * 60 + mi);
-
-                  if (minuti <= 0) {
-                    minuti += 24 * 60;
-                  }
-
-                  const ore = Math.floor(minuti / 60);
-                  const min = minuti % 60;
-
-                  const durata =
-                    min === 0
-                      ? `${ore}h`
-                      : `${ore}h ${String(min).padStart(2, '0')}m`;
-
-                  const extra = Number(t.extra || 0);
-
-                  return (
-                    <View
-                      style={{
-                        position: 'absolute',
-                        right: 10,
-                        bottom: 10,
-                        alignItems: 'flex-end',
-                      }}
-                    >
-                      <Text
-                        style={{
-                          color: '#FFFFFF',
-                          fontSize: 13,
-                          fontWeight: '900',
-                        }}
-                      >
-                        {durata}
-                      </Text>
-
-                      {extra > 0 && (
-                        <Text
-                          style={{
-                            color: '#FFD166',
-                            fontSize: 9,
-                            fontWeight: '900',
-                            marginTop: 2,
-                          }}
-                        >
-                          +{extra}h EXTRA
-                        </Text>
-                      )}
-                    </View>
-                  );
-                })()}
-
-<View style={{ flex: 1, paddingLeft: 4 }}>
+          <View style={{ flex: 1, paddingLeft: 4 }}>
             {t.tipo === 'turno' ? (
               <>
                 <Text style={styles.turnTitle}>
@@ -6137,8 +4447,7 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
             )}
           </View>
         </TouchableOpacity>
-            
-              </React.Fragment>)
+            )
           )
         )}
       </Screen>
@@ -6524,51 +4833,7 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
           marginTop: 7,
           letterSpacing: 0.25,
         }}>CHAT</Text>
-        
-        {/* BADGE NON LETTI NAV CHAT */}
-        {Object.values(riepilogoChat || {}).reduce(
-          (totale, chat) => totale + (chat?.nonLetti || 0),
-          0
-        ) > 0 ? (
-          <View
-            style={{
-              position: 'absolute',
-              top: 3,
-              right: 7,
-              minWidth: 19,
-              height: 19,
-              borderRadius: 10,
-              paddingHorizontal: 5,
-              backgroundColor: '#FF4D6D',
-              borderWidth: 1.5,
-              borderColor: '#FFFFFF',
-              alignItems: 'center',
-              justifyContent: 'center',
-              shadowColor: '#FF4D6D',
-              shadowOpacity: 0.45,
-              shadowRadius: 7,
-            }}
-          >
-            <Text
-              style={{
-                color: '#FFFFFF',
-                fontSize: 9,
-                lineHeight: 12,
-                fontWeight: '900',
-              }}
-            >
-              {Math.min(
-                99,
-                Object.values(riepilogoChat || {}).reduce(
-                  (totale, chat) => totale + (chat?.nonLetti || 0),
-                  0
-                )
-              )}
-            </Text>
-          </View>
-        ) : null}
-
-      </TouchableOpacity>
+        </TouchableOpacity>
 
       </View>
       </ScrollView>
@@ -6989,11 +5254,7 @@ function Calendar({
 
 function Screen({
   children,
-  contentOffset,
-  showScrollTop = false,
 }) {
-  const screenScrollRef = React.useRef(null);
-  const [mostraTornaSu, setMostraTornaSu] = React.useState(false);
   return (
     <SafeAreaView
       style={
@@ -7008,75 +5269,10 @@ function Screen({
           styles.content
         }
         keyboardShouldPersistTaps="handled"
-      
-      contentOffset={contentOffset}
-    
-      ref={screenScrollRef}
-      onScroll={(event) => {
-        if (!showScrollTop) return;
-
-        const y = event.nativeEvent.contentOffset.y;
-        setMostraTornaSu(y > 450);
-      }}
-      scrollEventThrottle={16}
-    >
+      >
         {children}
       </ScrollView>
-    
-      {/* PULSANTE TORNA SU */}
-      {showScrollTop && mostraTornaSu && (
-        <TouchableOpacity
-          activeOpacity={0.82}
-          onPress={() => {
-            screenScrollRef.current?.scrollTo({
-              y: 0,
-              animated: true,
-            });
-          }}
-          style={{
-            position: 'absolute',
-            right: 18,
-            bottom: 24,
-            zIndex: 999,
-            flexDirection: 'row',
-            alignItems: 'center',
-            paddingHorizontal: 13,
-            paddingVertical: 10,
-            borderRadius: 18,
-            backgroundColor: '#10294A',
-            borderWidth: 1.2,
-            borderColor: '#58DFFF',
-            shadowColor: '#58DFFF',
-            shadowOpacity: 0.35,
-            shadowRadius: 12,
-            shadowOffset: { width: 0, height: 6 },
-          }}
-        >
-          <Text
-            style={{
-              color: '#8CEBFF',
-              fontSize: 17,
-              fontWeight: '900',
-              marginRight: 5,
-            }}
-          >
-            ↑
-          </Text>
-
-          <Text
-            style={{
-              color: '#FFFFFF',
-              fontSize: 10,
-              fontWeight: '900',
-              letterSpacing: 0.7,
-            }}
-          >
-            TORNA SU
-          </Text>
-        </TouchableOpacity>
-      )}
-
-</SafeAreaView>
+    </SafeAreaView>
   );
 }
 
@@ -7330,20 +5526,25 @@ function Field({
   value,
   onChange,
   keyboardType,
-  profile = false,
 }) {
   return (
     <View
-      style={[styles.fieldWrap, profile && styles.profileFieldWrap]}
+      style={
+        styles.fieldWrap
+      }
     >
       <Text
-        style={[styles.label, profile && styles.profileFieldLabel]}
+        style={
+          styles.label
+        }
       >
         {label}
       </Text>
 
       <TextInput
-        style={[styles.input, profile && styles.profileFieldInput]}
+        style={
+          styles.input
+        }
         value={
           value
         }
@@ -7717,39 +5918,21 @@ const styles =
     },
 
     saveButton: {
-    minHeight: 58,
-    borderRadius: 22,
-
-    marginTop: 24,
-    marginBottom: 10,
-
-    backgroundColor: '#1763D8',
-
-    borderWidth: 1.5,
-    borderColor: '#63E7FF',
-
-    alignItems: 'center',
-    justifyContent: 'center',
-
-    shadowColor: '#54E4FF',
-    shadowOpacity: 0.48,
-    shadowRadius: 18,
-    shadowOffset: { width: 0, height: 7 },
-
-    elevation: 9,
-  },
+      backgroundColor:
+        COLORS.blue,
+      borderRadius: 17,
+      padding: 17,
+      alignItems:
+        'center',
+      marginTop: 12,
+    },
 
     saveText: {
-    color: '#FFFFFF',
-    fontSize: 15,
-    fontWeight: '900',
-    letterSpacing: 0.8,
-    textAlign: 'center',
-
-    textShadowColor: 'rgba(93,235,255,0.50)',
-    textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 8,
-  },
+      color:
+        COLORS.white,
+      fontWeight:
+        '900',
+    },
 
     syncButton: {
     minHeight: 58,
@@ -7791,24 +5974,20 @@ const styles =
     back: {
       width: 44,
       height: 44,
-      borderRadius: 15,
-      alignItems: 'center',
-      justifyContent: 'center',
-      backgroundColor: '#10213A',
-      borderWidth: 1,
-      borderColor: '#315276',
-      shadowColor: '#42CFFF',
-      shadowOpacity: 0.12,
-      shadowRadius: 10,
-      shadowOffset: { width: 0, height: 4 },
-      marginBottom: 14,
+      backgroundColor:
+        COLORS.card,
+      borderRadius: 14,
+      alignItems:
+        'center',
+      justifyContent:
+        'center',
+      marginBottom: 18,
     },
 
     backText: {
-      color: '#FFFFFF',
-      fontSize: 25,
-      fontWeight: '900',
-      lineHeight: 27,
+      color:
+        COLORS.white,
+      fontSize: 34,
     },
 
     title: {
@@ -8011,32 +6190,30 @@ const styles =
     },
 
     label: {
-      color: '#8EDFFF',
+      color:
+        COLORS.muted,
       fontSize: 10,
-      fontWeight: '900',
-      letterSpacing: 1,
-      marginBottom: 8,
-      marginTop: 4,
+      fontWeight:
+        '900',
+      marginBottom: 7,
     },
 
     types: {
-      flexDirection: 'row',
-      flexWrap: 'wrap',
-      gap: 7,
+      flexDirection:
+        'row',
+      flexWrap:
+        'wrap',
       marginBottom: 18,
     },
 
     type: {
-      paddingVertical: 11,
-      paddingHorizontal: 13,
-      borderRadius: 14,
-      backgroundColor: '#10213A',
-      borderWidth: 1,
-      borderColor: '#315276',
+      backgroundColor:
+        COLORS.card,
+      paddingVertical: 10,
+      paddingHorizontal: 12,
+      borderRadius: 12,
       marginRight: 6,
       marginBottom: 7,
-      alignItems: 'center',
-      justifyContent: 'center',
     },
 
     typeSelected: {
@@ -8045,10 +6222,10 @@ const styles =
     },
 
     typeText: {
-      color: '#DFF7FF',
-      fontSize: 12,
-      fontWeight: '900',
-      letterSpacing: 0.2,
+      color:
+        COLORS.muted,
+      fontWeight:
+        '800',
     },
 
     typeTextSelected: {
@@ -8064,22 +6241,20 @@ const styles =
 
     quick: {
       flex: 1,
-      backgroundColor: '#10213A',
-      paddingVertical: 13,
-      paddingHorizontal: 8,
+      backgroundColor:
+        '#19334F',
+      padding: 13,
       marginHorizontal: 3,
-      borderRadius: 14,
-      borderWidth: 1,
-      borderColor: '#294B70',
-      alignItems: 'center',
-      justifyContent: 'center',
+      borderRadius: 13,
+      alignItems:
+        'center',
     },
 
     quickText: {
-      color: '#DDF7FF',
-      fontWeight: '900',
-      fontSize: 12,
-      letterSpacing: 0.2,
+      color:
+        COLORS.white,
+      fontWeight:
+        '900',
     },
 
     row: {
@@ -8096,66 +6271,46 @@ const styles =
     },
 
     input: {
-      backgroundColor: '#0B1930',
-      borderWidth: 1.2,
-      borderColor: '#315276',
-      borderRadius: 16,
-      paddingVertical: 15,
-      paddingHorizontal: 16,
-      color: '#FFFFFF',
-      fontSize: 15,
-      fontWeight: '700',
-      shadowColor: '#42CFFF',
-      shadowOpacity: 0.06,
-      shadowRadius: 8,
+      backgroundColor:
+        COLORS.card,
+      borderWidth: 1,
+      borderColor:
+        COLORS.border,
+      borderRadius: 14,
+      padding: 15,
+      color:
+        COLORS.white,
     },
 
     restButton: {
-      backgroundColor: '#10213A',
-      borderRadius: 16,
-      borderWidth: 1,
-      borderColor: '#315276',
-      paddingVertical: 15,
-      paddingHorizontal: 14,
+      backgroundColor:
+        COLORS.card,
+      borderRadius: 14,
+      padding: 15,
       marginBottom: 10,
-      alignItems: 'center',
-      justifyContent: 'center',
     },
 
     restButtonOn: {
-      backgroundColor: '#123A26',
-      borderRadius: 16,
-      borderWidth: 1.4,
-      borderColor: '#54E887',
-      shadowColor: '#54E887',
-      shadowOpacity: 0.18,
-      shadowRadius: 10,
+      backgroundColor:
+        '#173C5D',
     },
 
     restText: {
-      color: '#FFFFFF',
-      fontWeight: '900',
-      fontSize: 13,
+      color:
+        COLORS.white,
+      fontWeight:
+        '800',
     },
 
     deleteButton: {
-      paddingVertical: 15,
-      paddingHorizontal: 16,
-      alignItems: 'center',
-      justifyContent: 'center',
-      borderRadius: 16,
-      backgroundColor: '#29131A',
-      borderWidth: 1,
-      borderColor: '#7A3446',
-      marginTop: 8,
-      marginBottom: 16,
+      padding: 17,
+      alignItems:
+        'center',
     },
 
     deleteText: {
-      color: '#FF718D',
-      fontWeight: '900',
-      fontSize: 13,
-      letterSpacing: 0.3,
+      color:
+        COLORS.red,
     },
 
     empty: {
@@ -8236,82 +6391,58 @@ const styles =
   },
 
   profileHero: {
-    backgroundColor: 'rgba(30, 39, 104, 0.92)',
-    borderRadius: 30,
-    paddingHorizontal: 22,
-    paddingVertical: 24,
-    alignItems: 'center',
-    marginBottom: 24,
-
-    borderWidth: 1.3,
-    borderColor: '#756CFF',
-
-    shadowColor: '#7367FF',
-    shadowOpacity: 0.42,
-    shadowRadius: 22,
-    shadowOffset: { width: 0, height: 7 },
-
-    elevation: 10,
+      backgroundColor:
+        '#10304B',
+      borderRadius: 24,
+      padding: 24,
+      alignItems:
+        'center',
+      marginBottom: 24,
     },
 
     profileAvatar: {
-    width: 118,
-    height: 118,
-    borderRadius: 59,
-
-    backgroundColor: '#17355A',
-
-    borderWidth: 2.2,
-    borderColor: '#62E8FF',
-
-    alignItems: 'center',
-    justifyContent: 'center',
-
-    shadowColor: '#56E6FF',
-    shadowOpacity: 0.70,
-    shadowRadius: 18,
-    shadowOffset: { width: 0, height: 4 },
-
-    elevation: 10,
+      width: 100,
+      height: 100,
+      borderRadius: 50,
+      backgroundColor:
+        COLORS.blue,
+      alignItems:
+        'center',
+      justifyContent:
+        'center',
     },
 
     profileAvatarImage: {
-    width: 110,
-    height: 110,
-    borderRadius: 55,
+      width: 100,
+      height: 100,
+      borderRadius: 50,
     },
 
     profileAvatarText: {
-    color: '#ECFDFF',
-    fontSize: 31,
-    fontWeight: '900',
-
-    textShadowColor: '#59E8FF',
-    textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 10,
+      color:
+        COLORS.white,
+      fontSize: 30,
+      fontWeight:
+        '900',
     },
 
     cameraBadge: {
-    position: 'absolute',
-    right: -3,
-    bottom: 2,
-
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-
-    backgroundColor: '#262D70',
-
-    alignItems: 'center',
-    justifyContent: 'center',
-
-    borderWidth: 1.5,
-    borderColor: '#74EBFF',
-
-    shadowColor: '#5DEAFF',
-    shadowOpacity: 0.60,
-    shadowRadius: 9,
-    shadowOffset: { width: 0, height: 3 },
+      position:
+        'absolute',
+      right: -3,
+      bottom: 1,
+      width: 31,
+      height: 31,
+      borderRadius: 16,
+      backgroundColor:
+        COLORS.card,
+      alignItems:
+        'center',
+      justifyContent:
+        'center',
+      borderWidth: 2,
+      borderColor:
+        '#10304B',
     },
 
     cameraBadgeText: {
@@ -8326,199 +6457,116 @@ const styles =
     },
 
     profileName: {
-    color: '#FFFFFF',
-    fontWeight: '900',
-    fontSize: 25,
-    marginTop: 13,
-    textAlign: 'center',
-    letterSpacing: -0.5,
-
-    textShadowColor: 'rgba(92,235,255,0.32)',
-    textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 10,
+      color:
+        COLORS.white,
+      fontWeight:
+        '900',
+      fontSize: 23,
+      marginTop: 12,
+      textAlign:
+        'center',
     },
 
     profileRole: {
-    color: '#B5CBE1',
-    marginTop: 5,
-    fontSize: 14,
-    fontWeight: '700',
-    textAlign: 'center',
-    letterSpacing: 0.1,
+      color:
+        COLORS.muted,
+      marginTop: 5,
+      textAlign:
+        'center',
     },
 
     companyBadge: {
-    backgroundColor: 'rgba(58, 78, 174, 0.72)',
-
-    borderRadius: 15,
-
-    paddingHorizontal: 15,
-    paddingVertical: 8,
-
-    marginTop: 14,
-
-    borderWidth: 1,
-    borderColor: '#638FEF',
-
-    shadowColor: '#5CEAFF',
-    shadowOpacity: 0.16,
-    shadowRadius: 8,
-  },
+      backgroundColor:
+        '#173F61',
+      borderRadius: 13,
+      paddingHorizontal: 14,
+      paddingVertical: 8,
+      marginTop: 14,
+    },
 
     companyBadgeText: {
-    color: '#BDEEFF',
-    fontWeight: '900',
-    letterSpacing: 0.25,
-  },
+      color:
+        COLORS.lightBlue,
+      fontWeight:
+        '900',
+    },
 
     profileSectionTitle: {
-    color: '#8FE8FF',
-    fontSize: 10,
-    fontWeight: '900',
-    letterSpacing: 1.25,
-    marginTop: 10,
-    marginBottom: 13,
+      color:
+        COLORS.lightBlue,
+      fontSize: 11,
+      fontWeight:
+        '900',
+      marginTop: 6,
+      marginBottom: 12,
+    },
 
-    textShadowColor: 'rgba(92,235,255,0.22)',
-    textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 6,
-  },
-
-    profileFieldWrap: {
-    marginBottom: 18,
-  },
-
-  profileFieldLabel: {
-    color: '#8FE8FF',
-    fontSize: 10,
-    fontWeight: '900',
-    letterSpacing: 1.15,
-    marginBottom: 8,
-
-    textShadowColor: 'rgba(92,235,255,0.28)',
-    textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 7,
-  },
-
-  profileFieldInput: {
-    backgroundColor: 'rgba(25, 31, 78, 0.90)',
-
-    borderWidth: 1.25,
-    borderColor: '#65DFF5',
-
-    borderRadius: 21,
-
-    paddingVertical: 16,
-    paddingHorizontal: 17,
-
-    color: '#FFFFFF',
-
-    fontSize: 15,
-    fontWeight: '700',
-
-    shadowColor: '#58E4FF',
-    shadowOpacity: 0.18,
-    shadowRadius: 11,
-    shadowOffset: { width: 0, height: 4 },
-
-    elevation: 4,
-  },
-
-  roleRow: {
+    roleRow: {
       flexDirection:
         'row',
       marginBottom: 18,
     },
 
     roleButton: {
-    flex: 1,
-    minHeight: 82,
-
-    backgroundColor: 'rgba(25, 29, 70, 0.82)',
-
-    borderWidth: 1.15,
-    borderColor: '#3A477D',
-
-    borderRadius: 22,
-
-    paddingVertical: 13,
-    paddingHorizontal: 8,
-
-    marginHorizontal: 5,
-
-    justifyContent: 'center',
-    alignItems: 'center',
-
-    shadowColor: '#766CFF',
-    shadowOpacity: 0.10,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 4 },
-  },
+      flex: 1,
+      minHeight: 86,
+      backgroundColor:
+        COLORS.card,
+      borderWidth: 1,
+      borderColor:
+        COLORS.border,
+      borderRadius: 15,
+      padding: 12,
+      marginHorizontal: 4,
+      justifyContent:
+        'center',
+      alignItems:
+        'center',
+    },
 
     roleButtonActive: {
-    backgroundColor: '#21458B',
-
-    borderColor: '#65E5FF',
-    borderWidth: 1.6,
-
-    shadowColor: '#5CEAFF',
-    shadowOpacity: 0.48,
-    shadowRadius: 15,
-    shadowOffset: { width: 0, height: 5 },
-
-    elevation: 7,
-  },
+      backgroundColor:
+        '#123D60',
+      borderColor:
+        COLORS.blue,
+      borderWidth: 2,
+    },
 
     roleButtonText: {
-    color: '#9AAFC8',
-    fontWeight: '900',
-    fontSize: 12,
-    textAlign: 'center',
-    letterSpacing: 0.15,
-  },
+      color:
+        COLORS.muted,
+      fontWeight:
+        '900',
+      fontSize: 12,
+      textAlign:
+        'center',
+    },
 
     roleButtonTextActive: {
-    color: '#FFFFFF',
-
-    textShadowColor: '#62E8FF',
-    textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 7,
-  },
+      color:
+        COLORS.white,
+    },
 
     roleDescription: {
-    color: '#8097B0',
-    fontSize: 9,
-    marginTop: 5,
-    textAlign: 'center',
-    fontWeight: '600',
-  },
+      color:
+        COLORS.muted,
+      fontSize: 9,
+      marginTop: 5,
+      textAlign:
+        'center',
+    },
 
     removePhotoButton: {
-    alignSelf: 'center',
-
-    marginTop: 18,
-    marginBottom: 8,
-
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-
-    borderRadius: 16,
-
-    backgroundColor: 'rgba(255, 91, 116, 0.07)',
-
-    borderWidth: 1,
-    borderColor: 'rgba(255, 110, 132, 0.24)',
-
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+      padding: 15,
+      alignItems:
+        'center',
+    },
 
     removePhotoText: {
-    color: '#FF98A9',
-    fontSize: 11,
-    fontWeight: '800',
-    letterSpacing: 0.35,
-  },
+      color:
+        COLORS.red,
+      fontSize: 12,
+    },
 
     savedBox: {
       backgroundColor:

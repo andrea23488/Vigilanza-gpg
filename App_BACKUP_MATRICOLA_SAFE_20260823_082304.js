@@ -442,9 +442,6 @@ const mediaOreGiornata =
     PROFILO_DEFAULT.sede
   );
 
-  const [matricolaDraft, setMatricolaDraft] = useState('');
-
-
   const [
     inServizioDalDraft,
     setInServizioDalDraft,
@@ -452,16 +449,7 @@ const mediaOreGiornata =
     PROFILO_DEFAULT.in_servizio_dal || ''
   );
 
-    /* SYNC MATRICOLA SAFE */
   useEffect(() => {
-    setMatricolaDraft(
-      profilo?.codice_gpg
-        ? String(profilo.codice_gpg)
-        : ''
-    );
-  }, [profilo?.codice_gpg]);
-
-useEffect(() => {
       caricaProfiloLocale();
       aggiornaColleghiInServizioOggi();
 
@@ -1549,7 +1537,6 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
         azienda: aziendaDraft.trim(),
         ruolo: ruoloDraft.trim(),
         sede: sedeDraft.trim(),
-      codice_gpg: matricolaDraft.trim(),
       in_servizio_dal:
         inServizioDalDraft.trim() === ''
           ? null
@@ -4276,7 +4263,13 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
           }
         />
 
-        
+        <Text
+          style={
+            styles.profileSectionTitle
+          }
+        >
+          AZIENDA
+        </Text>
 
         <Field profile
           label="AZIENDA"
@@ -4305,22 +4298,17 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
           ]}
         >
           <View style={{ flex: 1, minWidth: 0 }}>
-            <TextInput
-              value={matricolaDraft}
-              onChangeText={setMatricolaDraft}
-              placeholder="Inserisci matricola"
-              placeholderTextColor="#7899B8"
-              autoCapitalize="characters"
-              autoCorrect={false}
+            <Text
+              numberOfLines={1}
               style={{
                 color: '#FFFFFF',
                 fontSize: 15,
                 fontWeight: '800',
                 letterSpacing: 0.4,
-                padding: 0,
-                margin: 0,
               }}
-            />
+            >
+              {profilo?.codice_gpg || 'Non assegnato'}
+            </Text>
 
             <Text
               style={{

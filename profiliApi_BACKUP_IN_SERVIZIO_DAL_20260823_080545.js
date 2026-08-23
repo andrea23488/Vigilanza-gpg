@@ -45,13 +45,6 @@ export async function salvaProfiloUtente(profilo) {
     azienda: profilo.azienda || '',
     ruolo: profilo.ruolo || '',
     sede: profilo.sede || '',
-    codice_gpg: profilo.codice_gpg || '',
-    in_servizio_dal:
-      profilo.in_servizio_dal === '' ||
-      profilo.in_servizio_dal === null ||
-      profilo.in_servizio_dal === undefined
-        ? null
-        : Number(profilo.in_servizio_dal),
     updated_at: new Date().toISOString(),
   };
 

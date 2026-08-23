@@ -442,26 +442,7 @@ const mediaOreGiornata =
     PROFILO_DEFAULT.sede
   );
 
-  const [matricolaDraft, setMatricolaDraft] = useState('');
-
-
-  const [
-    inServizioDalDraft,
-    setInServizioDalDraft,
-  ] = useState(
-    PROFILO_DEFAULT.in_servizio_dal || ''
-  );
-
-    /* SYNC MATRICOLA SAFE */
   useEffect(() => {
-    setMatricolaDraft(
-      profilo?.codice_gpg
-        ? String(profilo.codice_gpg)
-        : ''
-    );
-  }, [profilo?.codice_gpg]);
-
-useEffect(() => {
       caricaProfiloLocale();
       aggiornaColleghiInServizioOggi();
 
@@ -517,11 +498,6 @@ useEffect(() => {
       setAziendaDraft(nuovoProfilo.azienda);
       setRuoloDraft(nuovoProfilo.ruolo);
       setSedeDraft(nuovoProfilo.sede);
-    setInServizioDalDraft(
-      nuovoProfilo.in_servizio_dal
-        ? String(nuovoProfilo.in_servizio_dal)
-        : ''
-    );
       setFotoProfilo(nuovoProfilo.foto_url);
 
       return nuovoProfilo;
@@ -1549,11 +1525,6 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
         azienda: aziendaDraft.trim(),
         ruolo: ruoloDraft.trim(),
         sede: sedeDraft.trim(),
-      codice_gpg: matricolaDraft.trim(),
-      in_servizio_dal:
-        inServizioDalDraft.trim() === ''
-          ? null
-          : Number(inServizioDalDraft.trim()),
       };
 
       const salvato = await salvaProfiloUtente(profiloDaSalvare);
@@ -1564,13 +1535,7 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
         azienda: salvato.azienda || "",
         ruolo: salvato.ruolo || "",
         sede: salvato.sede || "",
-      in_servizio_dal:
-        salvato.in_servizio_dal ?? null,
-            codice_gpg:
-        salvato.codice_gpg ||
-        profilo?.codice_gpg ||
-        "",
-};
+      };
 
       setProfilo(nuovoProfilo);
       setNomeDraft(nuovoProfilo.nome);
@@ -2882,33 +2847,40 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
 
               }}
               style={{
-          backgroundColor: '#1B2058',
-
+          backgroundColor: '#1B1D58',
           borderRadius: 28,
+
           paddingHorizontal: 18,
           paddingVertical: 17,
           marginBottom: 16,
 
-          borderWidth: 1.15,
-          borderColor: '#6CDFF4',
+          borderWidth: 1.5,
+          borderColor: '#62E8FF',
 
-          shadowColor: '#53DFF7',
-          shadowOpacity: 0.42,
-          shadowRadius: 18,
-          shadowOffset: { width: 0, height: 7 },
+          shadowColor: '#56E6FF',
+          shadowOpacity: 0.68,
+          shadowRadius: 20,
+          shadowOffset: { width: 0, height: 6 },
 
-          elevation: 9,
+          elevation: 10,
         }}
             >
-        {/* CONTENUTO CHAT CARD DEFINITIVO */}
-
+              {/* RIGA NOME ORA CHAT */}
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: 10,
+              }}
+            >
+{/* HEADER CONTATTO WOW */}
         <View
           style={{
             flexDirection: 'row',
             alignItems: 'center',
           }}
         >
-          {/* AVATAR */}
           <View
             style={{
               width: 48,
@@ -2920,7 +2892,6 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
               alignItems: 'center',
               justifyContent: 'center',
               marginRight: 13,
-
               shadowColor: '#59E8FF',
               shadowOpacity: 0.55,
               shadowRadius: 12,
@@ -2933,7 +2904,6 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
                 fontSize: 14,
                 fontWeight: '900',
                 letterSpacing: 0.6,
-
                 textShadowColor: '#5DEBFF',
                 textShadowOffset: { width: 0, height: 0 },
                 textShadowRadius: 7,
@@ -2943,23 +2913,14 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
             </Text>
           </View>
 
-          {/* NOME + AZIENDA */}
-          <View
-            style={{
-              flex: 1,
-              minWidth: 0,
-              justifyContent: 'center',
-            }}
-          >
+          <View style={{ flex: 1, minWidth: 0 }}>
             <Text
               numberOfLines={1}
-              ellipsizeMode="tail"
               style={{
                 color: '#FFFFFF',
                 fontSize: 18,
                 fontWeight: '900',
                 letterSpacing: -0.35,
-
                 textShadowColor: 'rgba(92,235,255,0.25)',
                 textShadowOffset: { width: 0, height: 0 },
                 textShadowRadius: 8,
@@ -2970,7 +2931,6 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
 
             <Text
               numberOfLines={1}
-              ellipsizeMode="tail"
               style={{
                 color: '#9CC7E4',
                 fontSize: 10.5,
@@ -2984,15 +2944,12 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
             </Text>
           </View>
 
-          {/* ORARIO */}
           <Text
             style={{
-              color: '#A9DDEB',
-              fontSize: 9.5,
+              color: '#9FE6F5',
+              fontSize: 10,
               fontWeight: '800',
               marginLeft: 10,
-              alignSelf: 'center',
-              opacity: 0.92,
             }}
           >
             {riepilogoChat[c.altro_user_id]?.created_at
@@ -3006,16 +2963,15 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
           </Text>
         </View>
 
-        {/* ULTIMO MESSAGGIO */}
+        {/* ANTEPRIMA ULTIMO MESSAGGIO WOW */}
         <View
           style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            width: '100%',
             marginTop: 12,
             paddingTop: 10,
             borderTopWidth: 1,
-            borderTopColor: 'rgba(108,223,244,0.14)',
+            borderTopColor: 'rgba(99,232,255,0.18)',
+            flexDirection: 'row',
+            alignItems: 'center',
           }}
         >
           <Text
@@ -3023,19 +2979,16 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
             ellipsizeMode="tail"
             style={{
               flex: 1,
-              minWidth: 0,
-
               color:
                 (riepilogoChat[c.altro_user_id]?.nonLetti || 0) > 0
-                  ? '#F4FDFF'
+                  ? '#F3FCFF'
                   : '#A7BAD0',
-
               fontSize: 12.5,
-
               fontWeight:
                 (riepilogoChat[c.altro_user_id]?.nonLetti || 0) > 0
                   ? '800'
                   : '500',
+              letterSpacing: 0.05,
             }}
           >
             {riepilogoChat[c.altro_user_id]?.ultimoMessaggio ||
@@ -3050,14 +3003,11 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
                 borderRadius: 11,
                 paddingHorizontal: 6,
                 marginLeft: 10,
-
                 backgroundColor: '#5CEAFF',
                 borderWidth: 1,
                 borderColor: '#D2FBFF',
-
                 alignItems: 'center',
                 justifyContent: 'center',
-
                 shadowColor: '#5CEAFF',
                 shadowOpacity: 0.75,
                 shadowRadius: 8,
@@ -3079,7 +3029,46 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
           ) : null}
         </View>
 
-      </TouchableOpacity>
+
+              
+            </View>
+
+        {/* BADGE NUOVO CONVERSAZIONE */}
+        {(riepilogoChat[c.altro_user_id]?.nonLetti || 0) > 0 ? (
+          <View
+            style={{
+              alignSelf: 'flex-start',
+              marginTop: 5,
+              paddingHorizontal: 9,
+              paddingVertical: 4,
+              borderRadius: 10,
+              backgroundColor: 'rgba(79,227,161,0.12)',
+              borderWidth: 0,
+            }}
+          >
+            <Text
+              style={{
+                color: '#6FD9A7',
+                fontSize: 9,
+                fontWeight: '900',
+                letterSpacing: 0.8,
+              }}
+            >
+              NUOVO
+            </Text>
+          </View>
+        ) : null}
+
+
+              <Text style={{
+            color: '#83AFD0',
+            fontSize: 10.5,
+            fontWeight: '600',
+            marginTop: 4,
+          }}>
+                {c.profilo?.azienda || 'Collega'}
+              </Text>
+            </TouchableOpacity>
           ))
         )}
       </Screen>
@@ -4256,7 +4245,7 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
           DATI PERSONALI
         </Text>
 
-        <Field profile
+        <Field
           label="NOME"
           value={
             nomeDraft
@@ -4266,7 +4255,7 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
           }
         />
 
-        <Field profile
+        <Field
           label="COGNOME"
           value={
             cognomeDraft
@@ -4276,9 +4265,15 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
           }
         />
 
-        
+        <Text
+          style={
+            styles.profileSectionTitle
+          }
+        >
+          AZIENDA
+        </Text>
 
-        <Field profile
+        <Field
           label="AZIENDA"
           value={
             aziendaDraft
@@ -4287,73 +4282,6 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
             setAziendaDraft
           }
         />
-
-      {/* MATRICOLA PROFILO */}
-      <View style={styles.profileFieldWrap}>
-        <Text style={styles.profileFieldLabel}>
-          MATRICOLA
-        </Text>
-
-        <View
-          style={[
-            styles.profileFieldInput,
-            {
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-            },
-          ]}
-        >
-          <View style={{ flex: 1, minWidth: 0 }}>
-            <TextInput
-              value={matricolaDraft}
-              onChangeText={setMatricolaDraft}
-              placeholder="Inserisci matricola"
-              placeholderTextColor="#7899B8"
-              autoCapitalize="characters"
-              autoCorrect={false}
-              style={{
-                color: '#FFFFFF',
-                fontSize: 15,
-                fontWeight: '800',
-                letterSpacing: 0.4,
-                padding: 0,
-                margin: 0,
-              }}
-            />
-
-            <Text
-              style={{
-                color: '#7899B8',
-                fontSize: 9,
-                fontWeight: '600',
-                marginTop: 3,
-              }}
-            >
-              Matricola professionale
-            </Text>
-          </View>
-
-          <View
-            style={{
-              width: 34,
-              height: 34,
-              borderRadius: 17,
-              backgroundColor: 'rgba(92,234,255,0.10)',
-              borderWidth: 1,
-              borderColor: 'rgba(92,234,255,0.45)',
-              alignItems: 'center',
-              justifyContent: 'center',
-              shadowColor: '#5CEAFF',
-              shadowOpacity: 0.22,
-              shadowRadius: 7,
-            }}
-          >
-            <Text style={{ fontSize: 15 }}>🛡️</Text>
-          </View>
-        </View>
-      </View>
-
 
         <Text
           style={
@@ -4439,7 +4367,7 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
           </TouchableOpacity>
         </View>
 
-        <Field profile
+        <Field
           label="SEDE / ZONA"
           value={
             sedeDraft
@@ -4449,193 +4377,7 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
           }
         />
 
-      <Field
-        profile
-        label="IN SERVIZIO DAL"
-        value={inServizioDalDraft}
-        onChange={(testo) => {
-          const soloNumeri = testo.replace(/\D/g, '').slice(0, 4);
-          setInServizioDalDraft(soloNumeri);
-        }}
-        keyboardType="number-pad"
-      />
-
-
-        
-      {/* PANNELLO IDENTITA PROFESSIONALE */}
-      <View
-        style={{
-          marginTop: 8,
-          marginBottom: 8,
-          padding: 16,
-          borderRadius: 26,
-          backgroundColor: 'rgba(22, 28, 74, 0.88)',
-          borderWidth: 1.2,
-          borderColor: 'rgba(111, 111, 255, 0.72)',
-
-          shadowColor: '#706CFF',
-          shadowOpacity: 0.25,
-          shadowRadius: 16,
-          shadowOffset: { width: 0, height: 6 },
-        }}
-      >
-        <Text
-          style={{
-            color: '#8FE8FF',
-            fontSize: 10,
-            fontWeight: '900',
-            letterSpacing: 1.25,
-            marginBottom: 12,
-
-            textShadowColor: 'rgba(92,235,255,0.30)',
-            textShadowOffset: { width: 0, height: 0 },
-            textShadowRadius: 7,
-          }}
-        >
-          IDENTITÀ PROFESSIONALE
-        </Text>
-
-        <View
-          style={{
-            flexDirection: 'row',
-            gap: 8,
-          }}
-        >
-          {/* CODICE */}
-          <View
-            style={{
-              flex: 1,
-              minHeight: 82,
-              padding: 11,
-              borderRadius: 19,
-              backgroundColor: 'rgba(37, 49, 111, 0.78)',
-              borderWidth: 1,
-              borderColor: 'rgba(92,234,255,0.46)',
-
-              shadowColor: '#5CEAFF',
-              shadowOpacity: 0.15,
-              shadowRadius: 8,
-            }}
-          >
-            <Text style={{ fontSize: 16 }}>🛡️</Text>
-
-            <Text
-              style={{
-                color: '#7FA5C2',
-                fontSize: 8,
-                fontWeight: '800',
-                marginTop: 7,
-                letterSpacing: 0.5,
-              }}
-            >
-              MATRICOLA
-            </Text>
-
-            <Text
-              numberOfLines={1}
-              style={{
-                color: '#FFFFFF',
-                fontSize: 11,
-                fontWeight: '900',
-                marginTop: 3,
-              }}
-            >
-              {profilo?.codice_gpg || '—'}
-            </Text>
-          </View>
-
-          {/* SEDE */}
-          <View
-            style={{
-              flex: 1,
-              minHeight: 82,
-              padding: 11,
-              borderRadius: 19,
-              backgroundColor: 'rgba(43, 38, 105, 0.78)',
-              borderWidth: 1,
-              borderColor: 'rgba(135,122,255,0.55)',
-
-              shadowColor: '#8075FF',
-              shadowOpacity: 0.14,
-              shadowRadius: 8,
-            }}
-          >
-            <Text style={{ fontSize: 16 }}>📍</Text>
-
-            <Text
-              style={{
-                color: '#8C91C7',
-                fontSize: 8,
-                fontWeight: '800',
-                marginTop: 7,
-                letterSpacing: 0.5,
-              }}
-            >
-              SEDE / ZONA
-            </Text>
-
-            <Text
-              numberOfLines={1}
-              ellipsizeMode="tail"
-              style={{
-                color: '#FFFFFF',
-                fontSize: 11,
-                fontWeight: '900',
-                marginTop: 3,
-              }}
-            >
-              {sedeDraft || '—'}
-            </Text>
-          </View>
-
-          {/* ANZIANITÀ */}
-          <View
-            style={{
-              flex: 1,
-              minHeight: 82,
-              padding: 11,
-              borderRadius: 19,
-              backgroundColor: 'rgba(29, 58, 99, 0.78)',
-              borderWidth: 1,
-              borderColor: 'rgba(92,198,255,0.45)',
-
-              shadowColor: '#5CCAFF',
-              shadowOpacity: 0.14,
-              shadowRadius: 8,
-            }}
-          >
-            <Text style={{ fontSize: 16 }}>📅</Text>
-
-            <Text
-              style={{
-                color: '#7CAAC8',
-                fontSize: 8,
-                fontWeight: '800',
-                marginTop: 7,
-                letterSpacing: 0.45,
-              }}
-            >
-              IN SERVIZIO
-            </Text>
-
-            <Text
-              numberOfLines={1}
-              style={{
-                color: '#FFFFFF',
-                fontSize: 11,
-                fontWeight: '900',
-                marginTop: 3,
-              }}
-            >
-              {inServizioDalDraft
-                ? `Dal ${inServizioDalDraft}`
-                : '—'}
-            </Text>
-          </View>
-        </View>
-      </View>
-
-<TouchableOpacity
+        <TouchableOpacity
           style={
             styles.saveButton
           }
@@ -4653,30 +4395,7 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
         </TouchableOpacity>
 
           <TouchableOpacity
-            style={{
-          minHeight: 52,
-
-          marginTop: 12,
-          marginBottom: 8,
-
-          paddingHorizontal: 16,
-          paddingVertical: 13,
-
-          borderRadius: 20,
-
-          backgroundColor: 'rgba(67, 25, 43, 0.38)',
-
-          borderWidth: 1,
-          borderColor: 'rgba(255, 100, 126, 0.38)',
-
-          alignItems: 'center',
-          justifyContent: 'center',
-
-          shadowColor: '#FF657E',
-          shadowOpacity: 0.10,
-          shadowRadius: 8,
-          shadowOffset: { width: 0, height: 4 },
-        }}
+            style={{ backgroundColor: "#c62828", padding: 16, borderRadius: 12, marginTop: 14, alignItems: "center" }}
             onPress={logout}
           >
             <Text style={{ color: "white", fontWeight: "700", fontSize: 16 }}>
@@ -7330,20 +7049,25 @@ function Field({
   value,
   onChange,
   keyboardType,
-  profile = false,
 }) {
   return (
     <View
-      style={[styles.fieldWrap, profile && styles.profileFieldWrap]}
+      style={
+        styles.fieldWrap
+      }
     >
       <Text
-        style={[styles.label, profile && styles.profileFieldLabel]}
+        style={
+          styles.label
+        }
       >
         {label}
       </Text>
 
       <TextInput
-        style={[styles.input, profile && styles.profileFieldInput]}
+        style={
+          styles.input
+        }
         value={
           value
         }
@@ -7717,39 +7441,28 @@ const styles =
     },
 
     saveButton: {
-    minHeight: 58,
-    borderRadius: 22,
-
-    marginTop: 24,
-    marginBottom: 10,
-
-    backgroundColor: '#1763D8',
-
-    borderWidth: 1.5,
-    borderColor: '#63E7FF',
-
-    alignItems: 'center',
-    justifyContent: 'center',
-
-    shadowColor: '#54E4FF',
-    shadowOpacity: 0.48,
-    shadowRadius: 18,
-    shadowOffset: { width: 0, height: 7 },
-
-    elevation: 9,
-  },
+      backgroundColor: '#1368E8',
+      borderRadius: 18,
+      paddingVertical: 17,
+      paddingHorizontal: 18,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 1.3,
+      borderColor: '#58DFFF',
+      marginTop: 8,
+      marginBottom: 10,
+      shadowColor: '#42CFFF',
+      shadowOpacity: 0.32,
+      shadowRadius: 16,
+      shadowOffset: { width: 0, height: 7 },
+    },
 
     saveText: {
-    color: '#FFFFFF',
-    fontSize: 15,
-    fontWeight: '900',
-    letterSpacing: 0.8,
-    textAlign: 'center',
-
-    textShadowColor: 'rgba(93,235,255,0.50)',
-    textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 8,
-  },
+      color: '#FFFFFF',
+      fontSize: 15,
+      fontWeight: '900',
+      letterSpacing: 0.7,
+    },
 
     syncButton: {
     minHeight: 58,
@@ -8236,82 +7949,58 @@ const styles =
   },
 
   profileHero: {
-    backgroundColor: 'rgba(30, 39, 104, 0.92)',
-    borderRadius: 30,
-    paddingHorizontal: 22,
-    paddingVertical: 24,
-    alignItems: 'center',
-    marginBottom: 24,
-
-    borderWidth: 1.3,
-    borderColor: '#756CFF',
-
-    shadowColor: '#7367FF',
-    shadowOpacity: 0.42,
-    shadowRadius: 22,
-    shadowOffset: { width: 0, height: 7 },
-
-    elevation: 10,
+      backgroundColor:
+        '#10304B',
+      borderRadius: 24,
+      padding: 24,
+      alignItems:
+        'center',
+      marginBottom: 24,
     },
 
     profileAvatar: {
-    width: 118,
-    height: 118,
-    borderRadius: 59,
-
-    backgroundColor: '#17355A',
-
-    borderWidth: 2.2,
-    borderColor: '#62E8FF',
-
-    alignItems: 'center',
-    justifyContent: 'center',
-
-    shadowColor: '#56E6FF',
-    shadowOpacity: 0.70,
-    shadowRadius: 18,
-    shadowOffset: { width: 0, height: 4 },
-
-    elevation: 10,
+      width: 100,
+      height: 100,
+      borderRadius: 50,
+      backgroundColor:
+        COLORS.blue,
+      alignItems:
+        'center',
+      justifyContent:
+        'center',
     },
 
     profileAvatarImage: {
-    width: 110,
-    height: 110,
-    borderRadius: 55,
+      width: 100,
+      height: 100,
+      borderRadius: 50,
     },
 
     profileAvatarText: {
-    color: '#ECFDFF',
-    fontSize: 31,
-    fontWeight: '900',
-
-    textShadowColor: '#59E8FF',
-    textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 10,
+      color:
+        COLORS.white,
+      fontSize: 30,
+      fontWeight:
+        '900',
     },
 
     cameraBadge: {
-    position: 'absolute',
-    right: -3,
-    bottom: 2,
-
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-
-    backgroundColor: '#262D70',
-
-    alignItems: 'center',
-    justifyContent: 'center',
-
-    borderWidth: 1.5,
-    borderColor: '#74EBFF',
-
-    shadowColor: '#5DEAFF',
-    shadowOpacity: 0.60,
-    shadowRadius: 9,
-    shadowOffset: { width: 0, height: 3 },
+      position:
+        'absolute',
+      right: -3,
+      bottom: 1,
+      width: 31,
+      height: 31,
+      borderRadius: 16,
+      backgroundColor:
+        COLORS.card,
+      alignItems:
+        'center',
+      justifyContent:
+        'center',
+      borderWidth: 2,
+      borderColor:
+        '#10304B',
     },
 
     cameraBadgeText: {
@@ -8326,199 +8015,116 @@ const styles =
     },
 
     profileName: {
-    color: '#FFFFFF',
-    fontWeight: '900',
-    fontSize: 25,
-    marginTop: 13,
-    textAlign: 'center',
-    letterSpacing: -0.5,
-
-    textShadowColor: 'rgba(92,235,255,0.32)',
-    textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 10,
+      color:
+        COLORS.white,
+      fontWeight:
+        '900',
+      fontSize: 23,
+      marginTop: 12,
+      textAlign:
+        'center',
     },
 
     profileRole: {
-    color: '#B5CBE1',
-    marginTop: 5,
-    fontSize: 14,
-    fontWeight: '700',
-    textAlign: 'center',
-    letterSpacing: 0.1,
+      color:
+        COLORS.muted,
+      marginTop: 5,
+      textAlign:
+        'center',
     },
 
     companyBadge: {
-    backgroundColor: 'rgba(58, 78, 174, 0.72)',
-
-    borderRadius: 15,
-
-    paddingHorizontal: 15,
-    paddingVertical: 8,
-
-    marginTop: 14,
-
-    borderWidth: 1,
-    borderColor: '#638FEF',
-
-    shadowColor: '#5CEAFF',
-    shadowOpacity: 0.16,
-    shadowRadius: 8,
-  },
+      backgroundColor:
+        '#173F61',
+      borderRadius: 13,
+      paddingHorizontal: 14,
+      paddingVertical: 8,
+      marginTop: 14,
+    },
 
     companyBadgeText: {
-    color: '#BDEEFF',
-    fontWeight: '900',
-    letterSpacing: 0.25,
-  },
+      color:
+        COLORS.lightBlue,
+      fontWeight:
+        '900',
+    },
 
     profileSectionTitle: {
-    color: '#8FE8FF',
-    fontSize: 10,
-    fontWeight: '900',
-    letterSpacing: 1.25,
-    marginTop: 10,
-    marginBottom: 13,
+      color:
+        COLORS.lightBlue,
+      fontSize: 11,
+      fontWeight:
+        '900',
+      marginTop: 6,
+      marginBottom: 12,
+    },
 
-    textShadowColor: 'rgba(92,235,255,0.22)',
-    textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 6,
-  },
-
-    profileFieldWrap: {
-    marginBottom: 18,
-  },
-
-  profileFieldLabel: {
-    color: '#8FE8FF',
-    fontSize: 10,
-    fontWeight: '900',
-    letterSpacing: 1.15,
-    marginBottom: 8,
-
-    textShadowColor: 'rgba(92,235,255,0.28)',
-    textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 7,
-  },
-
-  profileFieldInput: {
-    backgroundColor: 'rgba(25, 31, 78, 0.90)',
-
-    borderWidth: 1.25,
-    borderColor: '#65DFF5',
-
-    borderRadius: 21,
-
-    paddingVertical: 16,
-    paddingHorizontal: 17,
-
-    color: '#FFFFFF',
-
-    fontSize: 15,
-    fontWeight: '700',
-
-    shadowColor: '#58E4FF',
-    shadowOpacity: 0.18,
-    shadowRadius: 11,
-    shadowOffset: { width: 0, height: 4 },
-
-    elevation: 4,
-  },
-
-  roleRow: {
+    roleRow: {
       flexDirection:
         'row',
       marginBottom: 18,
     },
 
     roleButton: {
-    flex: 1,
-    minHeight: 82,
-
-    backgroundColor: 'rgba(25, 29, 70, 0.82)',
-
-    borderWidth: 1.15,
-    borderColor: '#3A477D',
-
-    borderRadius: 22,
-
-    paddingVertical: 13,
-    paddingHorizontal: 8,
-
-    marginHorizontal: 5,
-
-    justifyContent: 'center',
-    alignItems: 'center',
-
-    shadowColor: '#766CFF',
-    shadowOpacity: 0.10,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 4 },
-  },
+      flex: 1,
+      minHeight: 86,
+      backgroundColor:
+        COLORS.card,
+      borderWidth: 1,
+      borderColor:
+        COLORS.border,
+      borderRadius: 15,
+      padding: 12,
+      marginHorizontal: 4,
+      justifyContent:
+        'center',
+      alignItems:
+        'center',
+    },
 
     roleButtonActive: {
-    backgroundColor: '#21458B',
-
-    borderColor: '#65E5FF',
-    borderWidth: 1.6,
-
-    shadowColor: '#5CEAFF',
-    shadowOpacity: 0.48,
-    shadowRadius: 15,
-    shadowOffset: { width: 0, height: 5 },
-
-    elevation: 7,
-  },
+      backgroundColor:
+        '#123D60',
+      borderColor:
+        COLORS.blue,
+      borderWidth: 2,
+    },
 
     roleButtonText: {
-    color: '#9AAFC8',
-    fontWeight: '900',
-    fontSize: 12,
-    textAlign: 'center',
-    letterSpacing: 0.15,
-  },
+      color:
+        COLORS.muted,
+      fontWeight:
+        '900',
+      fontSize: 12,
+      textAlign:
+        'center',
+    },
 
     roleButtonTextActive: {
-    color: '#FFFFFF',
-
-    textShadowColor: '#62E8FF',
-    textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 7,
-  },
+      color:
+        COLORS.white,
+    },
 
     roleDescription: {
-    color: '#8097B0',
-    fontSize: 9,
-    marginTop: 5,
-    textAlign: 'center',
-    fontWeight: '600',
-  },
+      color:
+        COLORS.muted,
+      fontSize: 9,
+      marginTop: 5,
+      textAlign:
+        'center',
+    },
 
     removePhotoButton: {
-    alignSelf: 'center',
-
-    marginTop: 18,
-    marginBottom: 8,
-
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-
-    borderRadius: 16,
-
-    backgroundColor: 'rgba(255, 91, 116, 0.07)',
-
-    borderWidth: 1,
-    borderColor: 'rgba(255, 110, 132, 0.24)',
-
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+      padding: 15,
+      alignItems:
+        'center',
+    },
 
     removePhotoText: {
-    color: '#FF98A9',
-    fontSize: 11,
-    fontWeight: '800',
-    letterSpacing: 0.35,
-  },
+      color:
+        COLORS.red,
+      fontSize: 12,
+    },
 
     savedBox: {
       backgroundColor:

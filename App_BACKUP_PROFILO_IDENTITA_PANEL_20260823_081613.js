@@ -442,9 +442,6 @@ const mediaOreGiornata =
     PROFILO_DEFAULT.sede
   );
 
-  const [matricolaDraft, setMatricolaDraft] = useState('');
-
-
   const [
     inServizioDalDraft,
     setInServizioDalDraft,
@@ -452,16 +449,7 @@ const mediaOreGiornata =
     PROFILO_DEFAULT.in_servizio_dal || ''
   );
 
-    /* SYNC MATRICOLA SAFE */
   useEffect(() => {
-    setMatricolaDraft(
-      profilo?.codice_gpg
-        ? String(profilo.codice_gpg)
-        : ''
-    );
-  }, [profilo?.codice_gpg]);
-
-useEffect(() => {
       caricaProfiloLocale();
       aggiornaColleghiInServizioOggi();
 
@@ -1549,7 +1537,6 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
         azienda: aziendaDraft.trim(),
         ruolo: ruoloDraft.trim(),
         sede: sedeDraft.trim(),
-      codice_gpg: matricolaDraft.trim(),
       in_servizio_dal:
         inServizioDalDraft.trim() === ''
           ? null
@@ -4276,7 +4263,13 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
           }
         />
 
-        
+        <Text
+          style={
+            styles.profileSectionTitle
+          }
+        >
+          AZIENDA
+        </Text>
 
         <Field profile
           label="AZIENDA"
@@ -4288,10 +4281,10 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
           }
         />
 
-      {/* MATRICOLA PROFILO */}
+      {/* CODICE GPG PROFILO */}
       <View style={styles.profileFieldWrap}>
         <Text style={styles.profileFieldLabel}>
-          MATRICOLA
+          CODICE GPG
         </Text>
 
         <View
@@ -4305,22 +4298,17 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
           ]}
         >
           <View style={{ flex: 1, minWidth: 0 }}>
-            <TextInput
-              value={matricolaDraft}
-              onChangeText={setMatricolaDraft}
-              placeholder="Inserisci matricola"
-              placeholderTextColor="#7899B8"
-              autoCapitalize="characters"
-              autoCorrect={false}
+            <Text
+              numberOfLines={1}
               style={{
                 color: '#FFFFFF',
                 fontSize: 15,
                 fontWeight: '800',
                 letterSpacing: 0.4,
-                padding: 0,
-                margin: 0,
               }}
-            />
+            >
+              {profilo?.codice_gpg || 'Non assegnato'}
+            </Text>
 
             <Text
               style={{
@@ -4330,7 +4318,7 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
                 marginTop: 3,
               }}
             >
-              Matricola professionale
+              Identificativo professionale
             </Text>
           </View>
 
@@ -4461,181 +4449,7 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
       />
 
 
-        
-      {/* PANNELLO IDENTITA PROFESSIONALE */}
-      <View
-        style={{
-          marginTop: 8,
-          marginBottom: 8,
-          padding: 16,
-          borderRadius: 26,
-          backgroundColor: 'rgba(22, 28, 74, 0.88)',
-          borderWidth: 1.2,
-          borderColor: 'rgba(111, 111, 255, 0.72)',
-
-          shadowColor: '#706CFF',
-          shadowOpacity: 0.25,
-          shadowRadius: 16,
-          shadowOffset: { width: 0, height: 6 },
-        }}
-      >
-        <Text
-          style={{
-            color: '#8FE8FF',
-            fontSize: 10,
-            fontWeight: '900',
-            letterSpacing: 1.25,
-            marginBottom: 12,
-
-            textShadowColor: 'rgba(92,235,255,0.30)',
-            textShadowOffset: { width: 0, height: 0 },
-            textShadowRadius: 7,
-          }}
-        >
-          IDENTITÀ PROFESSIONALE
-        </Text>
-
-        <View
-          style={{
-            flexDirection: 'row',
-            gap: 8,
-          }}
-        >
-          {/* CODICE */}
-          <View
-            style={{
-              flex: 1,
-              minHeight: 82,
-              padding: 11,
-              borderRadius: 19,
-              backgroundColor: 'rgba(37, 49, 111, 0.78)',
-              borderWidth: 1,
-              borderColor: 'rgba(92,234,255,0.46)',
-
-              shadowColor: '#5CEAFF',
-              shadowOpacity: 0.15,
-              shadowRadius: 8,
-            }}
-          >
-            <Text style={{ fontSize: 16 }}>🛡️</Text>
-
-            <Text
-              style={{
-                color: '#7FA5C2',
-                fontSize: 8,
-                fontWeight: '800',
-                marginTop: 7,
-                letterSpacing: 0.5,
-              }}
-            >
-              MATRICOLA
-            </Text>
-
-            <Text
-              numberOfLines={1}
-              style={{
-                color: '#FFFFFF',
-                fontSize: 11,
-                fontWeight: '900',
-                marginTop: 3,
-              }}
-            >
-              {profilo?.codice_gpg || '—'}
-            </Text>
-          </View>
-
-          {/* SEDE */}
-          <View
-            style={{
-              flex: 1,
-              minHeight: 82,
-              padding: 11,
-              borderRadius: 19,
-              backgroundColor: 'rgba(43, 38, 105, 0.78)',
-              borderWidth: 1,
-              borderColor: 'rgba(135,122,255,0.55)',
-
-              shadowColor: '#8075FF',
-              shadowOpacity: 0.14,
-              shadowRadius: 8,
-            }}
-          >
-            <Text style={{ fontSize: 16 }}>📍</Text>
-
-            <Text
-              style={{
-                color: '#8C91C7',
-                fontSize: 8,
-                fontWeight: '800',
-                marginTop: 7,
-                letterSpacing: 0.5,
-              }}
-            >
-              SEDE / ZONA
-            </Text>
-
-            <Text
-              numberOfLines={1}
-              ellipsizeMode="tail"
-              style={{
-                color: '#FFFFFF',
-                fontSize: 11,
-                fontWeight: '900',
-                marginTop: 3,
-              }}
-            >
-              {sedeDraft || '—'}
-            </Text>
-          </View>
-
-          {/* ANZIANITÀ */}
-          <View
-            style={{
-              flex: 1,
-              minHeight: 82,
-              padding: 11,
-              borderRadius: 19,
-              backgroundColor: 'rgba(29, 58, 99, 0.78)',
-              borderWidth: 1,
-              borderColor: 'rgba(92,198,255,0.45)',
-
-              shadowColor: '#5CCAFF',
-              shadowOpacity: 0.14,
-              shadowRadius: 8,
-            }}
-          >
-            <Text style={{ fontSize: 16 }}>📅</Text>
-
-            <Text
-              style={{
-                color: '#7CAAC8',
-                fontSize: 8,
-                fontWeight: '800',
-                marginTop: 7,
-                letterSpacing: 0.45,
-              }}
-            >
-              IN SERVIZIO
-            </Text>
-
-            <Text
-              numberOfLines={1}
-              style={{
-                color: '#FFFFFF',
-                fontSize: 11,
-                fontWeight: '900',
-                marginTop: 3,
-              }}
-            >
-              {inServizioDalDraft
-                ? `Dal ${inServizioDalDraft}`
-                : '—'}
-            </Text>
-          </View>
-        </View>
-      </View>
-
-<TouchableOpacity
+        <TouchableOpacity
           style={
             styles.saveButton
           }

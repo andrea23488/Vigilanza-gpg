@@ -190,8 +190,7 @@ export default function LoginScreen({ onEnterTest }) {
           </View>
 
           <Text style={styles.appName}>
-            VIGILANZA GPG
-E FIDUCIARI
+            VIGILANZA GPG E FIDUCIARI
           </Text>
 
           <Text style={styles.tagline}>
@@ -392,12 +391,12 @@ function Field({
 const styles = StyleSheet.create({
   safe: {
     flex: 1,
-    backgroundColor: '#061126',
+    backgroundColor: '#05091B',
   },
 
   screen: {
     flex: 1,
-    backgroundColor: '#061126',
+    backgroundColor: '#05091B',
   },
 
   content: {
@@ -415,24 +414,24 @@ const styles = StyleSheet.create({
   },
 
   logoCircle: {
-    width: 108,
-    height: 108,
-    borderRadius: 34,
+    width: 104,
+    height: 104,
+    borderRadius: 52,
 
-    backgroundColor: 'rgba(13, 39, 79, 0.62)',
+    backgroundColor: '#111D56',
 
-    borderWidth: 1,
-    borderColor: 'rgba(82, 224, 255, 0.52)',
+    borderWidth: 2,
+    borderColor: '#5BE8FF',
 
     alignItems: 'center',
     justifyContent: 'center',
 
-    shadowColor: '#49DFFF',
-    shadowOpacity: 0.42,
-    shadowRadius: 24,
-    shadowOffset: { width: 0, height: 5 },
+    shadowColor: '#795CFF',
+    shadowOpacity: 0.88,
+    shadowRadius: 28,
+    shadowOffset: { width: 0, height: 0 },
 
-    elevation: 10,
+    elevation: 15,
   },
 
   logoIcon: {
@@ -444,54 +443,61 @@ const styles = StyleSheet.create({
   },
 
   appName: {
-    color: '#FFFFFF',
-    fontSize: 25,
-    lineHeight: 29,
-    fontWeight: '850',
+    color: '#F7FBFF',
+    fontSize: 24,
+    fontWeight: '800',
     textAlign: 'center',
-    letterSpacing: 0.7,
-    marginTop: 15,
+    letterSpacing: 1.1,
+    marginTop: 14,
 
-    textShadowColor: 'rgba(77, 220, 255, 0.30)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 8,
+    textShadowColor: 'rgba(88,226,255,0.34)',
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 9,
   },
 
   tagline: {
-    color: '#A7B8CC',
-    fontSize: 11.5,
+    color: '#9EB5D1',
+    fontSize: 12.5,
     fontWeight: '600',
     textAlign: 'center',
-    marginTop: 7,
-    marginBottom: 24,
-    letterSpacing: 0.1,
+
+    marginTop: 6,
+    marginBottom: 22,
+
+    letterSpacing: 0.12,
   },
 
   authCard: {
-    backgroundColor: 'rgba(9, 24, 54, 0.94)',
+    backgroundColor: 'rgba(14, 22, 59, 0.95)',
+
     borderRadius: 30,
-    paddingHorizontal: 19,
-    paddingVertical: 19,
 
-    borderWidth: 1,
-    borderColor: 'rgba(74, 139, 210, 0.48)',
+    paddingHorizontal: 18,
+    paddingVertical: 18,
 
-    shadowColor: '#34C7FF',
-    shadowOpacity: 0.18,
-    shadowRadius: 20,
-    shadowOffset: { width: 0, height: 10 },
+    borderWidth: 1.2,
+    borderColor: '#3E5EB2',
 
-    elevation: 8,
+    shadowColor: '#536DFF',
+    shadowOpacity: 0.34,
+    shadowRadius: 22,
+    shadowOffset: { width: 0, height: 9 },
+
+    elevation: 10,
   },
 
   modeRow: {
     flexDirection: 'row',
-    backgroundColor: 'rgba(5, 17, 39, 0.90)',
+
+    backgroundColor: 'rgba(5, 12, 40, 0.92)',
+
     borderRadius: 22,
     padding: 4,
+
     borderWidth: 1,
-    borderColor: 'rgba(70, 124, 181, 0.38)',
-    marginBottom: 23,
+    borderColor: 'rgba(95,116,230,0.42)',
+
+    marginBottom: 22,
   },
 
   modeButton: {
@@ -508,16 +514,17 @@ const styles = StyleSheet.create({
   },
 
   modeButtonActive: {
-    backgroundColor: '#176BE5',
-    borderWidth: 1,
-    borderColor: '#69E6FF',
+    backgroundColor: '#2457DF',
 
-    shadowColor: '#4ADFFF',
-    shadowOpacity: 0.40,
-    shadowRadius: 13,
-    shadowOffset: { width: 0, height: 4 },
+    borderWidth: 1.2,
+    borderColor: '#62E8FF',
 
-    elevation: 7,
+    shadowColor: '#5CEAFF',
+    shadowOpacity: 0.58,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 3 },
+
+    elevation: 8,
   },
 
   modeText: {
@@ -537,29 +544,29 @@ const styles = StyleSheet.create({
   },
 
   title: {
-    color: '#F5F3FF',
+    color: '#FFFFFF',
 
-    fontSize: 25,
-    fontWeight: '800',
+    fontSize: 27,
+    fontWeight: '900',
 
-    letterSpacing: -0.55,
+    letterSpacing: -0.65,
 
-    marginTop: 3,
-    marginBottom: 6,
+    marginTop: 2,
+    marginBottom: 5,
 
-    textShadowColor: 'rgba(142,116,255,0.24)',
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 9,
+    textShadowColor: 'rgba(110,101,255,0.42)',
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 11,
   },
 
   subtitle: {
-    color: '#A7AEC8',
+    color: '#A0B4D1',
 
-    fontSize: 12,
-    fontWeight: '500',
+    fontSize: 12.5,
+    fontWeight: '600',
 
     lineHeight: 18,
-    marginBottom: 21,
+    marginBottom: 20,
   },
 
   fieldWrap: {
@@ -567,65 +574,78 @@ const styles = StyleSheet.create({
   },
 
   label: {
-    color: '#9FAADB',
+    color: '#79E8FF',
 
     fontSize: 9.5,
-    fontWeight: '800',
+    fontWeight: '900',
 
-    letterSpacing: 1.15,
+    letterSpacing: 1.1,
 
     marginBottom: 7,
+
+    textShadowColor: 'rgba(83,226,255,0.24)',
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 6,
   },
 
   input: {
-    minHeight: 54,
-    backgroundColor: 'rgba(7, 20, 46, 0.95)',
+    minHeight: 52,
 
-    borderWidth: 1,
-    borderColor: 'rgba(77, 137, 202, 0.56)',
+    backgroundColor: 'rgba(8, 17, 50, 0.94)',
 
-    borderRadius: 20,
+    borderWidth: 1.2,
+    borderColor: '#3A7BDB',
+
+    borderRadius: 18,
+
     paddingVertical: 14,
-    paddingHorizontal: 17,
+    paddingHorizontal: 16,
 
     color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '600',
 
-    shadowColor: '#29BFFF',
-    shadowOpacity: 0.08,
-    shadowRadius: 7,
+    fontSize: 14,
+    fontWeight: '650',
+
+    shadowColor: '#42CFFF',
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
     shadowOffset: { width: 0, height: 3 },
   },
 
   primaryButton: {
     minHeight: 58,
-    marginTop: 8,
-    borderRadius: 21,
 
-    backgroundColor: '#176BE5',
+    marginTop: 7,
 
-    borderWidth: 1.2,
-    borderColor: '#6BE8FF',
+    borderRadius: 20,
+
+    backgroundColor: '#2858F4',
+
+    borderWidth: 1.5,
+    borderColor: '#5DEAFF',
 
     alignItems: 'center',
     justifyContent: 'center',
 
-    shadowColor: '#3ACDFF',
-    shadowOpacity: 0.38,
-    shadowRadius: 17,
+    shadowColor: '#5A6CFF',
+    shadowOpacity: 0.78,
+    shadowRadius: 23,
     shadowOffset: { width: 0, height: 7 },
 
-    elevation: 10,
+    elevation: 13,
   },
 
   primaryButtonText: {
     color: '#FFFFFF',
 
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '900',
 
-    letterSpacing: 1.25,
+    letterSpacing: 1.15,
+
+    textShadowColor: '#65E9FF',
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 9,
   },
 
   disabled: {
@@ -639,27 +659,34 @@ const styles = StyleSheet.create({
   },
 
   forgotText: {
-    color: '#8DA7E9',
+    color: '#62DFFF',
 
-    fontSize: 11,
-    fontWeight: '700',
+    fontSize: 11.5,
+    fontWeight: '800',
 
-    letterSpacing: 0.1,
+    letterSpacing: 0.15,
+
+    textShadowColor: 'rgba(92,234,255,0.25)',
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 6,
   },
 
   testBox: {
-    backgroundColor: 'rgba(8, 48, 53, 0.72)',
+    backgroundColor: 'rgba(7, 54, 52, 0.72)',
+
     borderRadius: 24,
+
     paddingHorizontal: 16,
     paddingVertical: 15,
+
     marginTop: 18,
 
-    borderWidth: 1,
-    borderColor: 'rgba(72, 218, 190, 0.48)',
+    borderWidth: 1.2,
+    borderColor: '#27D9B4',
 
-    shadowColor: '#2BD6B3',
-    shadowOpacity: 0.12,
-    shadowRadius: 10,
+    shadowColor: '#22E5B9',
+    shadowOpacity: 0.20,
+    shadowRadius: 12,
     shadowOffset: { width: 0, height: 5 },
   },
 

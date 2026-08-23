@@ -442,26 +442,7 @@ const mediaOreGiornata =
     PROFILO_DEFAULT.sede
   );
 
-  const [matricolaDraft, setMatricolaDraft] = useState('');
-
-
-  const [
-    inServizioDalDraft,
-    setInServizioDalDraft,
-  ] = useState(
-    PROFILO_DEFAULT.in_servizio_dal || ''
-  );
-
-    /* SYNC MATRICOLA SAFE */
   useEffect(() => {
-    setMatricolaDraft(
-      profilo?.codice_gpg
-        ? String(profilo.codice_gpg)
-        : ''
-    );
-  }, [profilo?.codice_gpg]);
-
-useEffect(() => {
       caricaProfiloLocale();
       aggiornaColleghiInServizioOggi();
 
@@ -517,11 +498,6 @@ useEffect(() => {
       setAziendaDraft(nuovoProfilo.azienda);
       setRuoloDraft(nuovoProfilo.ruolo);
       setSedeDraft(nuovoProfilo.sede);
-    setInServizioDalDraft(
-      nuovoProfilo.in_servizio_dal
-        ? String(nuovoProfilo.in_servizio_dal)
-        : ''
-    );
       setFotoProfilo(nuovoProfilo.foto_url);
 
       return nuovoProfilo;
@@ -1549,11 +1525,6 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
         azienda: aziendaDraft.trim(),
         ruolo: ruoloDraft.trim(),
         sede: sedeDraft.trim(),
-      codice_gpg: matricolaDraft.trim(),
-      in_servizio_dal:
-        inServizioDalDraft.trim() === ''
-          ? null
-          : Number(inServizioDalDraft.trim()),
       };
 
       const salvato = await salvaProfiloUtente(profiloDaSalvare);
@@ -1564,8 +1535,6 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
         azienda: salvato.azienda || "",
         ruolo: salvato.ruolo || "",
         sede: salvato.sede || "",
-      in_servizio_dal:
-        salvato.in_servizio_dal ?? null,
             codice_gpg:
         salvato.codice_gpg ||
         profilo?.codice_gpg ||
@@ -4276,7 +4245,13 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
           }
         />
 
-        
+        <Text
+          style={
+            styles.profileSectionTitle
+          }
+        >
+          AZIENDA
+        </Text>
 
         <Field profile
           label="AZIENDA"
@@ -4288,10 +4263,10 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
           }
         />
 
-      {/* MATRICOLA PROFILO */}
+      {/* CODICE GPG PROFILO */}
       <View style={styles.profileFieldWrap}>
         <Text style={styles.profileFieldLabel}>
-          MATRICOLA
+          CODICE GPG
         </Text>
 
         <View
@@ -4305,22 +4280,17 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
           ]}
         >
           <View style={{ flex: 1, minWidth: 0 }}>
-            <TextInput
-              value={matricolaDraft}
-              onChangeText={setMatricolaDraft}
-              placeholder="Inserisci matricola"
-              placeholderTextColor="#7899B8"
-              autoCapitalize="characters"
-              autoCorrect={false}
+            <Text
+              numberOfLines={1}
               style={{
                 color: '#FFFFFF',
                 fontSize: 15,
                 fontWeight: '800',
                 letterSpacing: 0.4,
-                padding: 0,
-                margin: 0,
               }}
-            />
+            >
+              {profilo?.codice_gpg || 'Non assegnato'}
+            </Text>
 
             <Text
               style={{
@@ -4330,7 +4300,7 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
                 marginTop: 3,
               }}
             >
-              Matricola professionale
+              Identificativo professionale
             </Text>
           </View>
 
@@ -4449,193 +4419,7 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
           }
         />
 
-      <Field
-        profile
-        label="IN SERVIZIO DAL"
-        value={inServizioDalDraft}
-        onChange={(testo) => {
-          const soloNumeri = testo.replace(/\D/g, '').slice(0, 4);
-          setInServizioDalDraft(soloNumeri);
-        }}
-        keyboardType="number-pad"
-      />
-
-
-        
-      {/* PANNELLO IDENTITA PROFESSIONALE */}
-      <View
-        style={{
-          marginTop: 8,
-          marginBottom: 8,
-          padding: 16,
-          borderRadius: 26,
-          backgroundColor: 'rgba(22, 28, 74, 0.88)',
-          borderWidth: 1.2,
-          borderColor: 'rgba(111, 111, 255, 0.72)',
-
-          shadowColor: '#706CFF',
-          shadowOpacity: 0.25,
-          shadowRadius: 16,
-          shadowOffset: { width: 0, height: 6 },
-        }}
-      >
-        <Text
-          style={{
-            color: '#8FE8FF',
-            fontSize: 10,
-            fontWeight: '900',
-            letterSpacing: 1.25,
-            marginBottom: 12,
-
-            textShadowColor: 'rgba(92,235,255,0.30)',
-            textShadowOffset: { width: 0, height: 0 },
-            textShadowRadius: 7,
-          }}
-        >
-          IDENTITÀ PROFESSIONALE
-        </Text>
-
-        <View
-          style={{
-            flexDirection: 'row',
-            gap: 8,
-          }}
-        >
-          {/* CODICE */}
-          <View
-            style={{
-              flex: 1,
-              minHeight: 82,
-              padding: 11,
-              borderRadius: 19,
-              backgroundColor: 'rgba(37, 49, 111, 0.78)',
-              borderWidth: 1,
-              borderColor: 'rgba(92,234,255,0.46)',
-
-              shadowColor: '#5CEAFF',
-              shadowOpacity: 0.15,
-              shadowRadius: 8,
-            }}
-          >
-            <Text style={{ fontSize: 16 }}>🛡️</Text>
-
-            <Text
-              style={{
-                color: '#7FA5C2',
-                fontSize: 8,
-                fontWeight: '800',
-                marginTop: 7,
-                letterSpacing: 0.5,
-              }}
-            >
-              MATRICOLA
-            </Text>
-
-            <Text
-              numberOfLines={1}
-              style={{
-                color: '#FFFFFF',
-                fontSize: 11,
-                fontWeight: '900',
-                marginTop: 3,
-              }}
-            >
-              {profilo?.codice_gpg || '—'}
-            </Text>
-          </View>
-
-          {/* SEDE */}
-          <View
-            style={{
-              flex: 1,
-              minHeight: 82,
-              padding: 11,
-              borderRadius: 19,
-              backgroundColor: 'rgba(43, 38, 105, 0.78)',
-              borderWidth: 1,
-              borderColor: 'rgba(135,122,255,0.55)',
-
-              shadowColor: '#8075FF',
-              shadowOpacity: 0.14,
-              shadowRadius: 8,
-            }}
-          >
-            <Text style={{ fontSize: 16 }}>📍</Text>
-
-            <Text
-              style={{
-                color: '#8C91C7',
-                fontSize: 8,
-                fontWeight: '800',
-                marginTop: 7,
-                letterSpacing: 0.5,
-              }}
-            >
-              SEDE / ZONA
-            </Text>
-
-            <Text
-              numberOfLines={1}
-              ellipsizeMode="tail"
-              style={{
-                color: '#FFFFFF',
-                fontSize: 11,
-                fontWeight: '900',
-                marginTop: 3,
-              }}
-            >
-              {sedeDraft || '—'}
-            </Text>
-          </View>
-
-          {/* ANZIANITÀ */}
-          <View
-            style={{
-              flex: 1,
-              minHeight: 82,
-              padding: 11,
-              borderRadius: 19,
-              backgroundColor: 'rgba(29, 58, 99, 0.78)',
-              borderWidth: 1,
-              borderColor: 'rgba(92,198,255,0.45)',
-
-              shadowColor: '#5CCAFF',
-              shadowOpacity: 0.14,
-              shadowRadius: 8,
-            }}
-          >
-            <Text style={{ fontSize: 16 }}>📅</Text>
-
-            <Text
-              style={{
-                color: '#7CAAC8',
-                fontSize: 8,
-                fontWeight: '800',
-                marginTop: 7,
-                letterSpacing: 0.45,
-              }}
-            >
-              IN SERVIZIO
-            </Text>
-
-            <Text
-              numberOfLines={1}
-              style={{
-                color: '#FFFFFF',
-                fontSize: 11,
-                fontWeight: '900',
-                marginTop: 3,
-              }}
-            >
-              {inServizioDalDraft
-                ? `Dal ${inServizioDalDraft}`
-                : '—'}
-            </Text>
-          </View>
-        </View>
-      </View>
-
-<TouchableOpacity
+        <TouchableOpacity
           style={
             styles.saveButton
           }
@@ -4653,30 +4437,7 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
         </TouchableOpacity>
 
           <TouchableOpacity
-            style={{
-          minHeight: 52,
-
-          marginTop: 12,
-          marginBottom: 8,
-
-          paddingHorizontal: 16,
-          paddingVertical: 13,
-
-          borderRadius: 20,
-
-          backgroundColor: 'rgba(67, 25, 43, 0.38)',
-
-          borderWidth: 1,
-          borderColor: 'rgba(255, 100, 126, 0.38)',
-
-          alignItems: 'center',
-          justifyContent: 'center',
-
-          shadowColor: '#FF657E',
-          shadowOpacity: 0.10,
-          shadowRadius: 8,
-          shadowOffset: { width: 0, height: 4 },
-        }}
+            style={{ backgroundColor: "#c62828", padding: 16, borderRadius: 12, marginTop: 14, alignItems: "center" }}
             onPress={logout}
           >
             <Text style={{ color: "white", fontWeight: "700", fontSize: 16 }}>
@@ -7717,39 +7478,28 @@ const styles =
     },
 
     saveButton: {
-    minHeight: 58,
-    borderRadius: 22,
-
-    marginTop: 24,
-    marginBottom: 10,
-
-    backgroundColor: '#1763D8',
-
-    borderWidth: 1.5,
-    borderColor: '#63E7FF',
-
-    alignItems: 'center',
-    justifyContent: 'center',
-
-    shadowColor: '#54E4FF',
-    shadowOpacity: 0.48,
-    shadowRadius: 18,
-    shadowOffset: { width: 0, height: 7 },
-
-    elevation: 9,
-  },
+      backgroundColor: '#1368E8',
+      borderRadius: 18,
+      paddingVertical: 17,
+      paddingHorizontal: 18,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 1.3,
+      borderColor: '#58DFFF',
+      marginTop: 8,
+      marginBottom: 10,
+      shadowColor: '#42CFFF',
+      shadowOpacity: 0.32,
+      shadowRadius: 16,
+      shadowOffset: { width: 0, height: 7 },
+    },
 
     saveText: {
-    color: '#FFFFFF',
-    fontSize: 15,
-    fontWeight: '900',
-    letterSpacing: 0.8,
-    textAlign: 'center',
-
-    textShadowColor: 'rgba(93,235,255,0.50)',
-    textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 8,
-  },
+      color: '#FFFFFF',
+      fontSize: 15,
+      fontWeight: '900',
+      letterSpacing: 0.7,
+    },
 
     syncButton: {
     minHeight: 58,
@@ -8494,31 +8244,16 @@ const styles =
   },
 
     removePhotoButton: {
-    alignSelf: 'center',
-
-    marginTop: 18,
-    marginBottom: 8,
-
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-
-    borderRadius: 16,
-
-    backgroundColor: 'rgba(255, 91, 116, 0.07)',
-
-    borderWidth: 1,
-    borderColor: 'rgba(255, 110, 132, 0.24)',
-
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+      padding: 15,
+      alignItems:
+        'center',
+    },
 
     removePhotoText: {
-    color: '#FF98A9',
-    fontSize: 11,
-    fontWeight: '800',
-    letterSpacing: 0.35,
-  },
+      color:
+        COLORS.red,
+      fontSize: 12,
+    },
 
     savedBox: {
       backgroundColor:

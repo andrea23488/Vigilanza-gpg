@@ -10,7 +10,6 @@ import {
   StyleSheet,
   Alert,
   ActivityIndicator,
-  Image,
 } from 'react-native';
 
 import { supabase } from './supabase';
@@ -178,20 +177,11 @@ export default function LoginScreen({ onEnterTest }) {
       >
         <View style={styles.logoWrap}>
           <View style={styles.logoCircle}>
-            <Image
-          source={require('./assets/icon.png')}
-          resizeMode="contain"
-          style={{
-            width: 82,
-            height: 82,
-            borderRadius: 20,
-          }}
-        />
+            <Text style={styles.logoIcon}>🛡️</Text>
           </View>
 
           <Text style={styles.appName}>
             VIGILANZA GPG
-E FIDUCIARI
           </Text>
 
           <Text style={styles.tagline}>
@@ -392,174 +382,106 @@ function Field({
 const styles = StyleSheet.create({
   safe: {
     flex: 1,
-    backgroundColor: '#061126',
+    backgroundColor: COLORS.bg,
   },
 
   screen: {
     flex: 1,
-    backgroundColor: '#061126',
+    backgroundColor: COLORS.bg,
   },
 
   content: {
-    paddingHorizontal: 20,
-    paddingTop: 24,
-    paddingBottom: 34,
-    flexGrow: 1,
+    padding: 20,
+    paddingTop: 45,
+    paddingBottom: 60,
   },
 
   logoWrap: {
     alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 6,
-    marginBottom: 18,
+    marginBottom: 28,
   },
 
   logoCircle: {
-    width: 108,
-    height: 108,
-    borderRadius: 34,
-
-    backgroundColor: 'rgba(13, 39, 79, 0.62)',
-
-    borderWidth: 1,
-    borderColor: 'rgba(82, 224, 255, 0.52)',
-
+    width: 82,
+    height: 82,
+    borderRadius: 41,
+    backgroundColor: '#10304B',
     alignItems: 'center',
     justifyContent: 'center',
-
-    shadowColor: '#49DFFF',
-    shadowOpacity: 0.42,
-    shadowRadius: 24,
-    shadowOffset: { width: 0, height: 5 },
-
-    elevation: 10,
+    marginBottom: 14,
+    borderWidth: 1,
+    borderColor: '#1C4D73',
   },
 
   logoIcon: {
-    fontSize: 49,
-
-    textShadowColor: '#54E9FF',
-    textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 16,
+    fontSize: 38,
   },
 
   appName: {
-    color: '#FFFFFF',
-    fontSize: 25,
-    lineHeight: 29,
-    fontWeight: '850',
-    textAlign: 'center',
-    letterSpacing: 0.7,
-    marginTop: 15,
-
-    textShadowColor: 'rgba(77, 220, 255, 0.30)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 8,
+    color: COLORS.white,
+    fontSize: 27,
+    fontWeight: '900',
+    letterSpacing: 1,
   },
 
   tagline: {
-    color: '#A7B8CC',
-    fontSize: 11.5,
-    fontWeight: '600',
+    color: COLORS.muted,
+    fontSize: 12,
     textAlign: 'center',
     marginTop: 7,
-    marginBottom: 24,
-    letterSpacing: 0.1,
+    lineHeight: 18,
+    maxWidth: 310,
   },
 
   authCard: {
-    backgroundColor: 'rgba(9, 24, 54, 0.94)',
-    borderRadius: 30,
-    paddingHorizontal: 19,
-    paddingVertical: 19,
-
+    backgroundColor: COLORS.card,
+    borderRadius: 24,
     borderWidth: 1,
-    borderColor: 'rgba(74, 139, 210, 0.48)',
-
-    shadowColor: '#34C7FF',
-    shadowOpacity: 0.18,
-    shadowRadius: 20,
-    shadowOffset: { width: 0, height: 10 },
-
-    elevation: 8,
+    borderColor: COLORS.border,
+    padding: 18,
   },
 
   modeRow: {
     flexDirection: 'row',
-    backgroundColor: 'rgba(5, 17, 39, 0.90)',
-    borderRadius: 22,
+    backgroundColor: '#091728',
+    borderRadius: 14,
     padding: 4,
-    borderWidth: 1,
-    borderColor: 'rgba(70, 124, 181, 0.38)',
-    marginBottom: 23,
+    marginBottom: 24,
   },
 
   modeButton: {
     flex: 1,
-
-    minHeight: 46,
-
-    borderRadius: 18,
-
+    paddingVertical: 11,
+    borderRadius: 11,
     alignItems: 'center',
-    justifyContent: 'center',
-
-    marginHorizontal: 2,
   },
 
   modeButtonActive: {
-    backgroundColor: '#176BE5',
-    borderWidth: 1,
-    borderColor: '#69E6FF',
-
-    shadowColor: '#4ADFFF',
-    shadowOpacity: 0.40,
-    shadowRadius: 13,
-    shadowOffset: { width: 0, height: 4 },
-
-    elevation: 7,
+    backgroundColor: COLORS.blue,
   },
 
   modeText: {
-    color: '#8B9DBA',
+    color: COLORS.muted,
+    fontWeight: '900',
     fontSize: 13,
-    fontWeight: '800',
-    letterSpacing: 0.15,
   },
 
   modeTextActive: {
-    color: '#FFFFFF',
-    fontWeight: '900',
-
-    textShadowColor: '#5CEAFF',
-    textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 8,
+    color: COLORS.white,
   },
 
   title: {
-    color: '#F5F3FF',
-
+    color: COLORS.white,
     fontSize: 25,
-    fontWeight: '800',
-
-    letterSpacing: -0.55,
-
-    marginTop: 3,
-    marginBottom: 6,
-
-    textShadowColor: 'rgba(142,116,255,0.24)',
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 9,
+    fontWeight: '900',
   },
 
   subtitle: {
-    color: '#A7AEC8',
-
+    color: COLORS.muted,
     fontSize: 12,
-    fontWeight: '500',
-
     lineHeight: 18,
-    marginBottom: 21,
+    marginTop: 5,
+    marginBottom: 20,
   },
 
   fieldWrap: {
@@ -567,65 +489,36 @@ const styles = StyleSheet.create({
   },
 
   label: {
-    color: '#9FAADB',
-
-    fontSize: 9.5,
-    fontWeight: '800',
-
-    letterSpacing: 1.15,
-
+    color: COLORS.muted,
+    fontSize: 10,
+    fontWeight: '900',
     marginBottom: 7,
   },
 
   input: {
-    minHeight: 54,
-    backgroundColor: 'rgba(7, 20, 46, 0.95)',
-
+    backgroundColor: '#091728',
     borderWidth: 1,
-    borderColor: 'rgba(77, 137, 202, 0.56)',
-
-    borderRadius: 20,
+    borderColor: COLORS.border,
+    borderRadius: 14,
+    paddingHorizontal: 15,
     paddingVertical: 14,
-    paddingHorizontal: 17,
-
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '600',
-
-    shadowColor: '#29BFFF',
-    shadowOpacity: 0.08,
-    shadowRadius: 7,
-    shadowOffset: { width: 0, height: 3 },
+    color: COLORS.white,
+    fontSize: 15,
   },
 
   primaryButton: {
-    minHeight: 58,
-    marginTop: 8,
-    borderRadius: 21,
-
-    backgroundColor: '#176BE5',
-
-    borderWidth: 1.2,
-    borderColor: '#6BE8FF',
-
+    backgroundColor: COLORS.blue,
+    borderRadius: 15,
+    padding: 16,
     alignItems: 'center',
+    marginTop: 5,
+    minHeight: 52,
     justifyContent: 'center',
-
-    shadowColor: '#3ACDFF',
-    shadowOpacity: 0.38,
-    shadowRadius: 17,
-    shadowOffset: { width: 0, height: 7 },
-
-    elevation: 10,
   },
 
   primaryButtonText: {
-    color: '#FFFFFF',
-
-    fontSize: 14,
+    color: COLORS.white,
     fontWeight: '900',
-
-    letterSpacing: 1.25,
   },
 
   disabled: {
@@ -633,93 +526,56 @@ const styles = StyleSheet.create({
   },
 
   forgotButton: {
-    paddingVertical: 14,
+    paddingVertical: 15,
     alignItems: 'center',
-    justifyContent: 'center',
   },
 
   forgotText: {
-    color: '#8DA7E9',
-
-    fontSize: 11,
+    color: COLORS.lightBlue,
+    fontSize: 12,
     fontWeight: '700',
-
-    letterSpacing: 0.1,
   },
 
   testBox: {
-    backgroundColor: 'rgba(8, 48, 53, 0.72)',
-    borderRadius: 24,
-    paddingHorizontal: 16,
-    paddingVertical: 15,
+    backgroundColor: '#102A24',
+    borderRadius: 18,
+    padding: 16,
     marginTop: 18,
-
     borderWidth: 1,
-    borderColor: 'rgba(72, 218, 190, 0.48)',
-
-    shadowColor: '#2BD6B3',
-    shadowOpacity: 0.12,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 5 },
+    borderColor: '#1B493C',
   },
 
   testTitle: {
-    color: '#62F0C9',
-
+    color: COLORS.green,
     fontWeight: '900',
-    fontSize: 12.5,
-
-    letterSpacing: 0.2,
+    fontSize: 13,
   },
 
   testText: {
-    color: '#A5C9C5',
-
-    fontSize: 10.5,
-    lineHeight: 15,
-
+    color: COLORS.muted,
+    fontSize: 11,
+    lineHeight: 17,
     marginTop: 5,
   },
 
   testButton: {
-    minHeight: 45,
-
-    backgroundColor: 'rgba(24, 121, 105, 0.48)',
-
-    borderRadius: 16,
-
-    paddingHorizontal: 13,
-
+    backgroundColor: '#153A30',
+    borderRadius: 13,
+    padding: 13,
     alignItems: 'center',
-    justifyContent: 'center',
-
-    marginTop: 12,
-
-    borderWidth: 1,
-    borderColor: 'rgba(78,235,202,0.42)',
+    marginTop: 13,
   },
 
   testButtonText: {
-    color: '#8DFFE2',
-
+    color: '#7DE4BD',
     fontWeight: '900',
-    fontSize: 10.5,
-
-    letterSpacing: 0.55,
+    fontSize: 11,
   },
 
   footer: {
-    color: '#63718D',
-
+    color: '#586D85',
     textAlign: 'center',
-
-    fontSize: 9,
-
-    fontWeight: '700',
-
-    letterSpacing: 0.65,
-
-    marginTop: 22,
-    marginBottom: 6,
+    fontSize: 10,
+    marginTop: 25,
   },
 });
