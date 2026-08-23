@@ -11,7 +11,6 @@ import {
   Alert,
   ActivityIndicator,
   Image,
-  Keyboard,
 } from 'react-native';
 
 import { supabase } from './supabase';
@@ -37,41 +36,6 @@ export default function LoginScreen({ onEnterTest }) {
   const [cognome, setCognome] = useState('');
 
   const [loading, setLoading] = useState(false);
-
-  /* ===== LOGIN FINE SAFE ===== */
-  const [loginKeyboard, setLoginKeyboard] = useState({
-    visible: false,
-    height: 0,
-  });
-
-  React.useEffect(() => {
-    const show = Keyboard.addListener(
-      'keyboardWillShow',
-      (event) => {
-        setLoginKeyboard({
-          visible: true,
-          height: event?.endCoordinates?.height || 0,
-        });
-      }
-    );
-
-    const hide = Keyboard.addListener(
-      'keyboardWillHide',
-      () => {
-        setLoginKeyboard({
-          visible: false,
-          height: 0,
-        });
-      }
-    );
-
-    return () => {
-      show.remove();
-      hide.remove();
-    };
-  }, []);
-
-
 
   async function continua() {
     if (!email.trim() || !password.trim()) {
@@ -211,9 +175,7 @@ export default function LoginScreen({ onEnterTest }) {
         style={styles.screen}
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
-      
-      keyboardDismissMode="interactive"
-      automaticallyAdjustKeyboardInsets={true}>
+      >
         <View style={styles.logoWrap}>
           <View style={styles.logoCircle}>
             <Image
@@ -390,72 +352,7 @@ E FIDUCIARI
           VIGILANZA GPG • VERSIONE TEST
         </Text>
       </ScrollView>
-    
-      {loginKeyboard.visible ? (
-        <View
-          pointerEvents="box-none"
-          style={{
-            position: 'absolute',
-            left: 0,
-            right: 0,
-            bottom: loginKeyboard.height,
-            zIndex: 99999,
-          }}
-        >
-          <View
-            style={{
-              minHeight: 46,
-
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'flex-end',
-
-              paddingHorizontal: 14,
-              paddingVertical: 5,
-
-              backgroundColor: 'rgba(10,21,39,0.97)',
-
-              borderTopWidth: 1,
-              borderTopColor: 'rgba(89,211,255,0.24)',
-            }}
-          >
-            <TouchableOpacity
-              activeOpacity={0.82}
-              onPress={() => Keyboard.dismiss()}
-              style={{
-                minWidth: 92,
-                height: 36,
-
-                paddingHorizontal: 14,
-
-                flexDirection: 'row',
-                alignItems: 'center',
-                justifyContent: 'center',
-
-                borderRadius: 12,
-
-                backgroundColor: 'rgba(20,136,176,0.98)',
-
-                borderWidth: 1,
-                borderColor: 'rgba(106,232,255,0.68)',
-              }}
-            >
-              <Text
-                style={{
-                  color: '#FFFFFF',
-                  fontSize: 10,
-                  fontWeight: '900',
-                  letterSpacing: 0.7,
-                }}
-              >
-                ✓ FINE
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      ) : null}
-
-</SafeAreaView>
+    </SafeAreaView>
   );
 }
 

@@ -27,18 +27,9 @@ const COLORS = {
   green: '#50D89F',
 };
 
-export default function LoginScreen({ onEnterTest }) {
-  const [mode, setMode] = useState('login');
+export default function LoginScreen({
 
-  const [email, setEmail] = useState('');
-  const [matricola, setMatricola] = useState('');
-  const [password, setPassword] = useState('');
-  const [nome, setNome] = useState('');
-  const [cognome, setCognome] = useState('');
-
-  const [loading, setLoading] = useState(false);
-
-  /* ===== LOGIN FINE SAFE ===== */
+  /* ===== LOGIN KEYBOARD FINE ===== */
   const [loginKeyboard, setLoginKeyboard] = useState({
     visible: false,
     height: 0,
@@ -50,7 +41,8 @@ export default function LoginScreen({ onEnterTest }) {
       (event) => {
         setLoginKeyboard({
           visible: true,
-          height: event?.endCoordinates?.height || 0,
+          height:
+            event?.endCoordinates?.height || 0,
         });
       }
     );
@@ -71,7 +63,16 @@ export default function LoginScreen({ onEnterTest }) {
     };
   }, []);
 
+ onEnterTest }) {
+  const [mode, setMode] = useState('login');
 
+  const [email, setEmail] = useState('');
+  const [matricola, setMatricola] = useState('');
+  const [password, setPassword] = useState('');
+  const [nome, setNome] = useState('');
+  const [cognome, setCognome] = useState('');
+
+  const [loading, setLoading] = useState(false);
 
   async function continua() {
     if (!email.trim() || !password.trim()) {
@@ -399,7 +400,7 @@ E FIDUCIARI
             left: 0,
             right: 0,
             bottom: loginKeyboard.height,
-            zIndex: 99999,
+            zIndex: 9999,
           }}
         >
           <View
@@ -413,10 +414,12 @@ E FIDUCIARI
               paddingHorizontal: 14,
               paddingVertical: 5,
 
-              backgroundColor: 'rgba(10,21,39,0.97)',
+              backgroundColor:
+                'rgba(10,21,39,0.97)',
 
               borderTopWidth: 1,
-              borderTopColor: 'rgba(89,211,255,0.24)',
+              borderTopColor:
+                'rgba(89,211,255,0.24)',
             }}
           >
             <TouchableOpacity
@@ -434,10 +437,12 @@ E FIDUCIARI
 
                 borderRadius: 12,
 
-                backgroundColor: 'rgba(20,136,176,0.98)',
+                backgroundColor:
+                  'rgba(20,136,176,0.98)',
 
                 borderWidth: 1,
-                borderColor: 'rgba(106,232,255,0.68)',
+                borderColor:
+                  'rgba(106,232,255,0.68)',
               }}
             >
               <Text

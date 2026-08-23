@@ -5432,7 +5432,6 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
       <ConsegneServizioScreen
         onBack={() => setScreen('strumenti')}
         postazioni={postazioniSalvate}
-        colleghi={colleghi}
       />
     );
   }
@@ -17779,7 +17778,6 @@ function RapportoServizioScreen({
 function ConsegneServizioScreen({
   onBack,
   postazioni = [],
-  colleghi = [],
 }) {
   const oraCorrente = new Date();
 
@@ -17824,20 +17822,6 @@ function ConsegneServizioScreen({
 
   const [archivioConsegne, setArchivioConsegne] =
     React.useState([]);
-
-  const [mostraColleghiConsegna, setMostraColleghiConsegna] =
-    React.useState(false);
-
-  const [invioConsegnaInCorso, setInvioConsegnaInCorso] =
-    React.useState(false);
-
-  const colleghiAccettatiConsegna =
-    Array.isArray(colleghi)
-      ? colleghi.filter(
-          (c) => c?.stato === 'accettato'
-        )
-      : [];
-
 
   React.useEffect(() => {
     let attivo = true;
@@ -18046,60 +18030,17 @@ function ConsegneServizioScreen({
     );
   };
 
-  const inviaConsegnaACollega = async (collega) => {
-    const destinatarioId =
-      collega?.altro_user_id;
-
-    if (!destinatarioId) {
-      Alert.alert(
-        'Collega non disponibile',
-        'Non è stato possibile identificare il destinatario.'
-      );
-      return;
-    }
-
-    if (
-      !consegnaPostazione.trim() &&
-      !consegnaAccaduto.trim() &&
-      !consegnaDaFare.trim() &&
-      !consegnaNote.trim()
-    ) {
-      Alert.alert(
-        'Consegna vuota',
-        'Inserisci almeno una informazione utile.'
-      );
-      return;
-    }
-
+  const condividiConsegna = async () => {
     try {
-      setInvioConsegnaInCorso(true);
-
-      const messaggio =
-        `📋 CONSEGNA DI SERVIZIO\n\n${testoConsegna}`;
-
-      await inviaMessaggio(
-        destinatarioId,
-        messaggio
-      );
-
-      setMostraColleghiConsegna(false);
-
-      Alert.alert(
-        'Consegna inviata',
-        'La consegna è stata inviata nella chat privata del collega.'
-      );
+      await Share.share({
+        title: 'Consegne di servizio',
+        message: testoConsegna,
+      });
     } catch (e) {
-      console.log(
-        'Errore invio consegna:',
-        e
-      );
-
       Alert.alert(
         'Errore',
-        'Non è stato possibile inviare la consegna.'
+        'Non è stato possibile condividere la consegna.'
       );
-    } finally {
-      setInvioConsegnaInCorso(false);
     }
   };
 
@@ -18604,19 +18545,7 @@ function ConsegneServizioScreen({
 
       <TouchableOpacity
         activeOpacity={0.82}
-        onPress={() => {
-          if (colleghiAccettatiConsegna.length === 0) {
-            Alert.alert(
-              'Nessun collega disponibile',
-              'Devi avere almeno un collega accettato per poter inviare una consegna.'
-            );
-            return;
-          }
-
-          setMostraColleghiConsegna(
-            !mostraColleghiConsegna
-          );
-        }}
+        onPress={condividiConsegna}
         style={{
           minHeight: 56,
           marginBottom: 10,
@@ -18637,149 +18566,9 @@ function ConsegneServizioScreen({
             fontWeight: '900',
           }}
         >
-          📨 INVIA A COLLEGA
+          📤 CONDIVIDI CONSEGNA
         </Text>
       </TouchableOpacity>
-
-      {mostraColleghiConsegna ? (
-        <View
-          style={{
-            marginBottom: 16,
-            padding: 14,
-            borderRadius: 20,
-            backgroundColor:
-              'rgba(10,29,56,0.94)',
-            borderWidth: 1,
-            borderColor:
-              'rgba(107,142,224,0.28)',
-          }}
-        >
-          <Text
-            style={{
-              color: '#FFFFFF',
-              fontSize: 12,
-              fontWeight: '900',
-              marginBottom: 4,
-            }}
-          >
-            Scegli il collega
-          </Text>
-
-          <Text
-            style={{
-              color: '#8294B5',
-              fontSize: 9.5,
-              fontWeight: '700',
-              marginBottom: 12,
-            }}
-          >
-            Sono mostrati solo i colleghi già accettati.
-          </Text>
-
-          {colleghiAccettatiConsegna.map(
-            (c) => {
-              const p = c?.profilo || {};
-
-              const nome =
-                [p?.nome, p?.cognome]
-                  .filter(Boolean)
-                  .join(' ') ||
-                'Collega';
-
-              return (
-                <TouchableOpacity
-                  key={
-                    c?.id ||
-                    c?.altro_user_id
-                  }
-                  activeOpacity={0.82}
-                  disabled={invioConsegnaInCorso}
-                  onPress={() =>
-                    inviaConsegnaACollega(c)
-                  }
-                  style={{
-                    minHeight: 58,
-                    marginBottom: 8,
-                    paddingHorizontal: 12,
-
-                    flexDirection: 'row',
-                    alignItems: 'center',
-
-                    borderRadius: 17,
-
-                    backgroundColor:
-                      'rgba(18,43,80,0.88)',
-
-                    borderWidth: 1,
-                    borderColor:
-                      'rgba(97,143,214,0.22)',
-                  }}
-                >
-                  <View
-                    style={{
-                      width: 40,
-                      height: 40,
-                      borderRadius: 20,
-
-                      alignItems: 'center',
-                      justifyContent: 'center',
-
-                      backgroundColor:
-                        'rgba(87,146,220,0.15)',
-                    }}
-                  >
-                    <Ionicons
-                      name="person-outline"
-                      size={18}
-                      color="#8EC8FF"
-                    />
-                  </View>
-
-                  <View
-                    style={{
-                      flex: 1,
-                      marginLeft: 10,
-                    }}
-                  >
-                    <Text
-                      style={{
-                        color: '#FFFFFF',
-                        fontSize: 11.5,
-                        fontWeight: '900',
-                      }}
-                    >
-                      {nome}
-                    </Text>
-
-                    <Text
-                      style={{
-                        color: '#7890AE',
-                        fontSize: 9,
-                        fontWeight: '700',
-                        marginTop: 3,
-                      }}
-                    >
-                      {[
-                        p?.azienda,
-                        p?.sede,
-                      ]
-                        .filter(Boolean)
-                        .join(' · ') ||
-                        'Collega collegato'}
-                    </Text>
-                  </View>
-
-                  <Ionicons
-                    name="send-outline"
-                    size={18}
-                    color="#78C8FF"
-                  />
-                </TouchableOpacity>
-              );
-            }
-          )}
-        </View>
-      ) : null}
 
       <TouchableOpacity
         activeOpacity={0.82}
