@@ -1,7 +1,7 @@
-import { Ionicons } from '@expo/vector-icons';
-import { Linking } from 'react-native';
-import LoginScreen from './LoginScreen';
 import {
+  Ionicons } from '@expo/vector-icons',
+  import LoginScreen from './LoginScreen',
+  import {
   caricaMessaggi,
   inviaMessaggio,
   mioUserId,
@@ -10,15 +10,28 @@ import {
   colleghiConConversazione,
   caricaRiepilogoConversazioni,
   segnaMessaggiComeLetti,
-} from './chatApi';
-import { caricaTurniUtente, creaTurnoUtente, aggiornaTurnoUtente, eliminaTurnoUtente } from './turniApi';
-import { supabase } from './supabase';
-import { caricaProfiloUtente, salvaProfiloUtente, caricaFotoProfilo, eliminaFotoProfiloCloud } from './profiliApi';
-import { caricaColleghi, aggiungiCollega, rimuoviCollega, accettaCollega, rifiutaCollega } from './colleghiApi';
-import { caricaColleghiInServizio } from './servizioApi';
-import React, { useRef, useEffect, useMemo, useState } from 'react';
-
-import {
+  } from './chatApi',
+  import { caricaTurniUtente,
+  creaTurnoUtente,
+  aggiornaTurnoUtente,
+  eliminaTurnoUtente } from './turniApi',
+  import { supabase } from './supabase',
+  import { caricaProfiloUtente,
+  salvaProfiloUtente,
+  caricaFotoProfilo,
+  eliminaFotoProfiloCloud } from './profiliApi',
+  import { caricaColleghi,
+  aggiungiCollega,
+  rimuoviCollega,
+  accettaCollega,
+  rifiutaCollega } from './colleghiApi',
+  import { caricaColleghiInServizio } from './servizioApi',
+  import React,
+  { useRef,
+  useEffect,
+  useMemo,
+  useState } from 'react',
+  import {
   SafeAreaView,
   KeyboardAvoidingView,
   Platform,
@@ -31,6 +44,7 @@ import {
   Alert,
   ActivityIndicator,
   Image,
+  Linking,
 } from 'react-native';
 
 import * as ImagePicker from 'expo-image-picker';
@@ -261,40 +275,33 @@ useEffect(() => {
   const [colleghiInServizio, setColleghiInServizio] = useState([]);
   const [collegaSelezionato, setCollegaSelezionato] = useState(null);
 
-  /* ===== METEO SERVIZIO ===== */
-  const [meteoServizio, setMeteoServizio] = useState(null);
-  const [meteoLoading, setMeteoLoading] = useState(false);
-  const [meteoErrore, setMeteoErrore] = useState('');
-  const [localitaMeteo, setLocalitaMeteo] = useState('');
+  const [numeriLavoro, setNumeriLavoro] = useState({
+    salaOperativa: '',
+    responsabile: '',
+    referenteSito: '',
+    altro: '',
+  });
 
-  /* ===== LUOGO METEO ASSOCIATO AI TURNI ===== */
-  const [luoghiTurniMeteo, setLuoghiTurniMeteo] = useState({});
+  const [numeriLavoroCaricati, setNumeriLavoroCaricati] = useState(false);
 
+  /* ===== NUMERI UTILI LOCALI ===== */
   useEffect(() => {
     let attivo = true;
 
     (async () => {
       try {
-        const dati = await AsyncStorage.getItem(
-          'vigilanza_luoghi_turni_meteo'
-        );
+        const salvati = await AsyncStorage.getItem('vigilanza_numeri_utili');
 
-        if (attivo && dati) {
-          const parsed = JSON.parse(dati);
-
-          if (
-            parsed &&
-            typeof parsed === 'object' &&
-            !Array.isArray(parsed)
-          ) {
-            setLuoghiTurniMeteo(parsed);
-          }
+        if (attivo && salvati) {
+          setNumeriLavoro((prev) => ({
+            ...prev,
+            ...JSON.parse(salvati),
+          }));
         }
       } catch (e) {
-        console.log(
-          'Errore caricamento luoghi turni meteo:',
-          e
-        );
+        console.log('Errore caricamento numeri utili:', e);
+      } finally {
+        if (attivo) setNumeriLavoroCaricati(true);
       }
     })();
 
@@ -303,252 +310,27 @@ useEffect(() => {
     };
   }, []);
 
-  const salvaLuogoTurnoMeteo = async (chiave, luogo) => {
-    const pulito = String(luogo || '').trim();
-
-    if (!chiave || !pulito) {
-      Alert.alert(
-        'Località mancante',
-        'Inserisci prima la località del servizio.'
-      );
-      return;
-    }
-
-    const nuovi = {
-      ...luoghiTurniMeteo,
-      [chiave]: pulito,
-    };
-
-    setLuoghiTurniMeteo(nuovi);
-    setLocalitaMeteo(pulito);
-
-    try {
-      await AsyncStorage.setItem(
-        'vigilanza_luoghi_turni_meteo',
-        JSON.stringify(nuovi)
-      );
-
-      Alert.alert(
-        'Località associata',
-        `${pulito} è stata associata a questo turno.`
-      );
-    } catch (e) {
-      console.log(
-        'Errore salvataggio luogo turno:',
-        e
-      );
-
-      Alert.alert(
-        'Errore',
-        'Non è stato possibile salvare la località.'
-      );
-    }
-  };
-
-
-  const [recentiMeteo, setRecentiMeteo] = useState([]);
-  const [meteoPreferenzeCaricate, setMeteoPreferenzeCaricate] =
-    useState(false);
-
-  /* ===== LOCALITÀ METEO RECENTI ===== */
   useEffect(() => {
-    let attivo = true;
+    if (!numeriLavoroCaricati) return;
 
-    const caricaPreferenzeMeteo = async () => {
-      try {
-        const dati = await AsyncStorage.getItem(
-          'vigilanza_meteo_localita'
-        );
-
-        if (attivo && dati) {
-          const parsed = JSON.parse(dati);
-
-          if (Array.isArray(parsed?.recenti)) {
-            setRecentiMeteo(parsed.recenti.slice(0, 5));
-          }
-
-          if (
-            typeof parsed?.ultima === 'string' &&
-            parsed.ultima.trim()
-          ) {
-            setLocalitaMeteo(parsed.ultima.trim());
-          }
-        }
-      } catch (e) {
-        console.log(
-          'Errore caricamento località meteo:',
-          e
-        );
-      } finally {
-        if (attivo) {
-          setMeteoPreferenzeCaricate(true);
-        }
-      }
-    };
-
-    caricaPreferenzeMeteo();
-
-    return () => {
-      attivo = false;
-    };
-  }, []);
-
-  const salvaLocalitaMeteo = async (localita) => {
-    const pulita = String(localita || '').trim();
-
-    if (!pulita) return;
-
-    const nuoveRecenti = [
-      pulita,
-      ...recentiMeteo.filter(
-        (x) =>
-          String(x).toLowerCase() !==
-          pulita.toLowerCase()
-      ),
-    ].slice(0, 5);
-
-    setRecentiMeteo(nuoveRecenti);
-    setLocalitaMeteo(pulita);
-
-    try {
-      await AsyncStorage.setItem(
-        'vigilanza_meteo_localita',
-        JSON.stringify({
-          ultima: pulita,
-          recenti: nuoveRecenti,
-        })
+    AsyncStorage
+      .setItem(
+        'vigilanza_numeri_utili',
+        JSON.stringify(numeriLavoro)
+      )
+      .catch((e) =>
+        console.log('Errore salvataggio numeri utili:', e)
       );
-    } catch (e) {
-      console.log(
-        'Errore salvataggio località meteo:',
-        e
-      );
-    }
-  };
+  }, [numeriLavoro, numeriLavoroCaricati]);
 
-
-  const caricaMeteoServizio = async (zona) => {
-    const luogo = String(zona || '').trim();
-
-    if (!luogo) {
-      setMeteoErrore('Imposta prima la zona operativa nel profilo.');
-      setMeteoServizio(null);
-      return;
-    }
-
-    setMeteoLoading(true);
-    setMeteoErrore('');
-
-    try {
-      const geoUrl =
-        'https://geocoding-api.open-meteo.com/v1/search?name=' +
-        encodeURIComponent(luogo) +
-        '&count=1&language=it&format=json';
-
-      const geoResponse = await fetch(geoUrl);
-      const geoData = await geoResponse.json();
-
-      if (!geoData?.results?.length) {
-        throw new Error('Località non trovata');
-      }
-
-      const luogoTrovato = geoData.results[0];
-
-      const meteoUrl =
-        'https://api.open-meteo.com/v1/forecast' +
-        '?latitude=' + luogoTrovato.latitude +
-        '&longitude=' + luogoTrovato.longitude +
-        '&current=temperature_2m,apparent_temperature,precipitation,weather_code,wind_speed_10m' +
-        '&hourly=temperature_2m,apparent_temperature,precipitation_probability,precipitation,weather_code,wind_speed_10m' +
-        '&forecast_days=7' +
-        '&timezone=auto';
-
-      const response = await fetch(meteoUrl);
-      const data = await response.json();
-
-      setMeteoServizio({
-        ...data,
-        luogo: luogoTrovato,
-      });
-
-      await salvaLocalitaMeteo(luogo);
-    } catch (e) {
-      console.log('Errore meteo:', e);
-
-      setMeteoErrore(
-        'Non riesco a recuperare il meteo per questa zona.'
-      );
-
-      setMeteoServizio(null);
-    } finally {
-      setMeteoLoading(false);
-    }
-  };
-
-
-  /* ===== CONTATTI PERSONALI NUMERI UTILI ===== */
-  const [numeriUtiliPersonali, setNumeriUtiliPersonali] = useState({
-    salaOperativa: '',
-    responsabile: '',
-    referenteSito: '',
-    altro: '',
-  });
-
-  const [numeriUtiliPronti, setNumeriUtiliPronti] = useState(false);
-
-  useEffect(() => {
-    let attivo = true;
-
-    const caricaNumeriUtili = async () => {
-      try {
-        const dati = await AsyncStorage.getItem(
-          'vigilanza_contatti_lavoro'
-        );
-
-        if (attivo && dati) {
-          const parsed = JSON.parse(dati);
-
-          setNumeriUtiliPersonali((prev) => ({
-            ...prev,
-            ...parsed,
-          }));
-        }
-      } catch (e) {
-        console.log('Errore caricamento contatti lavoro:', e);
-      } finally {
-        if (attivo) {
-          setNumeriUtiliPronti(true);
-        }
-      }
-    };
-
-    caricaNumeriUtili();
-
-    return () => {
-      attivo = false;
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!numeriUtiliPronti) return;
-
-    AsyncStorage.setItem(
-      'vigilanza_contatti_lavoro',
-      JSON.stringify(numeriUtiliPersonali)
-    ).catch((e) => {
-      console.log('Errore salvataggio contatti lavoro:', e);
-    });
-  }, [numeriUtiliPersonali, numeriUtiliPronti]);
-
-  const chiamaNumeroUtile = async (numero) => {
+  const chiamaNumero = async (numero) => {
     const pulito = String(numero || '')
-      .trim()
       .replace(/[^\d+]/g, '');
 
     if (!pulito) {
       Alert.alert(
         'Numero mancante',
-        'Inserisci prima il numero di telefono.'
+        'Inserisci prima un numero di telefono.'
       );
       return;
     }
@@ -4497,37 +4279,61 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
 
   
   /* =====================================================
-     NUMERI UTILI - SAFE V1
+     NUMERI UTILI - PAGINA COMPLETA
      ===================================================== */
   if (screen === 'numeriUtili') {
-    const numeriEmergenza = [
+
+    const emergenze = [
       {
+        nome: 'Emergenza unica',
         numero: '112',
-        titolo: 'Emergenza unica',
-        testo: 'Numero Unico Europeo di Emergenza',
-        icona: 'shield-checkmark-outline',
-        colore: '#63E6FF',
-      },
-      {
-        numero: '113',
-        titolo: 'Polizia di Stato',
-        testo: 'Soccorso pubblico di polizia',
+        descrizione: 'Numero Unico Europeo di Emergenza',
         icona: 'shield-outline',
-        colore: '#8DAAFF',
+        colore: '#67E8FF',
       },
       {
+        nome: 'Polizia di Stato',
+        numero: '113',
+        descrizione: 'Soccorso pubblico di polizia',
+        icona: 'shield-checkmark-outline',
+        colore: '#7FA7FF',
+      },
+      {
+        nome: 'Vigili del Fuoco',
         numero: '115',
-        titolo: 'Vigili del Fuoco',
-        testo: 'Incendi e soccorso tecnico urgente',
+        descrizione: 'Incendi e soccorso tecnico urgente',
         icona: 'flame-outline',
-        colore: '#FF9A70',
+        colore: '#FF9B70',
       },
       {
+        nome: 'Emergenza sanitaria',
         numero: '118',
-        titolo: 'Emergenza sanitaria',
-        testo: 'Soccorso sanitario',
+        descrizione: 'Soccorso sanitario',
         icona: 'medkit-outline',
-        colore: '#62E7B0',
+        colore: '#5DE6B0',
+      },
+    ];
+
+    const personali = [
+      {
+        key: 'salaOperativa',
+        titolo: 'Sala Operativa',
+        icona: 'headset-outline',
+      },
+      {
+        key: 'responsabile',
+        titolo: 'Responsabile',
+        icona: 'person-outline',
+      },
+      {
+        key: 'referenteSito',
+        titolo: 'Referente sito',
+        icona: 'business-outline',
+      },
+      {
+        key: 'altro',
+        titolo: 'Altro contatto',
+        icona: 'add-circle-outline',
       },
     ];
 
@@ -4538,16 +4344,20 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
         <View
           style={{
             marginTop: 8,
-            marginBottom: 22,
+            marginBottom: 20,
             padding: 20,
+
             borderRadius: 27,
-            backgroundColor: 'rgba(16,32,71,0.95)',
+
+            backgroundColor: 'rgba(18,31,72,0.94)',
+
             borderWidth: 1,
-            borderColor: 'rgba(94,224,255,0.42)',
-            shadowColor: '#54E1FF',
+            borderColor: 'rgba(92,228,255,0.42)',
+
+            shadowColor: '#52E1FF',
             shadowOpacity: 0.16,
-            shadowRadius: 16,
-            shadowOffset: { width: 0, height: 6 },
+            shadowRadius: 17,
+            shadowOffset: { width: 0, height: 7 },
           }}
         >
           <View
@@ -4555,17 +4365,19 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
               width: 48,
               height: 48,
               borderRadius: 16,
+
               alignItems: 'center',
               justifyContent: 'center',
-              backgroundColor: 'rgba(55,185,220,0.14)',
+
+              backgroundColor: 'rgba(54,184,218,0.14)',
               borderWidth: 1,
-              borderColor: 'rgba(102,230,255,0.38)',
+              borderColor: 'rgba(96,229,255,0.38)',
             }}
           >
             <Ionicons
               name="call-outline"
               size={25}
-              color="#6DE8FF"
+              color="#6BE7FF"
             />
           </View>
 
@@ -4582,20 +4394,20 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
 
           <Text
             style={{
-              color: '#9CB7D1',
+              color: '#9EB8D3',
               fontSize: 12.5,
               fontWeight: '600',
               lineHeight: 18,
-              marginTop: 6,
+              marginTop: 5,
             }}
           >
-            Numeri di emergenza e contatti di servizio sempre a portata di mano.
+            Emergenze e contatti importanti sempre a portata di mano.
           </Text>
         </View>
 
         <Text
           style={{
-            color: '#74E4FF',
+            color: '#7EE5FF',
             fontSize: 10,
             fontWeight: '900',
             letterSpacing: 1.15,
@@ -4605,39 +4417,48 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
           EMERGENZE
         </Text>
 
-        {numeriEmergenza.map((item) => (
+        {emergenze.map((item) => (
           <TouchableOpacity
             key={item.numero}
-            activeOpacity={0.82}
-            onPress={() => chiamaNumeroUtile(item.numero)}
+            activeOpacity={0.80}
+            onPress={() => chiamaNumero(item.numero)}
             style={{
-              minHeight: 78,
+              minHeight: 76,
+
               flexDirection: 'row',
               alignItems: 'center',
-              marginBottom: 11,
+
+              marginBottom: 10,
               paddingHorizontal: 14,
               paddingVertical: 12,
+
               borderRadius: 21,
+
               backgroundColor:
                 item.numero === '112'
-                  ? 'rgba(15,59,88,0.96)'
+                  ? 'rgba(17,58,86,0.96)'
                   : 'rgba(11,29,61,0.94)',
+
               borderWidth: item.numero === '112' ? 1.4 : 1,
               borderColor: `${item.colore}70`,
+
               shadowColor: item.colore,
-              shadowOpacity: item.numero === '112' ? 0.22 : 0.08,
+              shadowOpacity: item.numero === '112' ? 0.24 : 0.08,
               shadowRadius: item.numero === '112' ? 13 : 8,
               shadowOffset: { width: 0, height: 4 },
             }}
           >
             <View
               style={{
-                width: 45,
-                height: 45,
+                width: 44,
+                height: 44,
                 borderRadius: 15,
+
                 alignItems: 'center',
                 justifyContent: 'center',
-                backgroundColor: 'rgba(34,58,97,0.84)',
+
+                backgroundColor: 'rgba(32,58,96,0.84)',
+
                 borderWidth: 1,
                 borderColor: `${item.colore}70`,
               }}
@@ -4662,7 +4483,7 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
                   fontWeight: '900',
                 }}
               >
-                {item.titolo}
+                {item.nome}
               </Text>
 
               <Text
@@ -4673,7 +4494,7 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
                   marginTop: 3,
                 }}
               >
-                {item.testo}
+                {item.descrizione}
               </Text>
             </View>
 
@@ -4685,7 +4506,7 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
               <Text
                 style={{
                   color: item.colore,
-                  fontSize: 20,
+                  fontSize: 19,
                   fontWeight: '900',
                 }}
               >
@@ -4694,7 +4515,7 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
 
               <Text
                 style={{
-                  color: '#718AA5',
+                  color: '#738DA8',
                   fontSize: 8,
                   fontWeight: '900',
                   letterSpacing: 0.7,
@@ -4707,47 +4528,62 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
           </TouchableOpacity>
         ))}
 
-        
+        <View
+          style={{
+            marginTop: 9,
+            marginBottom: 20,
+            padding: 12,
+
+            borderRadius: 17,
+
+            flexDirection: 'row',
+
+            backgroundColor: 'rgba(32,44,74,0.58)',
+
+            borderWidth: 1,
+            borderColor: 'rgba(94,119,162,0.20)',
+          }}
+        >
+          <Ionicons
+            name="information-circle-outline"
+            size={17}
+            color="#8FB7D8"
+          />
+
+          <Text
+            style={{
+              flex: 1,
+              color: '#849CB5',
+              fontSize: 9.5,
+              lineHeight: 14,
+              fontWeight: '600',
+              marginLeft: 8,
+            }}
+          >
+            In caso di emergenza usa preferibilmente il 112,
+            Numero Unico Europeo di Emergenza, dove disponibile.
+          </Text>
+        </View>
+
         <Text
           style={{
             color: '#91A7FF',
             fontSize: 10,
             fontWeight: '900',
             letterSpacing: 1.15,
-            marginTop: 12,
             marginBottom: 10,
           }}
         >
           CONTATTI DI LAVORO
         </Text>
 
-        {[
-          {
-            key: 'salaOperativa',
-            titolo: 'Sala Operativa',
-            icona: 'headset-outline',
-          },
-          {
-            key: 'responsabile',
-            titolo: 'Responsabile',
-            icona: 'person-outline',
-          },
-          {
-            key: 'referenteSito',
-            titolo: 'Referente sito',
-            icona: 'business-outline',
-          },
-          {
-            key: 'altro',
-            titolo: 'Altro contatto',
-            icona: 'add-circle-outline',
-          },
-        ].map((contatto) => (
+        {personali.map((item) => (
           <View
-            key={contatto.key}
+            key={item.key}
             style={{
               marginBottom: 11,
               padding: 14,
+
               borderRadius: 21,
 
               backgroundColor: 'rgba(13,29,63,0.93)',
@@ -4764,7 +4600,7 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
               }}
             >
               <Ionicons
-                name={contatto.icona}
+                name={item.icona}
                 size={18}
                 color="#8BA9FF"
               />
@@ -4778,7 +4614,7 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
                   letterSpacing: 0.35,
                 }}
               >
-                {contatto.titolo}
+                {item.titolo}
               </Text>
             </View>
 
@@ -4786,14 +4622,15 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
               style={{
                 flexDirection: 'row',
                 alignItems: 'center',
+                gap: 8,
               }}
             >
               <TextInput
-                value={numeriUtiliPersonali[contatto.key]}
+                value={numeriLavoro[item.key]}
                 onChangeText={(testo) =>
-                  setNumeriUtiliPersonali((prev) => ({
+                  setNumeriLavoro((prev) => ({
                     ...prev,
-                    [contatto.key]: testo,
+                    [item.key]: testo,
                   }))
                 }
                 keyboardType="phone-pad"
@@ -4823,38 +4660,37 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
               <TouchableOpacity
                 activeOpacity={0.80}
                 onPress={() =>
-                  chiamaNumeroUtile(
-                    numeriUtiliPersonali[contatto.key]
-                  )
+                  chiamaNumero(numeriLavoro[item.key])
                 }
                 style={{
                   width: 48,
                   height: 48,
-                  marginLeft: 9,
-
                   borderRadius: 16,
 
                   alignItems: 'center',
                   justifyContent: 'center',
 
-                  backgroundColor:
-                    numeriUtiliPersonali[contatto.key]
-                      ? 'rgba(22,132,157,0.94)'
-                      : 'rgba(45,67,89,0.50)',
+                  backgroundColor: numeriLavoro[item.key]
+                    ? '#127C96'
+                    : 'rgba(45,67,89,0.50)',
 
                   borderWidth: 1,
+                  borderColor: numeriLavoro[item.key]
+                    ? '#66E5FF'
+                    : 'rgba(92,120,145,0.30)',
 
-                  borderColor:
-                    numeriUtiliPersonali[contatto.key]
-                      ? '#66E5FF'
-                      : 'rgba(92,120,145,0.30)',
+                  shadowColor: '#54DFFF',
+                  shadowOpacity: numeriLavoro[item.key]
+                    ? 0.22
+                    : 0,
+                  shadowRadius: 8,
                 }}
               >
                 <Ionicons
                   name="call"
                   size={19}
                   color={
-                    numeriUtiliPersonali[contatto.key]
+                    numeriLavoro[item.key]
                       ? '#FFFFFF'
                       : '#647E94'
                   }
@@ -4864,1464 +4700,18 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
           </View>
         ))}
 
-        <View
+        <Text
           style={{
+            color: '#677E98',
+            fontSize: 9,
+            lineHeight: 14,
+            textAlign: 'center',
             marginTop: 5,
-            marginBottom: 14,
-            padding: 12,
-            borderRadius: 17,
-
-            flexDirection: 'row',
-            alignItems: 'center',
-
-            backgroundColor: 'rgba(20,38,67,0.65)',
-
-            borderWidth: 1,
-            borderColor: 'rgba(83,125,166,0.24)',
+            marginBottom: 12,
           }}
         >
-          <Ionicons
-            name="phone-portrait-outline"
-            size={17}
-            color="#72DFFF"
-          />
-
-          <Text
-            style={{
-              flex: 1,
-              color: '#809AB4',
-              fontSize: 9.5,
-              lineHeight: 14,
-              fontWeight: '600',
-              marginLeft: 9,
-            }}
-          >
-            I contatti personali vengono salvati automaticamente
-            su questo dispositivo.
-          </Text>
-        </View>
-
-      </Screen>
-    );
-  }
-
-
-
-  /* =====================================================
-     METEO SERVIZIO - V1
-     ===================================================== */
-  if (screen === 'meteoServizio') {
-
-    const zonaMeteo =
-      localitaMeteo.trim() ||
-      profilo?.sede ||
-      sedeDraft ||
-      '';
-
-    const codiceMeteo = meteoServizio?.current?.weather_code;
-
-    const descrizioneMeteo = (codice) => {
-      if (codice === 0) return 'Sereno';
-      if ([1, 2].includes(codice)) return 'Poco nuvoloso';
-      if (codice === 3) return 'Nuvoloso';
-      if ([45, 48].includes(codice)) return 'Nebbia';
-      if ([51, 53, 55, 56, 57].includes(codice)) return 'Pioviggine';
-      if ([61, 63, 65, 66, 67].includes(codice)) return 'Pioggia';
-      if ([71, 73, 75, 77].includes(codice)) return 'Neve';
-      if ([80, 81, 82].includes(codice)) return 'Rovesci';
-      if ([85, 86].includes(codice)) return 'Rovesci di neve';
-      if ([95, 96, 99].includes(codice)) return 'Temporale';
-      return 'Condizioni variabili';
-    };
-
-    const iconaMeteo = (codice) => {
-      if (codice === 0) return 'sunny-outline';
-      if ([1, 2].includes(codice)) return 'partly-sunny-outline';
-      if ([3, 45, 48].includes(codice)) return 'cloud-outline';
-      if ([51,53,55,56,57,61,63,65,66,67,80,81,82].includes(codice))
-        return 'rainy-outline';
-      if ([71,73,75,77,85,86].includes(codice))
-        return 'snow-outline';
-      if ([95,96,99].includes(codice))
-        return 'thunderstorm-outline';
-      return 'partly-sunny-outline';
-    };
-
-
-    /* ===== PREVISIONE PROSSIMO SERVIZIO ===== */
-
-    const adessoServizio = new Date();
-
-    const prossimiServiziMeteo = (turniMese || [])
-      .filter((r) =>
-        r?.tipo === 'turno' &&
-        r?.inizio &&
-        r?.giorno
-      )
-      .map((r) => {
-        const [hi, mi] = String(r.inizio)
-          .split(':')
-          .map(Number);
-
-        const [hf, mf] = String(r.fine || r.inizio)
-          .split(':')
-          .map(Number);
-
-        let inizioTurno = new Date(
-          adessoServizio.getFullYear(),
-          adessoServizio.getMonth(),
-          Number(r.giorno),
-          Number.isFinite(hi) ? hi : 0,
-          Number.isFinite(mi) ? mi : 0,
-          0,
-          0
-        );
-
-        /*
-          Se il record possiede una data completa, la preferiamo.
-          Così la funzione resta compatibile anche con eventuali
-          turni salvati con data ISO.
-        */
-        if (r.data) {
-          const dataRecord = new Date(r.data);
-
-          if (!Number.isNaN(dataRecord.getTime())) {
-            inizioTurno = new Date(
-              dataRecord.getFullYear(),
-              dataRecord.getMonth(),
-              dataRecord.getDate(),
-              Number.isFinite(hi) ? hi : 0,
-              Number.isFinite(mi) ? mi : 0,
-              0,
-              0
-            );
-          }
-        }
-
-        const fineTurno = new Date(inizioTurno);
-
-        fineTurno.setHours(
-          Number.isFinite(hf) ? hf : 0,
-          Number.isFinite(mf) ? mf : 0,
-          0,
-          0
-        );
-
-        /*
-          Turno notturno:
-          23:30 → 05:30 = giorno successivo.
-        */
-        if (fineTurno <= inizioTurno) {
-          fineTurno.setDate(fineTurno.getDate() + 1);
-        }
-
-        return {
-          turno: r,
-          inizio: inizioTurno,
-          fine: fineTurno,
-        };
-      })
-      .filter((x) => x.fine >= adessoServizio)
-      .sort((a, b) => a.inizio - b.inizio);
-
-    const prossimoServizioMeteo =
-      prossimiServiziMeteo.length > 0
-        ? prossimiServiziMeteo[0]
-        : null;
-
-    /*
-      Il turno possiede già il campo "luogo".
-      Se è valorizzato lo usiamo direttamente per il Meteo.
-    */
-    const luogoRealeProssimoTurno =
-      prossimoServizioMeteo?.turno?.luogo &&
-      String(prossimoServizioMeteo.turno.luogo).trim() &&
-      String(prossimoServizioMeteo.turno.luogo).trim().toLowerCase() !==
-        'servizio'
-        ? String(prossimoServizioMeteo.turno.luogo).trim()
-        : '';
-
-    const zonaMeteoEffettiva =
-      luogoRealeProssimoTurno ||
-      localitaMeteo.trim() ||
-      zonaMeteo;
-
-
-    const chiaveProssimoServizioMeteo =
-      prossimoServizioMeteo
-        ? [
-            prossimoServizioMeteo.inizio
-              .getFullYear(),
-            String(
-              prossimoServizioMeteo.inizio.getMonth() + 1
-            ).padStart(2, '0'),
-            String(
-              prossimoServizioMeteo.inizio.getDate()
-            ).padStart(2, '0'),
-            prossimoServizioMeteo.turno.inizio || '',
-            prossimoServizioMeteo.turno.fine || '',
-          ].join('_')
-        : '';
-
-    const luogoAssociatoProssimoTurno =
-      chiaveProssimoServizioMeteo
-        ? luoghiTurniMeteo[
-            chiaveProssimoServizioMeteo
-          ] || ''
-        : '';
-
-
-
-
-    const formattaDataServizio = (data) => {
-      if (!data) return '';
-
-      try {
-        return data.toLocaleDateString('it-IT', {
-          weekday: 'long',
-          day: 'numeric',
-          month: 'long',
-        });
-      } catch {
-        return '';
-      }
-    };
-
-    const orePrevisioneServizio = (() => {
-      if (
-        !prossimoServizioMeteo ||
-        !meteoServizio?.hourly?.time
-      ) {
-        return [];
-      }
-
-      const tempi = meteoServizio.hourly.time || [];
-
-      return tempi
-        .map((tempo, index) => ({
-          tempo: new Date(tempo),
-
-          temperatura:
-            meteoServizio.hourly.temperature_2m?.[index],
-
-          percepita:
-            meteoServizio.hourly.apparent_temperature?.[index],
-
-          pioggia:
-            meteoServizio.hourly
-              .precipitation_probability?.[index],
-
-          precipitazioni:
-            meteoServizio.hourly.precipitation?.[index],
-
-          vento:
-            meteoServizio.hourly.wind_speed_10m?.[index],
-
-          codice:
-            meteoServizio.hourly.weather_code?.[index],
-        }))
-        .filter((x) =>
-          !Number.isNaN(x.tempo.getTime()) &&
-          x.tempo >= prossimoServizioMeteo.inizio &&
-          x.tempo <= prossimoServizioMeteo.fine
-        );
-    })();
-
-    const previsioneTurno = (() => {
-      if (!orePrevisioneServizio.length) {
-        return null;
-      }
-
-      const primo = orePrevisioneServizio[0];
-      const ultimo =
-        orePrevisioneServizio[
-          orePrevisioneServizio.length - 1
-        ];
-
-      const pioggiaMax = Math.max(
-        ...orePrevisioneServizio.map(
-          (x) => Number(x.pioggia) || 0
-        )
-      );
-
-      const ventoMax = Math.max(
-        ...orePrevisioneServizio.map(
-          (x) => Number(x.vento) || 0
-        )
-      );
-
-      const precipitazioniMax = Math.max(
-        ...orePrevisioneServizio.map(
-          (x) => Number(x.precipitazioni) || 0
-        )
-      );
-
-      const oraPioggia = orePrevisioneServizio.find(
-        (x) => Number(x.pioggia) >= 50
-      );
-
-      let avviso = 'Condizioni regolari previste durante il servizio.';
-
-      if (pioggiaMax >= 70) {
-        avviso = oraPioggia
-          ? `Pioggia probabile dalle ${String(
-              oraPioggia.tempo.getHours()
-            ).padStart(2, '0')}:00`
-          : 'Pioggia probabile durante il servizio.';
-      } else if (pioggiaMax >= 40) {
-        avviso =
-          'Possibili precipitazioni durante il servizio.';
-      }
-
-      if (ventoMax >= 40) {
-        avviso =
-          'Attenzione: vento sostenuto previsto durante il servizio.';
-      }
-
-      return {
-        temperaturaInizio:
-          Number.isFinite(Number(primo.temperatura))
-            ? Math.round(Number(primo.temperatura))
-            : null,
-
-        temperaturaFine:
-          Number.isFinite(Number(ultimo.temperatura))
-            ? Math.round(Number(ultimo.temperatura))
-            : null,
-
-        percepita:
-          Number.isFinite(Number(primo.percepita))
-            ? Math.round(Number(primo.percepita))
-            : null,
-
-        pioggiaMax: Math.round(pioggiaMax),
-
-        ventoMax: Math.round(ventoMax),
-
-        precipitazioniMax,
-
-        codice: primo.codice,
-
-        avviso,
-      };
-    })();
-
-    return (
-      <Screen>
-        <Back onPress={() => setScreen('strumenti')} />
-
-        <View
-          style={{
-            marginTop: 8,
-            paddingHorizontal: 20,
-            paddingVertical: 18,
-            borderRadius: 26,
-            marginBottom: 18,
-
-            backgroundColor: 'rgba(12,31,68,0.94)',
-
-            borderWidth: 1,
-            borderColor: 'rgba(94,212,255,0.28)',
-
-            shadowColor: '#4CDFFF',
-            shadowOpacity: 0.12,
-            shadowRadius: 15,
-            shadowOffset: { width: 0, height: 6 },
-          }}
-        >
-          <Text
-            style={{
-              color: '#6EE6FF',
-              fontSize: 10,
-              fontWeight: '900',
-              letterSpacing: 1.3,
-            }}
-          >
-            METEO DEL SERVIZIO
-          </Text>
-
-          <Text
-            style={{
-              color: '#FFFFFF',
-              fontSize: 27,
-              fontWeight: '900',
-              marginTop: 6,
-            }}
-          >
-            Condizioni operative
-          </Text>
-
-          <View
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              marginTop: 10,
-            }}
-          >
-            <Ionicons
-              name="location-outline"
-              size={16}
-              color="#78DFFF"
-            />
-
-            <Text
-              style={{
-                color: '#A7C0D9',
-                fontSize: 12,
-                fontWeight: '700',
-                marginLeft: 5,
-                flex: 1,
-              }}
-            >
-              {zonaMeteo || 'Zona operativa non impostata'}
-            </Text>
-          </View>
-        </View>
-
-
-        {/* ===== PROSSIMO SERVIZIO ===== */}
-        <View
-          style={{
-            marginBottom: 18,
-            padding: 18,
-            borderRadius: 26,
-
-            backgroundColor: 'rgba(9,27,59,0.96)',
-
-            borderWidth: 1,
-            borderColor: 'rgba(90,205,255,0.25)',
-
-            shadowColor: '#54DFFF',
-            shadowOpacity: 0.14,
-            shadowRadius: 14,
-            shadowOffset: { width: 0, height: 5 },
-          }}
-        >
-          <View
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              marginBottom: 12,
-            }}
-          >
-            <View
-              style={{
-                width: 39,
-                height: 39,
-                borderRadius: 13,
-
-                alignItems: 'center',
-                justifyContent: 'center',
-
-                backgroundColor: 'rgba(51,171,218,0.14)',
-
-                borderWidth: 1,
-                borderColor: 'rgba(94,222,255,0.32)',
-              }}
-            >
-              <Ionicons
-                name="calendar-outline"
-                size={20}
-                color="#6FE4FF"
-              />
-            </View>
-
-            <View
-              style={{
-                flex: 1,
-                marginLeft: 11,
-              }}
-            >
-              <Text
-                style={{
-                  color: '#70DFFF',
-                  fontSize: 9,
-                  fontWeight: '900',
-                  letterSpacing: 1.1,
-                }}
-              >
-                PROSSIMO SERVIZIO
-              </Text>
-
-              <Text
-                style={{
-                  color: '#FFFFFF',
-                  fontSize: 14,
-                  fontWeight: '900',
-                  marginTop: 3,
-                  textTransform: 'capitalize',
-                }}
-              >
-                {prossimoServizioMeteo
-                  ? formattaDataServizio(
-                      prossimoServizioMeteo.inizio
-                    )
-                  : 'Nessun turno futuro'}
-              </Text>
-            </View>
-          </View>
-
-          {prossimoServizioMeteo ? (
-            <>
-              <View
-                style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-
-                  paddingVertical: 10,
-                  paddingHorizontal: 12,
-
-                  borderRadius: 16,
-
-                  backgroundColor: 'rgba(4,18,40,0.72)',
-                }}
-              >
-                <Ionicons
-                  name="time-outline"
-                  size={18}
-                  color="#9DBBFF"
-                />
-
-                <Text
-                  style={{
-                    color: '#DDE8FF',
-                    fontSize: 13,
-                    fontWeight: '900',
-                    marginLeft: 7,
-                  }}
-                >
-                  {prossimoServizioMeteo.turno.inizio}
-                  {'  →  '}
-                  {prossimoServizioMeteo.turno.fine}
-                </Text>
-
-                <View style={{ flex: 1 }} />
-
-                {prossimoServizioMeteo.fine.getDate() !==
-                prossimoServizioMeteo.inizio.getDate() ? (
-                  <View
-                    style={{
-                      paddingHorizontal: 8,
-                      paddingVertical: 4,
-                      borderRadius: 9,
-
-                      backgroundColor:
-                        'rgba(123,91,221,0.18)',
-
-                      borderWidth: 1,
-                      borderColor:
-                        'rgba(169,139,255,0.32)',
-                    }}
-                  >
-                    <Text
-                      style={{
-                        color: '#C4AEFF',
-                        fontSize: 8,
-                        fontWeight: '900',
-                      }}
-                    >
-                      NOTTURNO
-                    </Text>
-                  </View>
-                ) : null}
-              </View>
-
-
-              <View
-                style={{
-                  marginTop: 10,
-                  padding: 12,
-                  borderRadius: 16,
-
-                  flexDirection: 'row',
-                  alignItems: 'center',
-
-                  backgroundColor:
-                    luogoAssociatoProssimoTurno
-                      ? 'rgba(19,72,83,0.56)'
-                      : 'rgba(35,43,67,0.62)',
-
-                  borderWidth: 1,
-
-                  borderColor:
-                    luogoAssociatoProssimoTurno
-                      ? 'rgba(89,224,209,0.28)'
-                      : 'rgba(93,116,148,0.20)',
-                }}
-              >
-                <Ionicons
-                  name="location-outline"
-                  size={17}
-                  color={
-                    luogoAssociatoProssimoTurno
-                      ? '#63E4CF'
-                      : '#8299B4'
-                  }
-                />
-
-                <View
-                  style={{
-                    flex: 1,
-                    marginLeft: 8,
-                  }}
-                >
-                  <Text
-                    style={{
-                      color: '#6F8DA8',
-                      fontSize: 8,
-                      fontWeight: '900',
-                      letterSpacing: 0.8,
-                    }}
-                  >
-                    LUOGO DEL SERVIZIO
-                  </Text>
-
-                  <Text
-                    style={{
-                      color: '#FFFFFF',
-                      fontSize: 11,
-                      fontWeight: '900',
-                      marginTop: 3,
-                    }}
-                  >
-                    {luogoRealeProssimoTurno ||
-                      luogoAssociatoProssimoTurno ||
-                      'Non indicato nel turno'}
-                  </Text>
-                </View>
-              </View>
-
-              {previsioneTurno ? (
-                <>
-                  <View
-                    style={{
-                      flexDirection: 'row',
-                      marginTop: 12,
-                    }}
-                  >
-                    <View
-                      style={{
-                        flex: 1,
-                        padding: 13,
-                        marginRight: 5,
-
-                        borderRadius: 17,
-
-                        backgroundColor:
-                          'rgba(25,53,90,0.68)',
-                      }}
-                    >
-                      <Text
-                        style={{
-                          color: '#7895B2',
-                          fontSize: 8,
-                          fontWeight: '900',
-                        }}
-                      >
-                        TEMPERATURA
-                      </Text>
-
-                      <Text
-                        style={{
-                          color: '#FFFFFF',
-                          fontSize: 20,
-                          fontWeight: '900',
-                          marginTop: 3,
-                        }}
-                      >
-                        {previsioneTurno.temperaturaInizio ?? '—'}°
-                        {' → '}
-                        {previsioneTurno.temperaturaFine ?? '—'}°
-                      </Text>
-                    </View>
-
-                    <View
-                      style={{
-                        flex: 1,
-                        padding: 13,
-                        marginLeft: 5,
-
-                        borderRadius: 17,
-
-                        backgroundColor:
-                          'rgba(25,53,90,0.68)',
-                      }}
-                    >
-                      <Text
-                        style={{
-                          color: '#7895B2',
-                          fontSize: 8,
-                          fontWeight: '900',
-                        }}
-                      >
-                        PIOGGIA MAX
-                      </Text>
-
-                      <Text
-                        style={{
-                          color: '#6FE4FF',
-                          fontSize: 20,
-                          fontWeight: '900',
-                          marginTop: 3,
-                        }}
-                      >
-                        {previsioneTurno.pioggiaMax}%
-                      </Text>
-                    </View>
-                  </View>
-
-                  <View
-                    style={{
-                      flexDirection: 'row',
-                      alignItems: 'center',
-
-                      marginTop: 10,
-                      padding: 13,
-
-                      borderRadius: 17,
-
-                      backgroundColor:
-                        previsioneTurno.pioggiaMax >= 50 ||
-                        previsioneTurno.ventoMax >= 40
-                          ? 'rgba(70,48,27,0.65)'
-                          : 'rgba(20,65,65,0.52)',
-
-                      borderWidth: 1,
-
-                      borderColor:
-                        previsioneTurno.pioggiaMax >= 50 ||
-                        previsioneTurno.ventoMax >= 40
-                          ? 'rgba(255,184,91,0.30)'
-                          : 'rgba(82,224,191,0.25)',
-                    }}
-                  >
-                    <Ionicons
-                      name={
-                        previsioneTurno.pioggiaMax >= 50 ||
-                        previsioneTurno.ventoMax >= 40
-                          ? 'warning-outline'
-                          : 'checkmark-circle-outline'
-                      }
-                      size={18}
-                      color={
-                        previsioneTurno.pioggiaMax >= 50 ||
-                        previsioneTurno.ventoMax >= 40
-                          ? '#FFBD6A'
-                          : '#62E1B9'
-                      }
-                    />
-
-                    <Text
-                      style={{
-                        flex: 1,
-                        marginLeft: 8,
-
-                        color: '#DDE7EE',
-                        fontSize: 10,
-                        fontWeight: '800',
-                        lineHeight: 15,
-                      }}
-                    >
-                      {previsioneTurno.avviso}
-                    </Text>
-                  </View>
-
-                  <View
-                    style={{
-                      flexDirection: 'row',
-                      alignItems: 'center',
-
-                      marginTop: 9,
-                    }}
-                  >
-                    <Ionicons
-                      name="navigate-outline"
-                      size={15}
-                      color="#70CFC0"
-                    />
-
-                    <Text
-                      style={{
-                        color: '#7996AE',
-                        fontSize: 9.5,
-                        fontWeight: '700',
-                        marginLeft: 5,
-                      }}
-                    >
-                      Vento max {previsioneTurno.ventoMax} km/h
-                    </Text>
-
-                    <Text
-                      style={{
-                        color: '#48637A',
-                        marginHorizontal: 7,
-                      }}
-                    >
-                      •
-                    </Text>
-
-                    <Ionicons
-                      name="thermometer-outline"
-                      size={15}
-                      color="#9EAFFF"
-                    />
-
-                    <Text
-                      style={{
-                        color: '#7996AE',
-                        fontSize: 9.5,
-                        fontWeight: '700',
-                        marginLeft: 4,
-                      }}
-                    >
-                      Percepita {previsioneTurno.percepita ?? '—'}°
-                    </Text>
-                  </View>
-                </>
-              ) : meteoServizio ? (
-                <View
-                  style={{
-                    marginTop: 11,
-                    padding: 12,
-                    borderRadius: 16,
-
-                    backgroundColor:
-                      'rgba(44,47,71,0.65)',
-                  }}
-                >
-                  <Text
-                    style={{
-                      color: '#96A8BC',
-                      fontSize: 9.5,
-                      fontWeight: '700',
-                      lineHeight: 14,
-                    }}
-                  >
-                    La previsione oraria di questo turno non è
-                    ancora disponibile. Le previsioni dettagliate
-                    vengono mostrate quando il servizio rientra
-                    nell'intervallo disponibile.
-                  </Text>
-                </View>
-              ) : (
-                <Text
-                  style={{
-                    color: '#738DA8',
-                    fontSize: 9.5,
-                    fontWeight: '700',
-                    lineHeight: 14,
-                    marginTop: 11,
-                  }}
-                >
-                  Carica il meteo per vedere la previsione
-                  specifica durante le ore del turno.
-                </Text>
-              )}
-            </>
-          ) : (
-            <Text
-              style={{
-                color: '#748DA6',
-                fontSize: 10,
-                lineHeight: 15,
-                fontWeight: '700',
-              }}
-            >
-              Non risultano turni futuri nel periodo attualmente
-              caricato nell'app.
-            </Text>
-          )}
-        </View>
-
-        {!zonaMeteo ? (
-          <View
-            style={{
-              padding: 18,
-              borderRadius: 22,
-              backgroundColor: 'rgba(66,45,20,0.75)',
-              borderWidth: 1,
-              borderColor: 'rgba(255,184,78,0.35)',
-            }}
-          >
-            <Ionicons
-              name="warning-outline"
-              size={24}
-              color="#FFBD65"
-            />
-
-            <Text
-              style={{
-                color: '#FFFFFF',
-                fontSize: 15,
-                fontWeight: '900',
-                marginTop: 9,
-              }}
-            >
-              Zona mancante
-            </Text>
-
-            <Text
-              style={{
-                color: '#CDBA9A',
-                fontSize: 11,
-                lineHeight: 17,
-                marginTop: 5,
-              }}
-            >
-              Inserisci la tua zona operativa nel profilo per ricevere
-              le previsioni meteo del servizio.
-            </Text>
-          </View>
-        ) : (
-          <>
-
-            <View
-              style={{
-                marginBottom: 14,
-                padding: meteoServizio ? 11 : 15,
-                borderRadius: 22,
-                backgroundColor: 'rgba(8,24,52,0.82)',
-                borderWidth: 1,
-                borderColor: 'rgba(82,170,220,0.22)',
-              }}
-            >
-              <Text
-                style={{
-                  color: meteoServizio ? '#6D8CA7' : '#7EDFFF',
-                  fontSize: 9,
-                  fontWeight: '900',
-                  letterSpacing: 1,
-                  marginBottom: 7,
-                }}
-              >
-                LOCALITÀ METEO
-              </Text>
-
-
-              {!meteoServizio && recentiMeteo.length > 0 ? (
-                <View
-                  style={{
-                    marginBottom: 10,
-                  }}
-                >
-                  <Text
-                    style={{
-                      color: '#6D8CA7',
-                      fontSize: 8,
-                      fontWeight: '900',
-                      letterSpacing: 0.8,
-                      marginBottom: 7,
-                    }}
-                  >
-                    ULTIME LOCALITÀ
-                  </Text>
-
-                  <View
-                    style={{
-                      flexDirection: 'row',
-                      flexWrap: 'wrap',
-                    }}
-                  >
-                    {recentiMeteo.map((localita) => (
-                      <TouchableOpacity
-                        key={localita}
-                        activeOpacity={0.78}
-                        onPress={() =>
-                          setLocalitaMeteo(localita)
-                        }
-                        style={{
-                          marginRight: 7,
-                          marginBottom: 7,
-                          paddingHorizontal: 11,
-                          paddingVertical: 7,
-
-                          borderRadius: 13,
-
-                          flexDirection: 'row',
-                          alignItems: 'center',
-
-                          backgroundColor:
-                            localitaMeteo
-                              .trim()
-                              .toLowerCase() ===
-                            String(localita)
-                              .trim()
-                              .toLowerCase()
-                              ? 'rgba(31,132,164,0.34)'
-                              : 'rgba(17,41,73,0.82)',
-
-                          borderWidth: 1,
-
-                          borderColor:
-                            localitaMeteo
-                              .trim()
-                              .toLowerCase() ===
-                            String(localita)
-                              .trim()
-                              .toLowerCase()
-                              ? 'rgba(100,226,255,0.64)'
-                              : 'rgba(76,136,183,0.30)',
-                        }}
-                      >
-                        <Ionicons
-                          name="location-outline"
-                          size={12}
-                          color={
-                            localitaMeteo
-                              .trim()
-                              .toLowerCase() ===
-                            String(localita)
-                              .trim()
-                              .toLowerCase()
-                              ? '#72E5FF'
-                              : '#7697B3'
-                          }
-                        />
-
-                        <Text
-                          style={{
-                            color:
-                              localitaMeteo
-                                .trim()
-                                .toLowerCase() ===
-                              String(localita)
-                                .trim()
-                                .toLowerCase()
-                                ? '#E8FAFF'
-                                : '#9CB2C6',
-
-                            fontSize: 9.5,
-                            fontWeight: '800',
-                            marginLeft: 4,
-                          }}
-                        >
-                          {localita}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                </View>
-              ) : null}
-
-              <TextInput
-                value={localitaMeteo}
-                onChangeText={setLocalitaMeteo}
-                placeholder="Es. Fiumicino, Roma, Ciampino..."
-                placeholderTextColor="#607B98"
-                autoCapitalize="words"
-                style={{
-                  minHeight: meteoServizio ? 42 : 48,
-                  color: '#FFFFFF',
-                  paddingHorizontal: 14,
-                  paddingVertical: meteoServizio ? 8 : 11,
-                  borderRadius: 16,
-                  backgroundColor: 'rgba(4,15,34,0.88)',
-                  borderWidth: 1,
-                  borderColor: 'rgba(91,169,214,0.26)',
-                  fontSize: 14,
-                  fontWeight: '800',
-                }}
-              />
-
-              {!meteoServizio ? (
-                <Text
-                  style={{
-                    color: '#6E879F',
-                    fontSize: 8.5,
-                    lineHeight: 13,
-                    marginTop: 7,
-                    fontWeight: '600',
-                  }}
-                >
-                  Se la sede è un nome interno, inserisci qui la città
-                  reale da usare per le previsioni.
-                </Text>
-              ) : null}
-            </View>
-
-
-            {prossimoServizioMeteo ? (
-              <TouchableOpacity
-                activeOpacity={0.80}
-                onPress={() =>
-                  salvaLuogoTurnoMeteo(
-                    chiaveProssimoServizioMeteo,
-                    localitaMeteo
-                  )
-                }
-                style={{
-                  minHeight: 44,
-                  marginBottom: 10,
-
-                  borderRadius: 16,
-
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-
-                  backgroundColor:
-                    meteoServizio
-                      ? 'rgba(16,43,55,0.38)'
-                      : 'rgba(20,55,70,0.55)',
-
-                  borderWidth: 1,
-                  borderColor:
-                    'rgba(83,201,191,0.24)',
-                }}
-              >
-                <Ionicons
-                  name="link-outline"
-                  size={17}
-                  color="#62E1CF"
-                />
-
-                <Text
-                  style={{
-                    color: '#DFFFFA',
-                    fontSize: 10,
-                    fontWeight: '900',
-                    letterSpacing: 0.45,
-                    marginLeft: 7,
-                  }}
-                >
-                  ASSOCIA AL PROSSIMO TURNO
-                </Text>
-              </TouchableOpacity>
-            ) : null}
-
-            <TouchableOpacity
-              activeOpacity={0.82}
-              onPress={() => caricaMeteoServizio(zonaMeteoEffettiva)}
-              disabled={meteoLoading}
-              style={{
-                minHeight: 56,
-                borderRadius: 19,
-
-                alignItems: 'center',
-                justifyContent: 'center',
-
-                backgroundColor: 'rgba(22,139,176,0.96)',
-
-                borderWidth: 1,
-                borderColor: 'rgba(109,232,255,0.78)',
-
-                shadowColor: '#52DFFF',
-                shadowOpacity: 0.24,
-                shadowRadius: 12,
-                shadowOffset: { width: 0, height: 5 },
-
-                marginBottom: 17,
-              }}
-            >
-              <Text
-                style={{
-                  color: '#FFFFFF',
-                  fontSize: 12,
-                  fontWeight: '900',
-                  letterSpacing: 0.5,
-                }}
-              >
-                {meteoLoading
-                  ? 'AGGIORNAMENTO...'
-                  : meteoServizio
-                    ? '↻ AGGIORNA METEO'
-                    : '🌦 CARICA METEO'}
-              </Text>
-            </TouchableOpacity>
-
-            {meteoErrore ? (
-              <View
-                style={{
-                  padding: 14,
-                  borderRadius: 18,
-                  marginBottom: 14,
-                  backgroundColor: 'rgba(77,34,39,0.70)',
-                  borderWidth: 1,
-                  borderColor: 'rgba(255,102,113,0.35)',
-                }}
-              >
-                <Text
-                  style={{
-                    color: '#FF9DA6',
-                    fontSize: 11,
-                    fontWeight: '800',
-                  }}
-                >
-                  {meteoErrore}
-                </Text>
-              </View>
-            ) : null}
-
-            {meteoServizio?.current ? (
-              <>
-                <View
-                  style={{
-                    padding: 20,
-                    borderRadius: 26,
-                    marginBottom: 12,
-
-                    backgroundColor: 'rgba(10,29,61,0.96)',
-
-                    borderWidth: 1,
-                    borderColor: 'rgba(91,207,255,0.38)',
-                  }}
-                >
-                  <View
-                    style={{
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                    }}
-                  >
-                    <View
-                      style={{
-                        width: 64,
-                        height: 64,
-                        borderRadius: 21,
-
-                        alignItems: 'center',
-                        justifyContent: 'center',
-
-                        backgroundColor: 'rgba(50,171,219,0.15)',
-
-                        borderWidth: 1,
-                        borderColor: 'rgba(94,222,255,0.40)',
-                      }}
-                    >
-                      <Ionicons
-                        name={iconaMeteo(codiceMeteo)}
-                        size={34}
-                        color="#72E5FF"
-                      />
-                    </View>
-
-                    <View
-                      style={{
-                        flex: 1,
-                        marginLeft: 15,
-                      }}
-                    >
-                      <Text
-                        style={{
-                          color: '#FFFFFF',
-                          fontSize: 36,
-                          fontWeight: '900',
-                        }}
-                      >
-                        {Math.round(
-                          meteoServizio.current.temperature_2m
-                        )}°
-                      </Text>
-
-                      <Text
-                        style={{
-                          color: '#A8C3DA',
-                          fontSize: 13,
-                          fontWeight: '800',
-                        }}
-                      >
-                        {descrizioneMeteo(codiceMeteo)}
-                      </Text>
-                    </View>
-                  </View>
-
-                  <Text
-                    style={{
-                      color: '#718EA9',
-                      fontSize: 10,
-                      fontWeight: '700',
-                      marginTop: 14,
-                    }}
-                  >
-                    {[
-                      meteoServizio.luogo?.name,
-                      meteoServizio.luogo?.admin1,
-                    ]
-                      .filter(Boolean)
-                      .join(' · ')}
-                  </Text>
-                </View>
-
-                <View
-                  style={{
-                    flexDirection: 'row',
-                    flexWrap: 'wrap',
-                    justifyContent: 'space-between',
-                  }}
-                >
-                  <View
-                    style={{
-                      width: '48.5%',
-                      padding: 15,
-                      borderRadius: 20,
-                      marginBottom: 10,
-
-                      backgroundColor: 'rgba(12,31,63,0.94)',
-                      borderWidth: 1,
-                      borderColor: 'rgba(111,142,214,0.30)',
-                    }}
-                  >
-                    <Ionicons
-                      name="thermometer-outline"
-                      size={20}
-                      color="#9CADFF"
-                    />
-
-                    <Text
-                      style={{
-                        color: '#8299B4',
-                        fontSize: 9,
-                        fontWeight: '900',
-                        marginTop: 8,
-                      }}
-                    >
-                      PERCEPITA
-                    </Text>
-
-                    <Text
-                      style={{
-                        color: '#FFFFFF',
-                        fontSize: 19,
-                        fontWeight: '900',
-                        marginTop: 2,
-                      }}
-                    >
-                      {Math.round(
-                        meteoServizio.current.apparent_temperature
-                      )}°
-                    </Text>
-                  </View>
-
-                  <View
-                    style={{
-                      width: '48.5%',
-                      padding: 15,
-                      borderRadius: 20,
-                      marginBottom: 10,
-
-                      backgroundColor: 'rgba(12,31,63,0.94)',
-                      borderWidth: 1,
-                      borderColor: 'rgba(91,209,255,0.30)',
-                    }}
-                  >
-                    <Ionicons
-                      name="rainy-outline"
-                      size={20}
-                      color="#67DFFF"
-                    />
-
-                    <Text
-                      style={{
-                        color: '#8299B4',
-                        fontSize: 9,
-                        fontWeight: '900',
-                        marginTop: 8,
-                      }}
-                    >
-                      PRECIPITAZIONI
-                    </Text>
-
-                    <Text
-                      style={{
-                        color: '#FFFFFF',
-                        fontSize: 19,
-                        fontWeight: '900',
-                        marginTop: 2,
-                      }}
-                    >
-                      {meteoServizio.current.precipitation ?? 0} mm
-                    </Text>
-                  </View>
-
-                  <View
-                    style={{
-                      width: '100%',
-                      padding: 15,
-                      borderRadius: 20,
-
-                      backgroundColor: 'rgba(12,31,63,0.94)',
-                      borderWidth: 1,
-                      borderColor: 'rgba(102,211,194,0.30)',
-
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                    }}
-                  >
-                    <Ionicons
-                      name="navigate-outline"
-                      size={21}
-                      color="#69E2C0"
-                    />
-
-                    <View
-                      style={{
-                        marginLeft: 11,
-                      }}
-                    >
-                      <Text
-                        style={{
-                          color: '#8299B4',
-                          fontSize: 9,
-                          fontWeight: '900',
-                        }}
-                      >
-                        VENTO
-                      </Text>
-
-                      <Text
-                        style={{
-                          color: '#FFFFFF',
-                          fontSize: 17,
-                          fontWeight: '900',
-                          marginTop: 2,
-                        }}
-                      >
-                        {Math.round(
-                          meteoServizio.current.wind_speed_10m
-                        )} km/h
-                      </Text>
-                    </View>
-                  </View>
-                </View>
-              </>
-            ) : null}
-          </>
-        )}
-
-        <View
-          style={{
-            marginTop: 16,
-            paddingHorizontal: 14,
-            paddingVertical: 12,
-            borderRadius: 17,
-
-            flexDirection: 'row',
-
-            backgroundColor: 'rgba(10,26,48,0.52)',
-            borderWidth: 1,
-            borderColor: 'rgba(78,112,145,0.16)',
-          }}
-        >
-          <Ionicons
-            name="information-circle-outline"
-            size={17}
-            color="#789BB9"
-          />
-
-          <Text
-            style={{
-              flex: 1,
-              marginLeft: 8,
-
-              color: '#768FA8',
-              fontSize: 9,
-              lineHeight: 14,
-              fontWeight: '600',
-            }}
-          >
-            Le previsioni meteo sono indicative. Per il servizio
-            fai sempre riferimento alle procedure operative previste.
-          </Text>
-        </View>
+          I contatti di lavoro vengono salvati solamente su questo dispositivo.
+        </Text>
       </Screen>
     );
   }
@@ -8384,61 +6774,15 @@ if (screen === 'profiloCollega') {
               </View>
             </View>
 
-            <View
-        style={{
-          marginTop: 4,
-          marginBottom: 8,
-        }}
-      >
-        <View
-          style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            marginBottom: 7,
-          }}
-        >
-          <Ionicons
-            name="location-outline"
-            size={17}
-            color="#69DFFF"
-          />
-
-          <View
-            style={{
-              marginLeft: 7,
-              flex: 1,
-            }}
-          >
-            <Text
-              style={{
-                color: '#DCEBFF',
-                fontSize: 11,
-                fontWeight: '900',
-                letterSpacing: 0.45,
-              }}
-            >
-              LUOGO DEL SERVIZIO
-            </Text>
-
-            <Text
-              style={{
-                color: '#718BA6',
-                fontSize: 8.5,
-                fontWeight: '700',
-                marginTop: 2,
-              }}
-            >
-              FACOLTATIVO · utile anche per il meteo
-            </Text>
-          </View>
-        </View>
-
-        <Field
-          label="ES. FIUMICINO, ROMA, CIAMPINO..."
-          value={luogo}
-          onChange={setLuogo}
-        />
-      </View>
+            <Field
+              label="POSTAZIONE"
+              value={
+                luogo
+              }
+              onChange={
+                setLuogo
+              }
+            />
 
             <Field
               label="ORE STRAORDINARIE"

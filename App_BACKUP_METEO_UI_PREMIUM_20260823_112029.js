@@ -5213,20 +5213,19 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
         <View
           style={{
             marginTop: 8,
-            paddingHorizontal: 20,
-            paddingVertical: 18,
-            borderRadius: 26,
-            marginBottom: 18,
+            padding: 20,
+            borderRadius: 28,
+            marginBottom: 16,
 
-            backgroundColor: 'rgba(12,31,68,0.94)',
+            backgroundColor: 'rgba(15,37,76,0.96)',
 
             borderWidth: 1,
-            borderColor: 'rgba(94,212,255,0.28)',
+            borderColor: 'rgba(89,221,255,0.44)',
 
-            shadowColor: '#4CDFFF',
-            shadowOpacity: 0.12,
-            shadowRadius: 15,
-            shadowOffset: { width: 0, height: 6 },
+            shadowColor: '#59DFFF',
+            shadowOpacity: 0.18,
+            shadowRadius: 18,
+            shadowOffset: { width: 0, height: 7 },
           }}
         >
           <Text
@@ -5282,19 +5281,19 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
         {/* ===== PROSSIMO SERVIZIO ===== */}
         <View
           style={{
-            marginBottom: 18,
-            padding: 18,
-            borderRadius: 26,
+            marginBottom: 15,
+            padding: 17,
+            borderRadius: 24,
 
-            backgroundColor: 'rgba(9,27,59,0.96)',
+            backgroundColor: 'rgba(10,31,62,0.96)',
 
             borderWidth: 1,
-            borderColor: 'rgba(90,205,255,0.25)',
+            borderColor: 'rgba(93,217,255,0.34)',
 
-            shadowColor: '#54DFFF',
-            shadowOpacity: 0.14,
-            shadowRadius: 14,
-            shadowOffset: { width: 0, height: 5 },
+            shadowColor: '#55DFFF',
+            shadowOpacity: 0.10,
+            shadowRadius: 10,
+            shadowOffset: { width: 0, height: 4 },
           }}
         >
           <View
@@ -5777,17 +5776,17 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
 
             <View
               style={{
-                marginBottom: 14,
-                padding: meteoServizio ? 11 : 15,
-                borderRadius: 22,
-                backgroundColor: 'rgba(8,24,52,0.82)',
+                marginBottom: 12,
+                padding: 13,
+                borderRadius: 19,
+                backgroundColor: 'rgba(10,26,55,0.92)',
                 borderWidth: 1,
-                borderColor: 'rgba(82,170,220,0.22)',
+                borderColor: 'rgba(94,188,229,0.32)',
               }}
             >
               <Text
                 style={{
-                  color: meteoServizio ? '#6D8CA7' : '#7EDFFF',
+                  color: '#7EDFFF',
                   fontSize: 9,
                   fontWeight: '900',
                   letterSpacing: 1,
@@ -5798,7 +5797,7 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
               </Text>
 
 
-              {!meteoServizio && recentiMeteo.length > 0 ? (
+              {recentiMeteo.length > 0 ? (
                 <View
                   style={{
                     marginBottom: 10,
@@ -5910,33 +5909,31 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
                 placeholderTextColor="#607B98"
                 autoCapitalize="words"
                 style={{
-                  minHeight: meteoServizio ? 42 : 48,
+                  minHeight: 46,
                   color: '#FFFFFF',
-                  paddingHorizontal: 14,
-                  paddingVertical: meteoServizio ? 8 : 11,
-                  borderRadius: 16,
-                  backgroundColor: 'rgba(4,15,34,0.88)',
+                  paddingHorizontal: 12,
+                  paddingVertical: 10,
+                  borderRadius: 15,
+                  backgroundColor: 'rgba(4,17,38,0.92)',
                   borderWidth: 1,
-                  borderColor: 'rgba(91,169,214,0.26)',
-                  fontSize: 14,
-                  fontWeight: '800',
+                  borderColor: 'rgba(83,153,205,0.38)',
+                  fontSize: 13,
+                  fontWeight: '700',
                 }}
               />
 
-              {!meteoServizio ? (
-                <Text
-                  style={{
-                    color: '#6E879F',
-                    fontSize: 8.5,
-                    lineHeight: 13,
-                    marginTop: 7,
-                    fontWeight: '600',
-                  }}
-                >
-                  Se la sede è un nome interno, inserisci qui la città
-                  reale da usare per le previsioni.
-                </Text>
-              ) : null}
+              <Text
+                style={{
+                  color: '#6E879F',
+                  fontSize: 8.5,
+                  lineHeight: 13,
+                  marginTop: 7,
+                  fontWeight: '600',
+                }}
+              >
+                Se la sede è un nome interno, inserisci qui la città
+                reale da usare per le previsioni.
+              </Text>
             </View>
 
 
@@ -5950,7 +5947,7 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
                   )
                 }
                 style={{
-                  minHeight: 44,
+                  minHeight: 46,
                   marginBottom: 10,
 
                   borderRadius: 16,
@@ -5960,13 +5957,11 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
                   justifyContent: 'center',
 
                   backgroundColor:
-                    meteoServizio
-                      ? 'rgba(16,43,55,0.38)'
-                      : 'rgba(20,55,70,0.55)',
+                    'rgba(31,75,91,0.72)',
 
                   borderWidth: 1,
                   borderColor:
-                    'rgba(83,201,191,0.24)',
+                    'rgba(91,220,207,0.32)',
                 }}
               >
                 <Ionicons
@@ -5994,23 +5989,18 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
               onPress={() => caricaMeteoServizio(zonaMeteoEffettiva)}
               disabled={meteoLoading}
               style={{
-                minHeight: 56,
-                borderRadius: 19,
+                minHeight: 52,
+                borderRadius: 18,
 
                 alignItems: 'center',
                 justifyContent: 'center',
 
-                backgroundColor: 'rgba(22,139,176,0.96)',
+                backgroundColor: 'rgba(21,126,157,0.94)',
 
                 borderWidth: 1,
-                borderColor: 'rgba(109,232,255,0.78)',
+                borderColor: '#69E4FF',
 
-                shadowColor: '#52DFFF',
-                shadowOpacity: 0.24,
-                shadowRadius: 12,
-                shadowOffset: { width: 0, height: 5 },
-
-                marginBottom: 17,
+                marginBottom: 15,
               }}
             >
               <Text
@@ -6289,16 +6279,15 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
 
         <View
           style={{
-            marginTop: 16,
-            paddingHorizontal: 14,
-            paddingVertical: 12,
-            borderRadius: 17,
+            marginTop: 15,
+            padding: 13,
+            borderRadius: 18,
 
             flexDirection: 'row',
 
-            backgroundColor: 'rgba(10,26,48,0.52)',
+            backgroundColor: 'rgba(18,36,62,0.67)',
             borderWidth: 1,
-            borderColor: 'rgba(78,112,145,0.16)',
+            borderColor: 'rgba(88,121,151,0.22)',
           }}
         >
           <Ionicons

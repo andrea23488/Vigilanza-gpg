@@ -265,167 +265,6 @@ useEffect(() => {
   const [meteoServizio, setMeteoServizio] = useState(null);
   const [meteoLoading, setMeteoLoading] = useState(false);
   const [meteoErrore, setMeteoErrore] = useState('');
-  const [localitaMeteo, setLocalitaMeteo] = useState('');
-
-  /* ===== LUOGO METEO ASSOCIATO AI TURNI ===== */
-  const [luoghiTurniMeteo, setLuoghiTurniMeteo] = useState({});
-
-  useEffect(() => {
-    let attivo = true;
-
-    (async () => {
-      try {
-        const dati = await AsyncStorage.getItem(
-          'vigilanza_luoghi_turni_meteo'
-        );
-
-        if (attivo && dati) {
-          const parsed = JSON.parse(dati);
-
-          if (
-            parsed &&
-            typeof parsed === 'object' &&
-            !Array.isArray(parsed)
-          ) {
-            setLuoghiTurniMeteo(parsed);
-          }
-        }
-      } catch (e) {
-        console.log(
-          'Errore caricamento luoghi turni meteo:',
-          e
-        );
-      }
-    })();
-
-    return () => {
-      attivo = false;
-    };
-  }, []);
-
-  const salvaLuogoTurnoMeteo = async (chiave, luogo) => {
-    const pulito = String(luogo || '').trim();
-
-    if (!chiave || !pulito) {
-      Alert.alert(
-        'Località mancante',
-        'Inserisci prima la località del servizio.'
-      );
-      return;
-    }
-
-    const nuovi = {
-      ...luoghiTurniMeteo,
-      [chiave]: pulito,
-    };
-
-    setLuoghiTurniMeteo(nuovi);
-    setLocalitaMeteo(pulito);
-
-    try {
-      await AsyncStorage.setItem(
-        'vigilanza_luoghi_turni_meteo',
-        JSON.stringify(nuovi)
-      );
-
-      Alert.alert(
-        'Località associata',
-        `${pulito} è stata associata a questo turno.`
-      );
-    } catch (e) {
-      console.log(
-        'Errore salvataggio luogo turno:',
-        e
-      );
-
-      Alert.alert(
-        'Errore',
-        'Non è stato possibile salvare la località.'
-      );
-    }
-  };
-
-
-  const [recentiMeteo, setRecentiMeteo] = useState([]);
-  const [meteoPreferenzeCaricate, setMeteoPreferenzeCaricate] =
-    useState(false);
-
-  /* ===== LOCALITÀ METEO RECENTI ===== */
-  useEffect(() => {
-    let attivo = true;
-
-    const caricaPreferenzeMeteo = async () => {
-      try {
-        const dati = await AsyncStorage.getItem(
-          'vigilanza_meteo_localita'
-        );
-
-        if (attivo && dati) {
-          const parsed = JSON.parse(dati);
-
-          if (Array.isArray(parsed?.recenti)) {
-            setRecentiMeteo(parsed.recenti.slice(0, 5));
-          }
-
-          if (
-            typeof parsed?.ultima === 'string' &&
-            parsed.ultima.trim()
-          ) {
-            setLocalitaMeteo(parsed.ultima.trim());
-          }
-        }
-      } catch (e) {
-        console.log(
-          'Errore caricamento località meteo:',
-          e
-        );
-      } finally {
-        if (attivo) {
-          setMeteoPreferenzeCaricate(true);
-        }
-      }
-    };
-
-    caricaPreferenzeMeteo();
-
-    return () => {
-      attivo = false;
-    };
-  }, []);
-
-  const salvaLocalitaMeteo = async (localita) => {
-    const pulita = String(localita || '').trim();
-
-    if (!pulita) return;
-
-    const nuoveRecenti = [
-      pulita,
-      ...recentiMeteo.filter(
-        (x) =>
-          String(x).toLowerCase() !==
-          pulita.toLowerCase()
-      ),
-    ].slice(0, 5);
-
-    setRecentiMeteo(nuoveRecenti);
-    setLocalitaMeteo(pulita);
-
-    try {
-      await AsyncStorage.setItem(
-        'vigilanza_meteo_localita',
-        JSON.stringify({
-          ultima: pulita,
-          recenti: nuoveRecenti,
-        })
-      );
-    } catch (e) {
-      console.log(
-        'Errore salvataggio località meteo:',
-        e
-      );
-    }
-  };
-
 
   const caricaMeteoServizio = async (zona) => {
     const luogo = String(zona || '').trim();
@@ -470,8 +309,6 @@ useEffect(() => {
         ...data,
         luogo: luogoTrovato,
       });
-
-      await salvaLocalitaMeteo(luogo);
     } catch (e) {
       console.log('Errore meteo:', e);
 
@@ -4913,7 +4750,6 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
   if (screen === 'meteoServizio') {
 
     const zonaMeteo =
-      localitaMeteo.trim() ||
       profilo?.sede ||
       sedeDraft ||
       '';
@@ -5028,50 +4864,6 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
       prossimiServiziMeteo.length > 0
         ? prossimiServiziMeteo[0]
         : null;
-
-    /*
-      Il turno possiede già il campo "luogo".
-      Se è valorizzato lo usiamo direttamente per il Meteo.
-    */
-    const luogoRealeProssimoTurno =
-      prossimoServizioMeteo?.turno?.luogo &&
-      String(prossimoServizioMeteo.turno.luogo).trim() &&
-      String(prossimoServizioMeteo.turno.luogo).trim().toLowerCase() !==
-        'servizio'
-        ? String(prossimoServizioMeteo.turno.luogo).trim()
-        : '';
-
-    const zonaMeteoEffettiva =
-      luogoRealeProssimoTurno ||
-      localitaMeteo.trim() ||
-      zonaMeteo;
-
-
-    const chiaveProssimoServizioMeteo =
-      prossimoServizioMeteo
-        ? [
-            prossimoServizioMeteo.inizio
-              .getFullYear(),
-            String(
-              prossimoServizioMeteo.inizio.getMonth() + 1
-            ).padStart(2, '0'),
-            String(
-              prossimoServizioMeteo.inizio.getDate()
-            ).padStart(2, '0'),
-            prossimoServizioMeteo.turno.inizio || '',
-            prossimoServizioMeteo.turno.fine || '',
-          ].join('_')
-        : '';
-
-    const luogoAssociatoProssimoTurno =
-      chiaveProssimoServizioMeteo
-        ? luoghiTurniMeteo[
-            chiaveProssimoServizioMeteo
-          ] || ''
-        : '';
-
-
-
 
     const formattaDataServizio = (data) => {
       if (!data) return '';
@@ -5213,20 +5005,19 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
         <View
           style={{
             marginTop: 8,
-            paddingHorizontal: 20,
-            paddingVertical: 18,
-            borderRadius: 26,
-            marginBottom: 18,
+            padding: 20,
+            borderRadius: 28,
+            marginBottom: 16,
 
-            backgroundColor: 'rgba(12,31,68,0.94)',
+            backgroundColor: 'rgba(15,37,76,0.96)',
 
             borderWidth: 1,
-            borderColor: 'rgba(94,212,255,0.28)',
+            borderColor: 'rgba(89,221,255,0.44)',
 
-            shadowColor: '#4CDFFF',
-            shadowOpacity: 0.12,
-            shadowRadius: 15,
-            shadowOffset: { width: 0, height: 6 },
+            shadowColor: '#59DFFF',
+            shadowOpacity: 0.18,
+            shadowRadius: 18,
+            shadowOffset: { width: 0, height: 7 },
           }}
         >
           <Text
@@ -5282,19 +5073,19 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
         {/* ===== PROSSIMO SERVIZIO ===== */}
         <View
           style={{
-            marginBottom: 18,
-            padding: 18,
-            borderRadius: 26,
+            marginBottom: 15,
+            padding: 17,
+            borderRadius: 24,
 
-            backgroundColor: 'rgba(9,27,59,0.96)',
+            backgroundColor: 'rgba(10,31,62,0.96)',
 
             borderWidth: 1,
-            borderColor: 'rgba(90,205,255,0.25)',
+            borderColor: 'rgba(93,217,255,0.34)',
 
-            shadowColor: '#54DFFF',
-            shadowOpacity: 0.14,
-            shadowRadius: 14,
-            shadowOffset: { width: 0, height: 5 },
+            shadowColor: '#55DFFF',
+            shadowOpacity: 0.10,
+            shadowRadius: 10,
+            shadowOffset: { width: 0, height: 4 },
           }}
         >
           <View
@@ -5424,71 +5215,6 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
                     </Text>
                   </View>
                 ) : null}
-              </View>
-
-
-              <View
-                style={{
-                  marginTop: 10,
-                  padding: 12,
-                  borderRadius: 16,
-
-                  flexDirection: 'row',
-                  alignItems: 'center',
-
-                  backgroundColor:
-                    luogoAssociatoProssimoTurno
-                      ? 'rgba(19,72,83,0.56)'
-                      : 'rgba(35,43,67,0.62)',
-
-                  borderWidth: 1,
-
-                  borderColor:
-                    luogoAssociatoProssimoTurno
-                      ? 'rgba(89,224,209,0.28)'
-                      : 'rgba(93,116,148,0.20)',
-                }}
-              >
-                <Ionicons
-                  name="location-outline"
-                  size={17}
-                  color={
-                    luogoAssociatoProssimoTurno
-                      ? '#63E4CF'
-                      : '#8299B4'
-                  }
-                />
-
-                <View
-                  style={{
-                    flex: 1,
-                    marginLeft: 8,
-                  }}
-                >
-                  <Text
-                    style={{
-                      color: '#6F8DA8',
-                      fontSize: 8,
-                      fontWeight: '900',
-                      letterSpacing: 0.8,
-                    }}
-                  >
-                    LUOGO DEL SERVIZIO
-                  </Text>
-
-                  <Text
-                    style={{
-                      color: '#FFFFFF',
-                      fontSize: 11,
-                      fontWeight: '900',
-                      marginTop: 3,
-                    }}
-                  >
-                    {luogoRealeProssimoTurno ||
-                      luogoAssociatoProssimoTurno ||
-                      'Non indicato nel turno'}
-                  </Text>
-                </View>
               </View>
 
               {previsioneTurno ? (
@@ -5774,243 +5500,23 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
           </View>
         ) : (
           <>
-
-            <View
-              style={{
-                marginBottom: 14,
-                padding: meteoServizio ? 11 : 15,
-                borderRadius: 22,
-                backgroundColor: 'rgba(8,24,52,0.82)',
-                borderWidth: 1,
-                borderColor: 'rgba(82,170,220,0.22)',
-              }}
-            >
-              <Text
-                style={{
-                  color: meteoServizio ? '#6D8CA7' : '#7EDFFF',
-                  fontSize: 9,
-                  fontWeight: '900',
-                  letterSpacing: 1,
-                  marginBottom: 7,
-                }}
-              >
-                LOCALITÀ METEO
-              </Text>
-
-
-              {!meteoServizio && recentiMeteo.length > 0 ? (
-                <View
-                  style={{
-                    marginBottom: 10,
-                  }}
-                >
-                  <Text
-                    style={{
-                      color: '#6D8CA7',
-                      fontSize: 8,
-                      fontWeight: '900',
-                      letterSpacing: 0.8,
-                      marginBottom: 7,
-                    }}
-                  >
-                    ULTIME LOCALITÀ
-                  </Text>
-
-                  <View
-                    style={{
-                      flexDirection: 'row',
-                      flexWrap: 'wrap',
-                    }}
-                  >
-                    {recentiMeteo.map((localita) => (
-                      <TouchableOpacity
-                        key={localita}
-                        activeOpacity={0.78}
-                        onPress={() =>
-                          setLocalitaMeteo(localita)
-                        }
-                        style={{
-                          marginRight: 7,
-                          marginBottom: 7,
-                          paddingHorizontal: 11,
-                          paddingVertical: 7,
-
-                          borderRadius: 13,
-
-                          flexDirection: 'row',
-                          alignItems: 'center',
-
-                          backgroundColor:
-                            localitaMeteo
-                              .trim()
-                              .toLowerCase() ===
-                            String(localita)
-                              .trim()
-                              .toLowerCase()
-                              ? 'rgba(31,132,164,0.34)'
-                              : 'rgba(17,41,73,0.82)',
-
-                          borderWidth: 1,
-
-                          borderColor:
-                            localitaMeteo
-                              .trim()
-                              .toLowerCase() ===
-                            String(localita)
-                              .trim()
-                              .toLowerCase()
-                              ? 'rgba(100,226,255,0.64)'
-                              : 'rgba(76,136,183,0.30)',
-                        }}
-                      >
-                        <Ionicons
-                          name="location-outline"
-                          size={12}
-                          color={
-                            localitaMeteo
-                              .trim()
-                              .toLowerCase() ===
-                            String(localita)
-                              .trim()
-                              .toLowerCase()
-                              ? '#72E5FF'
-                              : '#7697B3'
-                          }
-                        />
-
-                        <Text
-                          style={{
-                            color:
-                              localitaMeteo
-                                .trim()
-                                .toLowerCase() ===
-                              String(localita)
-                                .trim()
-                                .toLowerCase()
-                                ? '#E8FAFF'
-                                : '#9CB2C6',
-
-                            fontSize: 9.5,
-                            fontWeight: '800',
-                            marginLeft: 4,
-                          }}
-                        >
-                          {localita}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                </View>
-              ) : null}
-
-              <TextInput
-                value={localitaMeteo}
-                onChangeText={setLocalitaMeteo}
-                placeholder="Es. Fiumicino, Roma, Ciampino..."
-                placeholderTextColor="#607B98"
-                autoCapitalize="words"
-                style={{
-                  minHeight: meteoServizio ? 42 : 48,
-                  color: '#FFFFFF',
-                  paddingHorizontal: 14,
-                  paddingVertical: meteoServizio ? 8 : 11,
-                  borderRadius: 16,
-                  backgroundColor: 'rgba(4,15,34,0.88)',
-                  borderWidth: 1,
-                  borderColor: 'rgba(91,169,214,0.26)',
-                  fontSize: 14,
-                  fontWeight: '800',
-                }}
-              />
-
-              {!meteoServizio ? (
-                <Text
-                  style={{
-                    color: '#6E879F',
-                    fontSize: 8.5,
-                    lineHeight: 13,
-                    marginTop: 7,
-                    fontWeight: '600',
-                  }}
-                >
-                  Se la sede è un nome interno, inserisci qui la città
-                  reale da usare per le previsioni.
-                </Text>
-              ) : null}
-            </View>
-
-
-            {prossimoServizioMeteo ? (
-              <TouchableOpacity
-                activeOpacity={0.80}
-                onPress={() =>
-                  salvaLuogoTurnoMeteo(
-                    chiaveProssimoServizioMeteo,
-                    localitaMeteo
-                  )
-                }
-                style={{
-                  minHeight: 44,
-                  marginBottom: 10,
-
-                  borderRadius: 16,
-
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-
-                  backgroundColor:
-                    meteoServizio
-                      ? 'rgba(16,43,55,0.38)'
-                      : 'rgba(20,55,70,0.55)',
-
-                  borderWidth: 1,
-                  borderColor:
-                    'rgba(83,201,191,0.24)',
-                }}
-              >
-                <Ionicons
-                  name="link-outline"
-                  size={17}
-                  color="#62E1CF"
-                />
-
-                <Text
-                  style={{
-                    color: '#DFFFFA',
-                    fontSize: 10,
-                    fontWeight: '900',
-                    letterSpacing: 0.45,
-                    marginLeft: 7,
-                  }}
-                >
-                  ASSOCIA AL PROSSIMO TURNO
-                </Text>
-              </TouchableOpacity>
-            ) : null}
-
             <TouchableOpacity
               activeOpacity={0.82}
-              onPress={() => caricaMeteoServizio(zonaMeteoEffettiva)}
+              onPress={() => caricaMeteoServizio(zonaMeteo)}
               disabled={meteoLoading}
               style={{
-                minHeight: 56,
-                borderRadius: 19,
+                minHeight: 52,
+                borderRadius: 18,
 
                 alignItems: 'center',
                 justifyContent: 'center',
 
-                backgroundColor: 'rgba(22,139,176,0.96)',
+                backgroundColor: 'rgba(21,126,157,0.94)',
 
                 borderWidth: 1,
-                borderColor: 'rgba(109,232,255,0.78)',
+                borderColor: '#69E4FF',
 
-                shadowColor: '#52DFFF',
-                shadowOpacity: 0.24,
-                shadowRadius: 12,
-                shadowOffset: { width: 0, height: 5 },
-
-                marginBottom: 17,
+                marginBottom: 15,
               }}
             >
               <Text
@@ -6289,16 +5795,15 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
 
         <View
           style={{
-            marginTop: 16,
-            paddingHorizontal: 14,
-            paddingVertical: 12,
-            borderRadius: 17,
+            marginTop: 15,
+            padding: 13,
+            borderRadius: 18,
 
             flexDirection: 'row',
 
-            backgroundColor: 'rgba(10,26,48,0.52)',
+            backgroundColor: 'rgba(18,36,62,0.67)',
             borderWidth: 1,
-            borderColor: 'rgba(78,112,145,0.16)',
+            borderColor: 'rgba(88,121,151,0.22)',
           }}
         >
           <Ionicons
@@ -8384,61 +7889,15 @@ if (screen === 'profiloCollega') {
               </View>
             </View>
 
-            <View
-        style={{
-          marginTop: 4,
-          marginBottom: 8,
-        }}
-      >
-        <View
-          style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            marginBottom: 7,
-          }}
-        >
-          <Ionicons
-            name="location-outline"
-            size={17}
-            color="#69DFFF"
-          />
-
-          <View
-            style={{
-              marginLeft: 7,
-              flex: 1,
-            }}
-          >
-            <Text
-              style={{
-                color: '#DCEBFF',
-                fontSize: 11,
-                fontWeight: '900',
-                letterSpacing: 0.45,
-              }}
-            >
-              LUOGO DEL SERVIZIO
-            </Text>
-
-            <Text
-              style={{
-                color: '#718BA6',
-                fontSize: 8.5,
-                fontWeight: '700',
-                marginTop: 2,
-              }}
-            >
-              FACOLTATIVO · utile anche per il meteo
-            </Text>
-          </View>
-        </View>
-
-        <Field
-          label="ES. FIUMICINO, ROMA, CIAMPINO..."
-          value={luogo}
-          onChange={setLuogo}
-        />
-      </View>
+            <Field
+              label="POSTAZIONE"
+              value={
+                luogo
+              }
+              onChange={
+                setLuogo
+              }
+            />
 
             <Field
               label="ORE STRAORDINARIE"

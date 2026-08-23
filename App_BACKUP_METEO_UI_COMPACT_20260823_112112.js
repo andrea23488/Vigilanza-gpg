@@ -5778,7 +5778,7 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
             <View
               style={{
                 marginBottom: 14,
-                padding: meteoServizio ? 11 : 15,
+                padding: 15,
                 borderRadius: 22,
                 backgroundColor: 'rgba(8,24,52,0.82)',
                 borderWidth: 1,
@@ -5787,7 +5787,7 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
             >
               <Text
                 style={{
-                  color: meteoServizio ? '#6D8CA7' : '#7EDFFF',
+                  color: '#7EDFFF',
                   fontSize: 9,
                   fontWeight: '900',
                   letterSpacing: 1,
@@ -5798,7 +5798,7 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
               </Text>
 
 
-              {!meteoServizio && recentiMeteo.length > 0 ? (
+              {recentiMeteo.length > 0 ? (
                 <View
                   style={{
                     marginBottom: 10,
@@ -5910,10 +5910,10 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
                 placeholderTextColor="#607B98"
                 autoCapitalize="words"
                 style={{
-                  minHeight: meteoServizio ? 42 : 48,
+                  minHeight: 48,
                   color: '#FFFFFF',
                   paddingHorizontal: 14,
-                  paddingVertical: meteoServizio ? 8 : 11,
+                  paddingVertical: 11,
                   borderRadius: 16,
                   backgroundColor: 'rgba(4,15,34,0.88)',
                   borderWidth: 1,
@@ -5923,20 +5923,18 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
                 }}
               />
 
-              {!meteoServizio ? (
-                <Text
-                  style={{
-                    color: '#6E879F',
-                    fontSize: 8.5,
-                    lineHeight: 13,
-                    marginTop: 7,
-                    fontWeight: '600',
-                  }}
-                >
-                  Se la sede è un nome interno, inserisci qui la città
-                  reale da usare per le previsioni.
-                </Text>
-              ) : null}
+              <Text
+                style={{
+                  color: '#6E879F',
+                  fontSize: 8.5,
+                  lineHeight: 13,
+                  marginTop: 7,
+                  fontWeight: '600',
+                }}
+              >
+                Se la sede è un nome interno, inserisci qui la città
+                reale da usare per le previsioni.
+              </Text>
             </View>
 
 
@@ -5960,9 +5958,7 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
                   justifyContent: 'center',
 
                   backgroundColor:
-                    meteoServizio
-                      ? 'rgba(16,43,55,0.38)'
-                      : 'rgba(20,55,70,0.55)',
+                    'rgba(20,55,70,0.55)',
 
                   borderWidth: 1,
                   borderColor:
