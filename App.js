@@ -408,6 +408,157 @@ export default function App() {
   const [chatLoading, setChatLoading] = useState(false);
   const chatScrollRef = useRef(null);
 
+  const SNAKE_SIZE = 18;
+
+  const [snakeCorpo, setSnakeCorpo] = useState([
+    { x: 8, y: 9 },
+    { x: 7, y: 9 },
+    { x: 6, y: 9 },
+  ]);
+
+  const [snakeDirezione, setSnakeDirezione] =
+    useState({ x: 1, y: 0 });
+
+  const [snakeCibo, setSnakeCibo] =
+    useState({ x: 13, y: 9 });
+
+  const [snakePunteggio, setSnakePunteggio] =
+    useState(0);
+
+  const [snakeRecord, setSnakeRecord] =
+    useState(0);
+
+  const [snakeRunning, setSnakeRunning] =
+    useState(false);
+
+  const [snakeGameOver, setSnakeGameOver] =
+    useState(false);
+
+  const generaCiboSnake = (corpo) => {
+    const occupate = new Set(
+      corpo.map((p) => `${p.x}-${p.y}`)
+    );
+
+    const libere = [];
+
+    for (let y = 0; y < SNAKE_SIZE; y++) {
+      for (let x = 0; x < SNAKE_SIZE; x++) {
+        if (!occupate.has(`${x}-${y}`)) {
+          libere.push({ x, y });
+        }
+      }
+    }
+
+    if (!libere.length) {
+      return { x: 0, y: 0 };
+    }
+
+    return libere[
+      Math.floor(Math.random() * libere.length)
+    ];
+  };
+
+  useEffect(() => {
+    AsyncStorage.getItem('snake_record_v1')
+      .then((valore) => {
+        const record = Number(valore || 0);
+
+        if (Number.isFinite(record)) {
+          setSnakeRecord(record);
+        }
+      })
+      .catch((e) =>
+        console.log('Errore record Snake:', e)
+      );
+  }, []);
+
+  useEffect(() => {
+    if (
+      screen !== 'snakeGame' ||
+      !snakeRunning ||
+      snakeGameOver
+    ) {
+      return;
+    }
+
+    const timer = setInterval(() => {
+      setSnakeCorpo((corpoAttuale) => {
+        const testa = corpoAttuale[0];
+
+        const nuovaTesta = {
+          x: testa.x + snakeDirezione.x,
+          y: testa.y + snakeDirezione.y,
+        };
+
+        const muro =
+          nuovaTesta.x < 0 ||
+          nuovaTesta.x >= SNAKE_SIZE ||
+          nuovaTesta.y < 0 ||
+          nuovaTesta.y >= SNAKE_SIZE;
+
+        const corpoColpito = corpoAttuale.some(
+          (p) =>
+            p.x === nuovaTesta.x &&
+            p.y === nuovaTesta.y
+        );
+
+        if (muro || corpoColpito) {
+          setSnakeRunning(false);
+          setSnakeGameOver(true);
+          return corpoAttuale;
+        }
+
+        const nuovoCorpo = [
+          nuovaTesta,
+          ...corpoAttuale,
+        ];
+
+        const mangiato =
+          nuovaTesta.x === snakeCibo.x &&
+          nuovaTesta.y === snakeCibo.y;
+
+        if (mangiato) {
+          setSnakePunteggio((precedente) => {
+            const nuovo = precedente + 10;
+
+            setSnakeRecord((recordPrecedente) => {
+              if (nuovo > recordPrecedente) {
+                AsyncStorage.setItem(
+                  'snake_record_v1',
+                  String(nuovo)
+                ).catch(() => {});
+
+                return nuovo;
+              }
+
+              return recordPrecedente;
+            });
+
+            return nuovo;
+          });
+
+          setSnakeCibo(
+            generaCiboSnake(nuovoCorpo)
+          );
+        } else {
+          nuovoCorpo.pop();
+        }
+
+        return nuovoCorpo;
+      });
+    }, 170);
+
+    return () => clearInterval(timer);
+  }, [
+    screen,
+    snakeRunning,
+    snakeGameOver,
+    snakeDirezione,
+    snakeCibo,
+  ]);
+
+
+
   useEffect(() => {
     if (screen !== 'listaChat') return;
 
@@ -7799,7 +7950,552 @@ if (screen === 'configuraStipendio') {
     );
   }
 
-  if (screen === 'strumenti') {
+  
+  /* ============================================================
+     PASSATEMPO - SALA GIOCHI
+     ============================================================ */
+  
+  if (screen === 'snakeGame') {
+    const nuovaPartitaSnake = () => {
+      const corpo = [
+        { x: 8, y: 9 },
+        { x: 7, y: 9 },
+        { x: 6, y: 9 },
+      ];
+
+      setSnakeCorpo(corpo);
+      setSnakeDirezione({ x: 1, y: 0 });
+      setSnakeCibo(generaCiboSnake(corpo));
+      setSnakePunteggio(0);
+      setSnakeGameOver(false);
+      setSnakeRunning(true);
+    };
+
+    const cambiaDirezioneSnake = (x, y) => {
+      setSnakeDirezione((attuale) => {
+        if (
+          attuale.x + x === 0 &&
+          attuale.y + y === 0
+        ) {
+          return attuale;
+        }
+
+        return { x, y };
+      });
+
+      if (!snakeGameOver) {
+        setSnakeRunning(true);
+      }
+    };
+
+    const celle = [];
+
+    for (let y = 0; y < SNAKE_SIZE; y++) {
+      for (let x = 0; x < SNAKE_SIZE; x++) {
+        const indice = snakeCorpo.findIndex(
+          (p) => p.x === x && p.y === y
+        );
+
+        const testa = indice === 0;
+        const corpo = indice > 0;
+        const cibo =
+          snakeCibo.x === x &&
+          snakeCibo.y === y;
+
+        celle.push(
+          <View
+            key={`${x}-${y}`}
+            style={{
+              width: 15,
+              height: 15,
+              borderWidth: 0.2,
+              borderColor: 'rgba(111,234,255,0.05)',
+              backgroundColor: testa
+                ? '#A5FFD4'
+                : corpo
+                ? '#63E4A5'
+                : cibo
+                ? '#FF6B7A'
+                : 'rgba(4,13,30,0.97)',
+              borderRadius:
+                testa || corpo || cibo ? 3 : 0,
+            }}
+          />
+        );
+      }
+    }
+
+    const tasto = (label, x, y) => (
+      <TouchableOpacity
+        activeOpacity={0.75}
+        onPress={() => cambiaDirezioneSnake(x, y)}
+        style={{
+          width: 58,
+          height: 50,
+          borderRadius: 16,
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: 'rgba(23,49,91,0.95)',
+          borderWidth: 1,
+          borderColor: 'rgba(111,234,255,0.32)',
+        }}
+      >
+        <Text
+          style={{
+            color: '#FFFFFF',
+            fontSize: 25,
+            fontWeight: '900',
+          }}
+        >
+          {label}
+        </Text>
+      </TouchableOpacity>
+    );
+
+    return (
+      <Screen>
+        <Back
+          onPress={() => {
+            setSnakeRunning(false);
+            setScreen('passatempo');
+          }}
+        />
+
+        <View
+          style={{
+            marginTop: 7,
+            marginBottom: 14,
+            padding: 18,
+            borderRadius: 25,
+            backgroundColor: 'rgba(10,29,61,0.96)',
+            borderWidth: 1,
+            borderColor: 'rgba(99,228,165,0.35)',
+          }}
+        >
+          <Text
+            style={{
+              color: '#63E4A5',
+              fontSize: 10,
+              fontWeight: '900',
+              letterSpacing: 1.4,
+            }}
+          >
+            ARCADE CLASSIC
+          </Text>
+
+          <View
+            style={{
+              marginTop: 5,
+              flexDirection: 'row',
+              justifyContent: 'space-between',
+              alignItems: 'flex-end',
+            }}
+          >
+            <Text
+              style={{
+                color: '#FFFFFF',
+                fontSize: 29,
+                fontWeight: '900',
+              }}
+            >
+              Snake
+            </Text>
+
+            <View style={{ alignItems: 'flex-end' }}>
+              <Text
+                style={{
+                  color: '#91A8D0',
+                  fontSize: 9,
+                  fontWeight: '800',
+                }}
+              >
+                RECORD
+              </Text>
+
+              <Text
+                style={{
+                  color: '#FFD45A',
+                  fontSize: 18,
+                  fontWeight: '900',
+                }}
+              >
+                {snakeRecord}
+              </Text>
+            </View>
+          </View>
+        </View>
+
+        <View
+          style={{
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            marginBottom: 10,
+          }}
+        >
+          <View>
+            <Text
+              style={{
+                color: '#8398BC',
+                fontSize: 9,
+                fontWeight: '900',
+              }}
+            >
+              PUNTEGGIO
+            </Text>
+
+            <Text
+              style={{
+                color: '#FFFFFF',
+                fontSize: 23,
+                fontWeight: '900',
+              }}
+            >
+              {snakePunteggio}
+            </Text>
+          </View>
+
+          <Text
+            style={{
+              color: snakeGameOver
+                ? '#FF7886'
+                : snakeRunning
+                ? '#63E4A5'
+                : '#FFD45A',
+              fontSize: 11,
+              fontWeight: '900',
+            }}
+          >
+            {snakeGameOver
+              ? 'GAME OVER'
+              : snakeRunning
+              ? '● IN GIOCO'
+              : 'Ⅱ PAUSA'}
+          </Text>
+        </View>
+
+        <View
+          style={{
+            alignSelf: 'center',
+            padding: 7,
+            borderRadius: 18,
+            backgroundColor: 'rgba(3,11,27,0.98)',
+            borderWidth: 1.5,
+            borderColor: 'rgba(99,228,165,0.40)',
+          }}
+        >
+          <View
+            style={{
+              width: SNAKE_SIZE * 15,
+              height: SNAKE_SIZE * 15,
+              flexDirection: 'row',
+              flexWrap: 'wrap',
+            }}
+          >
+            {celle}
+          </View>
+        </View>
+
+        <Text
+          style={{
+            color: '#7187AC',
+            textAlign: 'center',
+            fontSize: 10,
+            fontWeight: '700',
+            marginTop: 10,
+          }}
+        >
+          Mangia i cubi rossi e non toccare muri o coda.
+        </Text>
+
+        <View
+          style={{
+            alignItems: 'center',
+            marginTop: 15,
+          }}
+        >
+          {tasto('↑', 0, -1)}
+
+          <View
+            style={{
+              flexDirection: 'row',
+              gap: 10,
+              marginTop: 9,
+            }}
+          >
+            {tasto('←', -1, 0)}
+            {tasto('↓', 0, 1)}
+            {tasto('→', 1, 0)}
+          </View>
+        </View>
+
+        <View
+          style={{
+            flexDirection: 'row',
+            gap: 10,
+            marginTop: 18,
+          }}
+        >
+          <TouchableOpacity
+            activeOpacity={0.8}
+            onPress={() =>
+              setSnakeRunning((v) => !v)
+            }
+            disabled={snakeGameOver}
+            style={{
+              flex: 1,
+              minHeight: 48,
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderRadius: 16,
+              backgroundColor: 'rgba(111,234,255,0.10)',
+              borderWidth: 1,
+              borderColor: 'rgba(111,234,255,0.34)',
+            }}
+          >
+            <Text
+              style={{
+                color: '#6FEAFF',
+                fontSize: 12,
+                fontWeight: '900',
+              }}
+            >
+              {snakeRunning ? 'Ⅱ PAUSA' : '▶ RIPRENDI'}
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            activeOpacity={0.8}
+            onPress={nuovaPartitaSnake}
+            style={{
+              flex: 1,
+              minHeight: 48,
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderRadius: 16,
+              backgroundColor: 'rgba(99,228,165,0.11)',
+              borderWidth: 1,
+              borderColor: 'rgba(99,228,165,0.36)',
+            }}
+          >
+            <Text
+              style={{
+                color: '#63E4A5',
+                fontSize: 12,
+                fontWeight: '900',
+              }}
+            >
+              ↻ NUOVA PARTITA
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </Screen>
+    );
+  }
+
+if (screen === 'passatempo') {
+    const giochiPassatempo = [
+      {
+        id: 'snake',
+        titolo: 'SNAKE',
+        sottotitolo: 'Il grande classico',
+        icona: 'git-branch-outline',
+        colore: '#63E4A5',
+      },
+      {
+        id: 'block',
+        titolo: 'BLOCK',
+        sottotitolo: 'Incastra e libera le linee',
+        icona: 'grid-outline',
+        colore: '#6FEAFF',
+      },
+      {
+        id: 'pong',
+        titolo: 'PONG',
+        sottotitolo: 'Sfida la CPU',
+        icona: 'radio-button-on-outline',
+        colore: '#FFD45A',
+      },
+      {
+        id: 'spacePatrol',
+        titolo: 'SPACE PATROL',
+        sottotitolo: 'Arcade nello spazio',
+        icona: 'rocket-outline',
+        colore: '#A997FF',
+      },
+      {
+        id: 'campoMinato',
+        titolo: 'CAMPO MINATO',
+        sottotitolo: 'Ragiona prima del click',
+        icona: 'warning-outline',
+        colore: '#FF8C8C',
+      },
+    ];
+
+    return (
+      <Screen>
+        <Back onPress={() => setScreen('strumenti')} />
+
+        <View
+          style={{
+            marginTop: 7,
+            marginBottom: 22,
+            padding: 20,
+            borderRadius: 27,
+            backgroundColor: 'rgba(16,32,71,0.95)',
+            borderWidth: 1,
+            borderColor: 'rgba(139,124,255,0.42)',
+            shadowColor: '#8B7CFF',
+            shadowOpacity: 0.16,
+            shadowRadius: 16,
+            shadowOffset: { width: 0, height: 6 },
+          }}
+        >
+          <Text
+            style={{
+              color: '#8B7CFF',
+              fontSize: 10,
+              fontWeight: '900',
+              letterSpacing: 1.4,
+            }}
+          >
+            ARCADE BREAK
+          </Text>
+
+          <Text
+            style={{
+              color: '#FFFFFF',
+              fontSize: 28,
+              fontWeight: '900',
+              marginTop: 5,
+            }}
+          >
+            Passatempo
+          </Text>
+
+          <Text
+            style={{
+              color: '#AFC3E8',
+              fontSize: 13,
+              fontWeight: '600',
+              lineHeight: 19,
+              marginTop: 6,
+            }}
+          >
+            Stacca qualche minuto durante il turno.
+            Cinque piccoli giochi, zero stress.
+          </Text>
+        </View>
+
+        <View
+          style={{
+            flexDirection: 'row',
+            flexWrap: 'wrap',
+            justifyContent: 'space-between',
+          }}
+        >
+          {giochiPassatempo.map((gioco) => (
+            <TouchableOpacity
+              key={gioco.id}
+              activeOpacity={0.82}
+              onPress={() => {
+                if (gioco.id === 'snake') {
+                  setScreen('snakeGame');
+                  return;
+                }
+
+                Alert.alert(
+                  gioco.titolo,
+                  'Questo gioco verrà aggiunto alla Sala Giochi.'
+                );
+              }}
+              style={{
+                width: '48.5%',
+                minHeight: 150,
+                marginBottom: 12,
+                padding: 15,
+                borderRadius: 23,
+                backgroundColor: 'rgba(10,29,61,0.94)',
+                borderWidth: 1,
+                borderColor: `${gioco.colore}70`,
+                shadowColor: gioco.colore,
+                shadowOpacity: 0.12,
+                shadowRadius: 10,
+                shadowOffset: { width: 0, height: 5 },
+                justifyContent: 'space-between',
+              }}
+            >
+              <View
+                style={{
+                  width: 46,
+                  height: 46,
+                  borderRadius: 15,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  backgroundColor: `${gioco.colore}18`,
+                  borderWidth: 1,
+                  borderColor: `${gioco.colore}55`,
+                }}
+              >
+                <Ionicons
+                  name={gioco.icona}
+                  size={24}
+                  color={gioco.colore}
+                />
+              </View>
+
+              <View>
+                <Text
+                  style={{
+                    color: '#FFFFFF',
+                    fontSize: 15,
+                    fontWeight: '900',
+                    letterSpacing: 0.4,
+                  }}
+                >
+                  {gioco.titolo}
+                </Text>
+
+                <Text
+                  style={{
+                    color: '#91A8D0',
+                    fontSize: 10,
+                    fontWeight: '700',
+                    marginTop: 4,
+                  }}
+                >
+                  {gioco.sottotitolo}
+                </Text>
+              </View>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        <View
+          style={{
+            marginTop: 5,
+            padding: 13,
+            borderRadius: 16,
+            backgroundColor: 'rgba(99,228,165,0.08)',
+            borderWidth: 1,
+            borderColor: 'rgba(99,228,165,0.20)',
+          }}
+        >
+          <Text
+            style={{
+              color: '#63E4A5',
+              fontSize: 11,
+              fontWeight: '800',
+              textAlign: 'center',
+            }}
+          >
+            🎮 Giochi offline · nessun costo · nessuna pubblicità
+          </Text>
+        </View>
+      </Screen>
+    );
+  }
+
+if (screen === 'strumenti') {
     const strumentiCards = [
       {
         id: 'meteoServizio',
@@ -7857,7 +8553,15 @@ if (screen === 'configuraStipendio') {
         testo: 'Giuramento, regole e riferimenti professionali',
         colore: '#B596FF',
       },
-    ];
+    
+    {
+      id: 'passatempo',
+      icon: 'game-controller-outline',
+      titolo: 'Passatempo',
+      testo: 'Snake, Block, Pong e altri giochi vintage',
+      colore: '#8B7CFF',
+    },
+];
 
     return (
       <Screen>
