@@ -45,6 +45,7 @@ export async function salvaProfiloUtente(profilo) {
     azienda: profilo.azienda || '',
     ruolo: profilo.ruolo || '',
     sede: profilo.sede || '',
+    punto_partenza: profilo.punto_partenza || '',
     codice_gpg: profilo.codice_gpg || '',
     in_servizio_dal:
       profilo.in_servizio_dal === '' ||

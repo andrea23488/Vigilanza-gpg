@@ -2817,6 +2817,220 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
   const [countdownTurno, setCountdownTurno] = useState('--h --m');
   const [countdownLabel, setCountdownLabel] = useState('FINE TRA');
 
+  const [etaServizio, setEtaServizio] = useState(null);
+  const [etaServizioLoading, setEtaServizioLoading] = useState(false);
+
+  /* ============================================================
+     ETA SERVIZIO HOME - GLOBALE
+     ============================================================ */
+  useEffect(() => {
+    let attivo = true;
+
+    const creaDataInizioEta = (t) => {
+      if (
+        !t ||
+        t.tipo !== 'turno' ||
+        !t.anno ||
+        !t.mese ||
+        !t.giorno ||
+        !t.inizio
+      ) {
+        return null;
+      }
+
+      const [ora, minuti] = String(t.inizio)
+        .split(':')
+        .map(Number);
+
+      const data = new Date(
+        Number(t.anno),
+        Number(t.mese) - 1,
+        Number(t.giorno),
+        Number(ora || 0),
+        Number(minuti || 0),
+        0
+      );
+
+      return Number.isNaN(data.getTime()) ? null : data;
+    };
+
+    const caricaEtaHome = async () => {
+      const partenza = String(
+        profilo?.punto_partenza || ''
+      ).trim();
+
+      let turnoEta = null;
+
+      if (
+        turnoInCorso &&
+        String(turnoInCorso.indirizzo_servizio || '').trim()
+      ) {
+        turnoEta = turnoInCorso;
+      } else if (
+        turnoOggi &&
+        String(turnoOggi.indirizzo_servizio || '').trim()
+      ) {
+        turnoEta = turnoOggi;
+      } else {
+        const adesso = new Date();
+
+        turnoEta =
+          (turni || [])
+            .filter((t) => {
+              if (
+                t?.tipo !== 'turno' ||
+                !String(t?.indirizzo_servizio || '').trim()
+              ) {
+                return false;
+              }
+
+              const data = creaDataInizioEta(t);
+
+              return (
+                data &&
+                data.getTime() >= adesso.getTime()
+              );
+            })
+            .sort((a, b) => {
+              return (
+                creaDataInizioEta(a).getTime() -
+                creaDataInizioEta(b).getTime()
+              );
+            })[0] || null;
+      }
+
+      const destinazione = String(
+        turnoEta?.indirizzo_servizio || ''
+      ).trim();
+
+      console.log(
+        'ETA HOME DATI:',
+        Boolean(partenza),
+        Boolean(destinazione)
+      );
+
+      if (!partenza || !destinazione) {
+        if (attivo) {
+          setEtaServizio(null);
+          setEtaServizioLoading(false);
+        }
+        return;
+      }
+
+      const cacheKey =
+        'ETA_SERVIZIO_CACHE_HOME_V3:' +
+        partenza +
+        '|' +
+        destinazione;
+
+      try {
+        const cacheRaw =
+          await AsyncStorage.getItem(cacheKey);
+
+        if (cacheRaw) {
+          try {
+            const cache = JSON.parse(cacheRaw);
+
+            if (
+              cache?.salvatoAlle &&
+              cache?.data &&
+              Date.now() - Number(cache.salvatoAlle) <
+                10 * 60 * 1000
+            ) {
+              if (attivo) {
+                setEtaServizio(cache.data);
+                setEtaServizioLoading(false);
+              }
+
+              console.log('ETA HOME DA CACHE');
+              return;
+            }
+          } catch (e) {
+            console.log('CACHE ETA NON VALIDA:', e);
+          }
+        }
+
+        if (attivo) {
+          setEtaServizioLoading(true);
+        }
+
+        const risposta = await fetch(
+          `${SUPABASE_URL}/functions/v1/eta-servizio`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${SUPABASE_KEY}`,
+              apikey: SUPABASE_KEY,
+            },
+            body: JSON.stringify({
+              partenza,
+              destinazione,
+            }),
+          }
+        );
+
+        const data = await risposta.json();
+
+        if (!risposta.ok || !data || data.error) {
+          throw new Error(
+            data?.error ||
+              `ETA non disponibile (${risposta.status})`
+          );
+        }
+
+        const risultato = {
+          minuti: Number(data.minuti || 0),
+          km: Number(data.km || 0),
+          ritardo_traffico: Number(
+            data.ritardo_traffico || 0
+          ),
+          minuti_senza_traffico: Number(
+            data.minuti_senza_traffico || 0
+          ),
+        };
+
+        await AsyncStorage.setItem(
+          cacheKey,
+          JSON.stringify({
+            salvatoAlle: Date.now(),
+            data: risultato,
+          })
+        );
+
+        if (attivo) {
+          setEtaServizio(risultato);
+        }
+
+        console.log('ETA HOME OK:', risultato);
+      } catch (error) {
+        console.log('ERRORE ETA HOME:', error);
+
+        if (attivo) {
+          setEtaServizio(null);
+        }
+      } finally {
+        if (attivo) {
+          setEtaServizioLoading(false);
+        }
+      }
+    };
+
+    caricaEtaHome();
+
+    return () => {
+      attivo = false;
+    };
+  }, [
+    profilo?.punto_partenza,
+    turnoInCorso?.id,
+    turnoInCorso?.indirizzo_servizio,
+    turnoOggi?.id,
+    turnoOggi?.indirizzo_servizio,
+    turni,
+  ]);
+
+
   useEffect(() => {
     const aggiornaCountdownTurno = () => {
       const adesso = new Date();
@@ -11434,6 +11648,8 @@ if (screen === 'configuraStipendio') {
       prossimoServizioMeteo?.turno?.indirizzo_servizio || ''
     ).trim();
 
+  
+
 
 
 
@@ -18184,6 +18400,93 @@ if (screen === 'profiloCollega') {
             color="#6FEAFF"
           />
         </TouchableOpacity>
+
+{/* ===== TRAFFICO ETA HOME ===== */}
+{etaServizioLoading ? (
+  <View
+    style={{
+      marginHorizontal: 16,
+      marginTop: 7,
+      marginBottom: 5,
+      paddingHorizontal: 13,
+      paddingVertical: 9,
+      borderRadius: 13,
+      backgroundColor: 'rgba(18,54,93,0.42)',
+      borderWidth: 1,
+      borderColor: 'rgba(111,234,255,0.20)',
+    }}
+  >
+    <Text
+      style={{
+        color: '#9FB4D8',
+        fontSize: 11,
+        fontWeight: '800',
+      }}
+    >
+      🚗 Calcolo traffico in corso...
+    </Text>
+  </View>
+) : etaServizio ? (
+  <View
+    style={{
+      marginHorizontal: 16,
+      marginTop: 7,
+      marginBottom: 5,
+      paddingHorizontal: 13,
+      paddingVertical: 10,
+      borderRadius: 13,
+      backgroundColor: 'rgba(18,54,93,0.42)',
+      borderWidth: 1,
+      borderColor: 'rgba(111,234,255,0.20)',
+    }}
+  >
+    <View
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+      }}
+    >
+      <Text
+        style={{
+          color: '#FFFFFF',
+          fontSize: 13,
+          fontWeight: '900',
+        }}
+      >
+        🚗 {etaServizio.minuti} min · {Number(etaServizio.km).toFixed(1)} km
+      </Text>
+
+      <Text
+        style={{
+          color: '#6FEAFF',
+          fontSize: 9,
+          fontWeight: '800',
+        }}
+      >
+        LIVE
+      </Text>
+    </View>
+
+    <Text
+      style={{
+        color:
+          etaServizio.ritardo_traffico > 0
+            ? '#FFD45A'
+            : '#63E4A5',
+        fontSize: 10,
+        fontWeight: '800',
+        marginTop: 4,
+      }}
+    >
+      {etaServizio.ritardo_traffico > 0
+        ? `Traffico +${etaServizio.ritardo_traffico} min`
+        : 'Traffico regolare'}
+      {' · '}aggiornato di recente
+    </Text>
+  </View>
+) : null}
+{/* ===== FINE TRAFFICO ETA HOME ===== */}
 
 <TouchableOpacity
           activeOpacity={0.85}
