@@ -214,6 +214,122 @@ function KeyboardDoneOverlay() {
 }
 
 
+
+function calcolaStraordinariConfigurati({
+  giornateMese,
+  tuttiTurni,
+  modalita,
+  sogliaGiornaliera,
+  sogliaSettimanale,
+  meseTarget,
+  annoTarget,
+}) {
+  // MODALITÀ GIORNALIERA
+  if (modalita !== 'settimanale') {
+    return giornateMese.reduce((tot, t) => {
+      if (t.riposo_lavorato === true) return tot;
+
+      const oreTurno = Number(t.ore || 0);
+
+      return (
+        tot +
+        Math.max(
+          0,
+          oreTurno - Number(sogliaGiornaliera || 0)
+        )
+      );
+    }, 0);
+  }
+
+  // MODALITÀ SETTIMANALE
+  const limiteSettimanale =
+    Number(sogliaSettimanale) > 0
+      ? Number(sogliaSettimanale)
+      : 40;
+
+  const turniUtili = tuttiTurni
+    .filter(
+      (t) =>
+        t.tipo === 'turno' &&
+        t.riposo_lavorato !== true &&
+        Number(t.ore || 0) > 0 &&
+        Number(t.giorno) > 0 &&
+        Number(t.mese) > 0 &&
+        Number(t.anno) > 0
+    )
+    .map((t) => {
+      const data = new Date(
+        Number(t.anno),
+        Number(t.mese) - 1,
+        Number(t.giorno),
+        12,
+        0,
+        0
+      );
+
+      const giornoSettimana = data.getDay();
+      const distanzaLunedi =
+        giornoSettimana === 0
+          ? -6
+          : 1 - giornoSettimana;
+
+      const lunedi = new Date(data);
+      lunedi.setDate(data.getDate() + distanzaLunedi);
+      lunedi.setHours(0, 0, 0, 0);
+
+      return {
+        ...t,
+        data,
+        chiaveSettimana: [
+          lunedi.getFullYear(),
+          String(lunedi.getMonth() + 1).padStart(2, '0'),
+          String(lunedi.getDate()).padStart(2, '0'),
+        ].join('-'),
+      };
+    })
+    .sort((a, b) => a.data - b.data);
+
+  const settimane = {};
+
+  turniUtili.forEach((t) => {
+    if (!settimane[t.chiaveSettimana]) {
+      settimane[t.chiaveSettimana] = [];
+    }
+
+    settimane[t.chiaveSettimana].push(t);
+  });
+
+  let extraMese = 0;
+
+  Object.values(settimane).forEach((turniSettimana) => {
+    let cumulato = 0;
+
+    turniSettimana.forEach((t) => {
+      const oreTurno = Number(t.ore || 0);
+
+      const extraPrima =
+        Math.max(0, cumulato - limiteSettimanale);
+
+      cumulato += oreTurno;
+
+      const extraDopo =
+        Math.max(0, cumulato - limiteSettimanale);
+
+      const extraTurno =
+        Math.max(0, extraDopo - extraPrima);
+
+      if (
+        Number(t.mese) === Number(meseTarget) &&
+        Number(t.anno) === Number(annoTarget)
+      ) {
+        extraMese += extraTurno;
+      }
+    });
+  });
+
+  return extraMese;
+}
+
 export default function App() {
   const giorniSettimana = ["Dom", "Lun", "Mar", "Mer", "Gio", "Ven", "Sab"];
  const [accessoTest, setAccessoTest] = useState(false);
@@ -221,6 +337,69 @@ export default function App() {
   const [stipendioCCNL, setStipendioCCNL] = useState('Vigilanza Privata e Servizi di Sicurezza');
   const [stipendioLivello, setStipendioLivello] = useState('');
   const [stipendioOreSettimanali, setStipendioOreSettimanali] = useState('40');
+
+  const [stipendioOreGiornaliere, setStipendioOreGiornaliere] = useState('7:00');
+
+  const [stipendioTariffaStraordinario, setStipendioTariffaStraordinario] =
+    useState('11.03783');
+
+  const [stipendioTariffaDomenicale, setStipendioTariffaDomenicale] =
+    useState('0.71');
+
+  const [stipendioTariffaDiurno, setStipendioTariffaDiurno] =
+    useState('0.65');
+
+  const [
+    stipendioTariffaIndennitaCompensativa,
+    setStipendioTariffaIndennitaCompensativa
+  ] = useState('1.86');
+
+  const [stipendioTariffaNotturno, setStipendioTariffaNotturno] =
+    useState('4.18');
+
+  const [stipendioTariffaRiposo, setStipendioTariffaRiposo] =
+    useState('11.8869');
+
+  const [mostraImportiCalcolo, setMostraImportiCalcolo] =
+    useState(false);
+
+  const [
+    stipendioProfiloCalcolo,
+    setStipendioProfiloCalcolo
+  ] = useState('automatico');
+
+  const [
+    stipendioCalcoloStraordinari,
+    setStipendioCalcoloStraordinari
+  ] = useState('giornaliero');
+
+  const [
+    mostraDettaglioStraordinari,
+    setMostraDettaglioStraordinari
+  ] = useState(false);
+
+  const oreOrdinarieGiornaliereNumero = (() => {
+    const valore = String(stipendioOreGiornaliere || '7:00').trim();
+
+    if (valore.includes(':')) {
+      const [ore, minuti] = valore.split(':').map(Number);
+
+      if (
+        Number.isFinite(ore) &&
+        Number.isFinite(minuti) &&
+        ore >= 0 &&
+        minuti >= 0 &&
+        minuti < 60
+      ) {
+        return ore + minuti / 60;
+      }
+
+      return 7;
+    }
+
+    const numero = Number(valore.replace(',', '.'));
+    return Number.isFinite(numero) && numero > 0 ? numero : 7;
+  })();
   const [stipendioNettoBase, setStipendioNettoBase] = useState('');
   const [stipendioIndennita20724, setStipendioIndennita20724] = useState('103.64');
   const [chatMessaggio, setChatMessaggio] = useState('');
@@ -369,7 +548,62 @@ useEffect(() => {
           );
         }
 
-        if (dati.nettoBase) {
+    if (dati.oreGiornaliere) {
+      setStipendioOreGiornaliere(
+        String(dati.oreGiornaliere)
+      );
+    }
+
+    if (dati.calcoloStraordinari) {
+      setStipendioCalcoloStraordinari(
+        String(dati.calcoloStraordinari)
+      );
+    }
+
+        
+        if (dati.profiloCalcolo) {
+      setStipendioProfiloCalcolo(
+        String(dati.profiloCalcolo)
+      );
+    }
+
+if (dati.tariffaStraordinario != null) {
+      setStipendioTariffaStraordinario(
+        String(dati.tariffaStraordinario)
+      );
+    }
+
+    if (dati.tariffaDomenicale != null) {
+      setStipendioTariffaDomenicale(
+        String(dati.tariffaDomenicale)
+      );
+    }
+
+    if (dati.tariffaDiurno != null) {
+      setStipendioTariffaDiurno(
+        String(dati.tariffaDiurno)
+      );
+    }
+
+    if (dati.tariffaIndennitaCompensativa != null) {
+      setStipendioTariffaIndennitaCompensativa(
+        String(dati.tariffaIndennitaCompensativa)
+      );
+    }
+
+    if (dati.tariffaNotturno != null) {
+      setStipendioTariffaNotturno(
+        String(dati.tariffaNotturno)
+      );
+    }
+
+    if (dati.tariffaRiposo != null) {
+      setStipendioTariffaRiposo(
+        String(dati.tariffaRiposo)
+      );
+    }
+
+    if (dati.nettoBase) {
           setStipendioNettoBase(
             String(dati.nettoBase)
           );
@@ -1845,42 +2079,20 @@ useEffect(() => {
     0
   );
 
-  const extraStipendioMese = giornateStipendioMese.reduce(
-    (tot, t) => tot + Number(t.extra || 0),
-    0
-  );
+  const extraStipendioMese =
+    calcolaStraordinariConfigurati({
+      giornateMese: giornateStipendioMese,
+      tuttiTurni: turni,
+      modalita: stipendioCalcoloStraordinari,
+      sogliaGiornaliera: oreOrdinarieGiornaliereNumero,
+      sogliaSettimanale: Number(
+        String(stipendioOreSettimanali || '40').replace(',', '.')
+      ),
+      meseTarget: mese + 1,
+      annoTarget: anno,
+    });
 
-  // Ore ordinarie reali:
-  // un turno effettuato durante il riposo resta lavorato,
-  // ma le sue ore base non vengono conteggiate come ordinarie.
-  const oreOrdinarieStipendioMese = giornateStipendioMese.reduce(
-    (tot, t) => {
-      if (t.riposo_lavorato === true) {
-        return tot;
-      }
-
-      return (
-        tot +
-        Math.max(
-          0,
-          Number(t.ore || 0) - Number(t.extra || 0)
-        )
-      );
-    },
-    0
-  );
-
-  const oreRiposoLavoratoMese = giornateStipendioMese.reduce(
-    (tot, t) =>
-      t.riposo_lavorato === true
-        ? tot + Number(t.ore || 0)
-        : tot,
-    0
-  );
-
-  
-
-const mediaOreGiornata =
+  const mediaOreGiornata =
     giornateStipendioMese.length > 0
       ? oreStipendioMese / giornateStipendioMese.length
       : 0;
@@ -2195,10 +2407,195 @@ const oreStipendioMese = giornateStipendioMese.reduce(
     0
   );
 
-  const extraStipendioMese = giornateStipendioMese.reduce(
-    (tot, t) => tot + Number(t.extra || 0),
-    0
-  );
+  const extraStipendioMese =
+    calcolaStraordinariConfigurati({
+      giornateMese: giornateStipendioMese,
+      tuttiTurni: turni,
+      modalita: stipendioCalcoloStraordinari,
+      sogliaGiornaliera: oreOrdinarieGiornaliereNumero,
+      sogliaSettimanale: Number(
+        String(stipendioOreSettimanali || '40').replace(',', '.')
+      ),
+      meseTarget: mese + 1,
+      annoTarget: anno,
+    });
+
+  const dettaglioStraordinariMese = (() => {
+    // GIORNALIERO
+    if (stipendioCalcoloStraordinari !== 'settimanale') {
+      return giornateStipendioMese
+        .filter(
+          (t) =>
+            t.tipo === 'turno' &&
+            t.riposo_lavorato !== true
+        )
+        .map((t) => {
+          const oreTurno = Number(t.ore || 0);
+
+          return {
+            tipo: 'giorno',
+            etichetta:
+              `${String(t.giorno).padStart(2, '0')}/` +
+              `${String(t.mese).padStart(2, '0')}`,
+            ore: oreTurno,
+            extra: Math.max(
+              0,
+              oreTurno - oreOrdinarieGiornaliereNumero
+            ),
+          };
+        })
+        .filter((riga) => riga.extra > 0);
+    }
+
+    // SETTIMANALE
+    const limite =
+      Number(
+        String(stipendioOreSettimanali || '40')
+          .replace(',', '.')
+      ) || 40;
+
+    const turniUtili = turni
+      .filter(
+        (t) =>
+          t.tipo === 'turno' &&
+          t.riposo_lavorato !== true &&
+          Number(t.ore || 0) > 0 &&
+          Number(t.giorno) > 0 &&
+          Number(t.mese) > 0 &&
+          Number(t.anno) > 0
+      )
+      .map((t) => {
+        const data = new Date(
+          Number(t.anno),
+          Number(t.mese) - 1,
+          Number(t.giorno),
+          12,
+          0,
+          0
+        );
+
+        const giornoSettimana = data.getDay();
+
+        const distanzaLunedi =
+          giornoSettimana === 0
+            ? -6
+            : 1 - giornoSettimana;
+
+        const lunedi = new Date(data);
+        lunedi.setDate(
+          data.getDate() + distanzaLunedi
+        );
+        lunedi.setHours(0, 0, 0, 0);
+
+        const domenica = new Date(lunedi);
+        domenica.setDate(
+          lunedi.getDate() + 6
+        );
+
+        const chiave = [
+          lunedi.getFullYear(),
+          String(
+            lunedi.getMonth() + 1
+          ).padStart(2, '0'),
+          String(
+            lunedi.getDate()
+          ).padStart(2, '0'),
+        ].join('-');
+
+        return {
+          ...t,
+          data,
+          lunedi,
+          domenica,
+          chiave,
+        };
+      })
+      .sort((a, b) => a.data - b.data);
+
+    const settimane = {};
+
+    turniUtili.forEach((t) => {
+      if (!settimane[t.chiave]) {
+        settimane[t.chiave] = {
+          lunedi: t.lunedi,
+          domenica: t.domenica,
+          turni: [],
+        };
+      }
+
+      settimane[t.chiave].turni.push(t);
+    });
+
+    const risultato = [];
+
+    Object.values(settimane).forEach(
+      (settimana) => {
+        let cumulato = 0;
+        let extraDelMese = 0;
+
+        settimana.turni.forEach((t) => {
+          const oreTurno =
+            Number(t.ore || 0);
+
+          const extraPrima =
+            Math.max(
+              0,
+              cumulato - limite
+            );
+
+          cumulato += oreTurno;
+
+          const extraDopo =
+            Math.max(
+              0,
+              cumulato - limite
+            );
+
+          const extraTurno =
+            Math.max(
+              0,
+              extraDopo - extraPrima
+            );
+
+          if (
+            Number(t.mese) ===
+              Number(mese + 1) &&
+            Number(t.anno) ===
+              Number(anno)
+          ) {
+            extraDelMese += extraTurno;
+          }
+        });
+
+        if (extraDelMese > 0) {
+          risultato.push({
+            tipo: 'settimana',
+
+            etichetta:
+              `${String(
+                settimana.lunedi.getDate()
+              ).padStart(2, '0')}/` +
+              `${String(
+                settimana.lunedi.getMonth() + 1
+              ).padStart(2, '0')}` +
+              ` – ` +
+              `${String(
+                settimana.domenica.getDate()
+              ).padStart(2, '0')}/` +
+              `${String(
+                settimana.domenica.getMonth() + 1
+              ).padStart(2, '0')}`,
+
+            ore: cumulato,
+            extra: extraDelMese,
+          });
+        }
+      }
+    );
+
+    return risultato;
+  })();
+
 
   const mediaOreGiornata =
     giornateStipendioMese.length > 0
@@ -2251,12 +2648,50 @@ const oreRiposoLavoratoMese = turniStipendioMese.reduce(
 );
 
 // Tariffe ricavate dal cedolino reale livello 4
-const tariffaStraordinario30 = 11.03783;
-const tariffaDomenicale = 0.71;
-const tariffaPiantonamentoDiurno = 0.65;
-const tariffaIndennitaCompensativa = 1.86;
-const tariffaPiantonamentoNotturno = 4.18;
-const tariffaRiposoLavorato = 11.8869;
+const leggiTariffa = (valore, fallback) => {
+  const numero = Number(
+    String(valore ?? '')
+      .trim()
+      .replace(',', '.')
+  );
+
+  return Number.isFinite(numero) && numero >= 0
+    ? numero
+    : fallback;
+};
+
+const tariffaStraordinario30 =
+  stipendioProfiloCalcolo === 'automatico'
+    ? 11.03783
+    : leggiTariffa(stipendioTariffaStraordinario, 11.03783);
+
+const tariffaDomenicale =
+  stipendioProfiloCalcolo === 'automatico'
+    ? 0.71
+    : leggiTariffa(stipendioTariffaDomenicale, 0.71);
+
+const tariffaPiantonamentoDiurno =
+  stipendioProfiloCalcolo === 'automatico'
+    ? 0.65
+    : leggiTariffa(stipendioTariffaDiurno, 0.65);
+
+const tariffaIndennitaCompensativa =
+  stipendioProfiloCalcolo === 'automatico'
+    ? 1.86
+    : leggiTariffa(
+        stipendioTariffaIndennitaCompensativa,
+        1.86
+      );
+
+const tariffaPiantonamentoNotturno =
+  stipendioProfiloCalcolo === 'automatico'
+    ? 4.18
+    : leggiTariffa(stipendioTariffaNotturno, 4.18);
+
+const tariffaRiposoLavorato =
+  stipendioProfiloCalcolo === 'automatico'
+    ? 11.8869
+    : leggiTariffa(stipendioTariffaRiposo, 11.8869);
 
 const extraPagateMese = giornateStipendioMese.reduce(
   (tot, t) =>
@@ -2267,7 +2702,7 @@ const extraPagateMese = giornateStipendioMese.reduce(
 );
 
 const importoStraordinarioMese =
-  extraPagateMese * tariffaStraordinario30;
+  extraStipendioMese * tariffaStraordinario30;
 
 const importoDomenicaleMese =
   oreDomenicaliMese * tariffaDomenicale;
@@ -2370,83 +2805,90 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
 
   useEffect(() => {
     const aggiornaCountdownTurno = () => {
+      const adesso = new Date();
+
+      // PRIORITÀ ASSOLUTA al turno realmente in corso,
+      // anche se è iniziato il giorno precedente.
+      const turnoCountdown = turnoInCorso || turnoOggi;
+
       if (
-        !turnoOggi ||
-        turnoOggi.tipo !== 'turno' ||
-        !turnoOggi.inizio ||
-        !turnoOggi.fine
+        !turnoCountdown ||
+        turnoCountdown.tipo !== 'turno' ||
+        !turnoCountdown.inizio ||
+        !turnoCountdown.fine
       ) {
         setCountdownLabel(
-          turnoOggi?.tipo === 'riposo' ? 'RIPOSO' : 'NESSUN TURNO'
+          turnoCountdown?.tipo === 'riposo' ? 'RIPOSO' : 'NESSUN TURNO'
         );
         setCountdownTurno('--h --m');
         return;
       }
 
-      const adesso = new Date();
+      const creaDateTurno = (t) => {
+        const [hInizio, mInizio] = String(t.inizio)
+          .split(':')
+          .map(Number);
 
-      const [hInizio, mInizio] = String(turnoOggi.inizio)
-        .split(':')
-        .map(Number);
+        const [hFine, mFine] = String(t.fine)
+          .split(':')
+          .map(Number);
 
-      const [hFine, mFine] = String(turnoOggi.fine)
-        .split(':')
-        .map(Number);
+        const inizio = new Date(
+          Number(t.anno),
+          Number(t.mese) - 1,
+          Number(t.giorno),
+          hInizio || 0,
+          mInizio || 0,
+          0
+        );
 
-      const inizioTurno = new Date(
-        adesso.getFullYear(),
-        adesso.getMonth(),
-        adesso.getDate(),
-        hInizio,
-        mInizio,
-        0
-      );
+        const fine = new Date(
+          Number(t.anno),
+          Number(t.mese) - 1,
+          Number(t.giorno),
+          hFine || 0,
+          mFine || 0,
+          0
+        );
 
-      const fineTurno = new Date(
-        adesso.getFullYear(),
-        adesso.getMonth(),
-        adesso.getDate(),
-        hFine,
-        mFine,
-        0
-      );
+        if (fine <= inizio) {
+          fine.setDate(fine.getDate() + 1);
+        }
 
-      if (fineTurno <= inizioTurno) {
-        fineTurno.setDate(fineTurno.getDate() + 1);
-      }
+        return { inizio, fine };
+      };
+
+      const dateCorrenti = creaDateTurno(turnoCountdown);
 
       let destinazione;
       let etichetta;
 
-      if (adesso < inizioTurno) {
-        destinazione = inizioTurno;
-        etichetta = 'INIZIA TRA';
-      } else if (adesso < fineTurno) {
-        destinazione = fineTurno;
+      if (
+        adesso >= dateCorrenti.inizio &&
+        adesso < dateCorrenti.fine
+      ) {
+        destinazione = dateCorrenti.fine;
         etichetta = 'FINE TRA';
+      } else if (adesso < dateCorrenti.inizio) {
+        destinazione = dateCorrenti.inizio;
+        etichetta = 'INIZIA TRA';
       } else {
         const prossimoTurno = turni
-          .filter((t) =>
-            t &&
-            t.tipo === 'turno' &&
-            t.anno &&
-            t.mese &&
-            t.giorno &&
-            t.inizio
+          .filter(
+            (t) =>
+              t.tipo === 'turno' &&
+              t.anno &&
+              t.mese &&
+              t.giorno &&
+              t.inizio &&
+              t.fine
           )
           .map((t) => {
-            const [h, m] = String(t.inizio).split(':').map(Number);
-
-            const data = new Date(
-              Number(t.anno),
-              Number(t.mese) - 1,
-              Number(t.giorno),
-              h || 0,
-              m || 0,
-              0
-            );
-
-            return { ...t, data };
+            const date = creaDateTurno(t);
+            return {
+              ...t,
+              data: date.inizio,
+            };
           })
           .filter((t) => t.data > adesso)
           .sort((a, b) => a.data - b.data)[0];
@@ -2463,6 +2905,12 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
 
       const diff = destinazione.getTime() - adesso.getTime();
 
+      if (diff <= 0) {
+        setCountdownTurno('00h 00m');
+        setCountdownLabel(etichetta);
+        return;
+      }
+
       const ore = Math.floor(diff / 3600000);
       const minuti = Math.floor((diff % 3600000) / 60000);
 
@@ -2474,10 +2922,13 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
 
     aggiornaCountdownTurno();
 
-    const timerCountdown = setInterval(aggiornaCountdownTurno, 30000);
+    const timerCountdown = setInterval(
+      aggiornaCountdownTurno,
+      30000
+    );
 
     return () => clearInterval(timerCountdown);
-  }, [turnoOggi]);
+  }, [turnoOggi, turnoInCorso, turni]);
 
 
   const statistiche =
@@ -2944,14 +3395,11 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
       ore,
 
       extra:
-        tipo === 'turno' &&
-        !Number.isNaN(
-          extraNumero
-        )
-          ? extraNumero
-          : 0,
+      tipo === 'turno'
+        ? Math.max(0, Number(ore || 0) - oreOrdinarieGiornaliereNumero)
+        : 0,
 
-      fascia:
+    fascia:
         tipo === 'turno'
           ? fasciaTurno(
               inizio
@@ -4064,13 +4512,7 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
               marginTop: 8,
             }}
           >
-            Extra: {giornateStipendioMese.reduce(
-  (tot, t) =>
-    t.riposo_lavorato === true
-      ? tot
-      : tot + Number(t.extra || 0),
-  0
-).toFixed(1)} h · Giorni lavorati: {giornateStipendioMese.filter(
+            Extra: {extraStipendioMese.toFixed(1)} h · Giorni lavorati: {giornateStipendioMese.filter(
   (t) => t.riposo_lavorato !== true
 ).length}
           </Text>
@@ -4317,18 +4759,7 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
               ○ Ore ordinarie
             </Text>
             <Text style={{ color: 'white', fontSize: 15, fontWeight: '900' }}>
-              {Math.max(
-  0,
-  oreStipendioMese -
-  extraStipendioMese -
-  giornateStipendioMese.reduce(
-    (tot, t) =>
-      t.riposo_lavorato === true
-        ? tot + Math.max(0, Number(t.ore || 0) - Number(t.extra || 0))
-        : tot,
-    0
-  )
-).toFixed(1)} h
+              {Math.max(0, oreStipendioMese - extraStipendioMese).toFixed(1)} h
             </Text>
           </View>
 
@@ -4350,15 +4781,184 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
               ⭐ Straordinari
             </Text>
             <Text style={{ color: '#ffd54a', fontSize: 15, fontWeight: '900' }}>
-              {giornateStipendioMese.reduce(
-  (tot, t) =>
-    t.riposo_lavorato === true
-      ? tot
-      : tot + Number(t.extra || 0),
-  0
-).toFixed(1)} h
+              {extraStipendioMese.toFixed(1)} h
             </Text>
           </View>
+
+        <TouchableOpacity
+          onPress={() =>
+            setMostraDettaglioStraordinari(
+              !mostraDettaglioStraordinari
+            )
+          }
+          style={{
+            alignSelf: 'flex-start',
+            marginLeft: 4,
+            marginTop: -2,
+            marginBottom:
+              mostraDettaglioStraordinari
+                ? 8
+                : 10,
+            paddingVertical: 5,
+          }}
+        >
+          <Text
+            style={{
+              color: '#75a0ff',
+              fontSize: 12,
+              fontWeight: '800',
+            }}
+          >
+            {mostraDettaglioStraordinari
+              ? 'Nascondi calcolo ▲'
+              : 'Vedi calcolo straordinari ›'}
+          </Text>
+        </TouchableOpacity>
+
+        {mostraDettaglioStraordinari && (
+          <View
+            style={{
+              backgroundColor: '#09162b',
+              borderWidth: 1,
+              borderColor: '#29466f',
+              borderRadius: 14,
+              padding: 12,
+              marginBottom: 12,
+            }}
+          >
+            <Text
+              style={{
+                color: 'white',
+                fontSize: 13,
+                fontWeight: '900',
+                marginBottom: 3,
+              }}
+            >
+              {stipendioCalcoloStraordinari ===
+              'settimanale'
+                ? 'Calcolo settimanale'
+                : 'Calcolo giornaliero'}
+            </Text>
+
+            <Text
+              style={{
+                color: '#8fa5cc',
+                fontSize: 11,
+                marginBottom: 10,
+              }}
+            >
+              {stipendioCalcoloStraordinari ===
+              'settimanale'
+                ? `Soglia: ${
+                    stipendioOreSettimanali || '40'
+                  } h a settimana`
+                : `Soglia: ${
+                    stipendioOreGiornaliere || '7:00'
+                  } h al giorno`}
+            </Text>
+
+            {dettaglioStraordinariMese.length ===
+            0 ? (
+              <Text
+                style={{
+                  color: '#aab8d1',
+                  fontSize: 12,
+                }}
+              >
+                Nessuna ora straordinaria nel mese.
+              </Text>
+            ) : (
+              dettaglioStraordinariMese.map(
+                (riga, index) => (
+                  <View
+                    key={`${riga.etichetta}-${index}`}
+                    style={{
+                      flexDirection: 'row',
+                      justifyContent:
+                        'space-between',
+                      alignItems: 'center',
+                      paddingVertical: 7,
+                      borderBottomWidth:
+                        index ===
+                        dettaglioStraordinariMese.length -
+                          1
+                          ? 0
+                          : 1,
+                      borderBottomColor:
+                        '#162b49',
+                    }}
+                  >
+                    <View>
+                      <Text
+                        style={{
+                          color: '#dfe6ff',
+                          fontSize: 12,
+                          fontWeight: '700',
+                        }}
+                      >
+                        {riga.etichetta}
+                      </Text>
+
+                      <Text
+                        style={{
+                          color: '#8295b7',
+                          fontSize: 10,
+                          marginTop: 2,
+                        }}
+                      >
+                        {riga.ore.toFixed(1)} h
+                        {' '}lavorate
+                      </Text>
+                    </View>
+
+                    <Text
+                      style={{
+                        color: '#ffd54a',
+                        fontSize: 12,
+                        fontWeight: '900',
+                      }}
+                    >
+                      +{riga.extra.toFixed(1)} h
+                    </Text>
+                  </View>
+                )
+              )
+            )}
+
+            <View
+              style={{
+                marginTop: 8,
+                paddingTop: 9,
+                borderTopWidth: 1,
+                borderTopColor: '#29466f',
+                flexDirection: 'row',
+                justifyContent:
+                  'space-between',
+              }}
+            >
+              <Text
+                style={{
+                  color: '#dfe6ff',
+                  fontWeight: '800',
+                  fontSize: 12,
+                }}
+              >
+                Totale straordinari
+              </Text>
+
+              <Text
+                style={{
+                  color: '#ffd54a',
+                  fontWeight: '900',
+                  fontSize: 13,
+                }}
+              >
+                {extraStipendioMese.toFixed(1)} h
+              </Text>
+            </View>
+          </View>
+        )}
+
 
           <View
             style={{
@@ -5256,7 +5856,416 @@ if (screen === 'configuraStipendio') {
             }}
           />
 
-          <Text style={{ color: 'white', fontWeight: '800' }}>
+          <Text style={{ color: 'white', fontWeight: '800', marginTop: 14 }}>
+              Ore normali al giorno
+            </Text>
+
+            <TextInput
+              placeholder="Es. 7:00"
+              placeholderTextColor="#7184aa"
+              value={stipendioOreGiornaliere}
+              onChangeText={setStipendioOreGiornaliere}
+              autoCorrect={false}
+              style={{
+                backgroundColor: '#091936',
+                color: 'white',
+                borderRadius: 12,
+                padding: 14,
+              }}
+            />
+
+            <Text
+              style={{
+                color: '#8fa5cc',
+                fontSize: 12,
+                marginTop: 6,
+                marginBottom: 14,
+              }}
+            >
+              Le ore oltre questa soglia saranno considerate straordinario.
+            </Text>
+
+            <Text
+              style={{
+                color: 'white',
+                fontWeight: '800',
+                marginTop: 18,
+                marginBottom: 10,
+              }}
+            >
+              Come calcolare gli straordinari
+            </Text>
+
+            <View
+              style={{
+                flexDirection: 'row',
+                gap: 10,
+                marginBottom: 8,
+              }}
+            >
+              <TouchableOpacity
+                onPress={() =>
+                  setStipendioCalcoloStraordinari('giornaliero')
+                }
+                style={{
+                  flex: 1,
+                  paddingVertical: 14,
+                  paddingHorizontal: 10,
+                  borderRadius: 14,
+                  alignItems: 'center',
+                  backgroundColor:
+                    stipendioCalcoloStraordinari === 'giornaliero'
+                      ? '#3154ff'
+                      : '#091936',
+                  borderWidth: 1,
+                  borderColor:
+                    stipendioCalcoloStraordinari === 'giornaliero'
+                      ? '#6f86ff'
+                      : '#203a67',
+                }}
+              >
+                <Text
+                  style={{
+                    color: 'white',
+                    fontWeight: '900',
+                    fontSize: 14,
+                  }}
+                >
+                  Giornaliero
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() =>
+                  setStipendioCalcoloStraordinari('settimanale')
+                }
+                style={{
+                  flex: 1,
+                  paddingVertical: 14,
+                  paddingHorizontal: 10,
+                  borderRadius: 14,
+                  alignItems: 'center',
+                  backgroundColor:
+                    stipendioCalcoloStraordinari === 'settimanale'
+                      ? '#3154ff'
+                      : '#091936',
+                  borderWidth: 1,
+                  borderColor:
+                    stipendioCalcoloStraordinari === 'settimanale'
+                      ? '#6f86ff'
+                      : '#203a67',
+                }}
+              >
+                <Text
+                  style={{
+                    color: 'white',
+                    fontWeight: '900',
+                    fontSize: 14,
+                  }}
+                >
+                  Settimanale
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            <Text
+              style={{
+                color: '#8fa5cc',
+                fontSize: 12,
+                marginBottom: 14,
+                lineHeight: 17,
+              }}
+            >
+              {stipendioCalcoloStraordinari === 'settimanale'
+                ? `Straordinario oltre ${stipendioOreSettimanali || '40'} ore nella settimana.`
+                : `Straordinario oltre ${stipendioOreGiornaliere || '7:00'} ore nella giornata.`}
+            </Text>
+
+            
+            
+            <Text
+              style={{
+                color: 'white',
+                fontSize: 15,
+                fontWeight: '900',
+                marginTop: 18,
+                marginBottom: 10,
+              }}
+            >
+              Profilo di calcolo
+            </Text>
+
+            <View
+              style={{
+                flexDirection: 'row',
+                gap: 10,
+              }}
+            >
+              <TouchableOpacity
+                onPress={() =>
+                  setStipendioProfiloCalcolo('automatico')
+                }
+                style={{
+                  flex: 1,
+                  paddingVertical: 14,
+                  borderRadius: 14,
+                  alignItems: 'center',
+                  backgroundColor:
+                    stipendioProfiloCalcolo === 'automatico'
+                      ? '#3154ff'
+                      : '#091936',
+                  borderWidth: 1,
+                  borderColor:
+                    stipendioProfiloCalcolo === 'automatico'
+                      ? '#6f86ff'
+                      : '#203a67',
+                }}
+              >
+                <Text
+                  style={{
+                    color: 'white',
+                    fontWeight: '900',
+                  }}
+                >
+                  Automatico
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() =>
+                  setStipendioProfiloCalcolo('personalizzato')
+                }
+                style={{
+                  flex: 1,
+                  paddingVertical: 14,
+                  borderRadius: 14,
+                  alignItems: 'center',
+                  backgroundColor:
+                    stipendioProfiloCalcolo === 'personalizzato'
+                      ? '#3154ff'
+                      : '#091936',
+                  borderWidth: 1,
+                  borderColor:
+                    stipendioProfiloCalcolo === 'personalizzato'
+                      ? '#6f86ff'
+                      : '#203a67',
+                }}
+              >
+                <Text
+                  style={{
+                    color: 'white',
+                    fontWeight: '900',
+                  }}
+                >
+                  Personalizzato
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            <Text
+              style={{
+                color: '#8fa5cc',
+                fontSize: 12,
+                lineHeight: 17,
+                marginTop: 8,
+              }}
+            >
+              {stipendioProfiloCalcolo === 'automatico'
+                ? 'Usa automaticamente i valori previsti dal profilo selezionato.'
+                : 'Puoi inserire manualmente gli importi riportati nella tua busta paga.'}
+            </Text>
+
+<View
+              style={{
+                marginTop: 18,
+                marginBottom: 18,
+                backgroundColor: '#0a1730',
+                borderWidth: 1,
+                borderColor: '#203a67',
+                borderRadius: 16,
+                padding: 14,
+              }}
+            >
+              <TouchableOpacity
+                onPress={() =>
+                  setMostraImportiCalcolo(
+                    !mostraImportiCalcolo
+                  )
+                }
+              >
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                  }}
+                >
+                  <View style={{ flex: 1 }}>
+                    <Text
+                      style={{
+                        color: 'white',
+                        fontSize: 15,
+                        fontWeight: '900',
+                      }}
+                    >
+                      Importi di calcolo
+                    </Text>
+
+                    <Text
+                      style={{
+                        color: '#8fa5cc',
+                        fontSize: 12,
+                        marginTop: 4,
+                      }}
+                    >
+                      {stipendioProfiloCalcolo === 'automatico'
+                        ? 'Valori gestiti automaticamente'
+                        : 'Inserisci i valori della tua busta paga'}
+                    </Text>
+                  </View>
+
+                  <Text
+                    style={{
+                      color: '#75a0ff',
+                      fontSize: 13,
+                      fontWeight: '900',
+                      marginLeft: 10,
+                    }}
+                  >
+                    {mostraImportiCalcolo
+                      ? 'Chiudi ▲'
+                      : 'Modifica ›'}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+
+              {mostraImportiCalcolo && (
+                <View style={{ marginTop: 18 }}>
+
+                  <Text style={{ color: '#dfe6ff', fontWeight: '800' }}>
+                    Straordinario · €/h
+                  </Text>
+                  <TextInput
+                    value={stipendioTariffaStraordinario}
+                    editable={stipendioProfiloCalcolo === 'personalizzato'}
+                    onChangeText={setStipendioTariffaStraordinario}
+                    keyboardType="decimal-pad"
+                    placeholder="11,03783"
+                    placeholderTextColor="#7184aa"
+                    style={{
+                      backgroundColor: '#091936',
+                      color: 'white',
+                      borderRadius: 12,
+                      padding: 13,
+                      marginTop: 7,
+                      marginBottom: 14,
+                    }}
+                  />
+
+                  <Text style={{ color: '#dfe6ff', fontWeight: '800' }}>
+                    Domenicale · €/h
+                  </Text>
+                  <TextInput
+                    value={stipendioTariffaDomenicale}
+                    editable={stipendioProfiloCalcolo === 'personalizzato'}
+                    onChangeText={setStipendioTariffaDomenicale}
+                    keyboardType="decimal-pad"
+                    placeholder="0,71"
+                    placeholderTextColor="#7184aa"
+                    style={{
+                      backgroundColor: '#091936',
+                      color: 'white',
+                      borderRadius: 12,
+                      padding: 13,
+                      marginTop: 7,
+                      marginBottom: 14,
+                    }}
+                  />
+
+                  <Text style={{ color: '#dfe6ff', fontWeight: '800' }}>
+                    Servizio diurno · €/h
+                  </Text>
+                  <TextInput
+                    value={stipendioTariffaDiurno}
+                    editable={stipendioProfiloCalcolo === 'personalizzato'}
+                    onChangeText={setStipendioTariffaDiurno}
+                    keyboardType="decimal-pad"
+                    placeholder="0,65"
+                    placeholderTextColor="#7184aa"
+                    style={{
+                      backgroundColor: '#091936',
+                      color: 'white',
+                      borderRadius: 12,
+                      padding: 13,
+                      marginTop: 7,
+                      marginBottom: 14,
+                    }}
+                  />
+
+                  <Text style={{ color: '#dfe6ff', fontWeight: '800' }}>
+                    Indennità compensativa · €/h
+                  </Text>
+                  <TextInput
+                    value={stipendioTariffaIndennitaCompensativa}
+                    editable={stipendioProfiloCalcolo === 'personalizzato'}
+                    onChangeText={setStipendioTariffaIndennitaCompensativa}
+                    keyboardType="decimal-pad"
+                    placeholder="1,86"
+                    placeholderTextColor="#7184aa"
+                    style={{
+                      backgroundColor: '#091936',
+                      color: 'white',
+                      borderRadius: 12,
+                      padding: 13,
+                      marginTop: 7,
+                      marginBottom: 14,
+                    }}
+                  />
+
+                  <Text style={{ color: '#dfe6ff', fontWeight: '800' }}>
+                    Notturno · €/h
+                  </Text>
+                  <TextInput
+                    value={stipendioTariffaNotturno}
+                    editable={stipendioProfiloCalcolo === 'personalizzato'}
+                    onChangeText={setStipendioTariffaNotturno}
+                    keyboardType="decimal-pad"
+                    placeholder="4,18"
+                    placeholderTextColor="#7184aa"
+                    style={{
+                      backgroundColor: '#091936',
+                      color: 'white',
+                      borderRadius: 12,
+                      padding: 13,
+                      marginTop: 7,
+                      marginBottom: 14,
+                    }}
+                  />
+
+                  <Text style={{ color: '#dfe6ff', fontWeight: '800' }}>
+                    Riposo lavorato · €/h
+                  </Text>
+                  <TextInput
+                    value={stipendioTariffaRiposo}
+                    editable={stipendioProfiloCalcolo === 'personalizzato'}
+                    onChangeText={setStipendioTariffaRiposo}
+                    keyboardType="decimal-pad"
+                    placeholder="11,8869"
+                    placeholderTextColor="#7184aa"
+                    style={{
+                      backgroundColor: '#091936',
+                      color: 'white',
+                      borderRadius: 12,
+                      padding: 13,
+                      marginTop: 7,
+                    }}
+                  />
+
+                </View>
+              )}
+            </View>
+
+<Text style={{ color: 'white', fontWeight: '800' }}>
             CCNL
           </Text>
 
@@ -5298,6 +6307,16 @@ if (screen === 'configuraStipendio') {
                   ccnl: stipendioCCNL,
                   livello: stipendioLivello,
                   oreSettimanali: stipendioOreSettimanali,
+              oreGiornaliere: stipendioOreGiornaliere,
+              calcoloStraordinari: stipendioCalcoloStraordinari,
+              profiloCalcolo: stipendioProfiloCalcolo,
+              tariffaStraordinario: stipendioTariffaStraordinario,
+              tariffaDomenicale: stipendioTariffaDomenicale,
+              tariffaDiurno: stipendioTariffaDiurno,
+              tariffaIndennitaCompensativa:
+                stipendioTariffaIndennitaCompensativa,
+              tariffaNotturno: stipendioTariffaNotturno,
+              tariffaRiposo: stipendioTariffaRiposo,
                   nettoBase: stipendioNettoBase,
                 })
               );
@@ -16691,15 +17710,15 @@ if (screen === 'profiloCollega') {
               </Text>
 
         <Text style={{color:'#FFFFFF',fontSize:29,fontWeight:'900',marginTop:8}}>
-          {turnoOggi
-            ? (turnoOggi.tipo === 'turno'
-                ? `${turnoOggi.inizio || '--:--'} - ${turnoOggi.fine || '--:--'}`
+          {(turnoInCorso || turnoOggi)
+            ? ((turnoInCorso || turnoOggi).tipo === 'turno'
+                ? `${(turnoInCorso || turnoOggi).inizio || '--:--'} - ${(turnoInCorso || turnoOggi).fine || '--:--'}`
                 : '🌿 RIPOSO')
             : '--:-- - --:--'}
         </Text>
 
         <Text style={{color:'#C8D0E0',fontSize:14,marginTop:6}}>
-                📍 {turnoOggi ? (turnoOggi.luogo || 'Luogo non indicato') : 'Luogo non indicato'}
+                📍 {(turnoInCorso || turnoOggi) ? ((turnoInCorso || turnoOggi).luogo || 'Luogo non indicato') : 'Luogo non indicato'}
               </Text>
             </View>
 
