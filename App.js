@@ -2143,6 +2143,9 @@ if (dati.tariffaStraordinario != null) {
   const [luogo, setLuogo] =
     useState('Fiumicino');
 
+  const [indirizzoServizio, setIndirizzoServizio] =
+    useState('');
+
   const [extra, setExtra] =
     useState('1');
 
@@ -2193,6 +2196,11 @@ if (dati.tariffaStraordinario != null) {
   ] = useState(
     PROFILO_DEFAULT.sede
   );
+
+  const [
+    puntoPartenzaDraft,
+    setPuntoPartenzaDraft,
+  ] = useState('');
 
   const [matricolaDraft, setMatricolaDraft] = useState('');
 
@@ -2252,6 +2260,7 @@ useEffect(() => {
             azienda: profiloCloud.azienda || "",
             ruolo: profiloCloud.ruolo || "",
             sede: profiloCloud.sede || "",
+          punto_partenza: profiloCloud.punto_partenza || "",
             foto_url: profiloCloud.foto_url || null,
           }
         : {
@@ -2260,6 +2269,7 @@ useEffect(() => {
             azienda: "",
             ruolo: "",
             sede: "",
+        punto_partenza: "",
             foto_url: null,
           };
 
@@ -2269,6 +2279,10 @@ useEffect(() => {
       setAziendaDraft(nuovoProfilo.azienda);
       setRuoloDraft(nuovoProfilo.ruolo);
       setSedeDraft(nuovoProfilo.sede);
+
+    setPuntoPartenzaDraft(
+      nuovoProfilo.punto_partenza || ''
+    );
     setInServizioDalDraft(
       nuovoProfilo.in_servizio_dal
         ? String(nuovoProfilo.in_servizio_dal)
@@ -3280,6 +3294,8 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
       'Fiumicino'
     );
 
+    setIndirizzoServizio('');
+
     setExtra('1');
 
     setRiposoLavorato(
@@ -3329,6 +3345,10 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
     setLuogo(
       record.luogo ||
         ''
+    );
+
+    setIndirizzoServizio(
+      record.indirizzo_servizio || ''
     );
 
     setExtra(
@@ -3391,6 +3411,11 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
           ? luogo ||
             'Servizio'
           : null,
+
+    indirizzo_servizio:
+      tipo === 'turno'
+        ? String(indirizzoServizio || '').trim()
+        : null,
 
       ore,
 
@@ -3698,6 +3723,7 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
         azienda: aziendaDraft.trim(),
         ruolo: ruoloDraft.trim(),
         sede: sedeDraft.trim(),
+      punto_partenza: puntoPartenzaDraft.trim(),
       codice_gpg: matricolaDraft.trim(),
       in_servizio_dal:
         inServizioDalDraft.trim() === ''
@@ -3713,13 +3739,17 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
         azienda: salvato.azienda || "",
         ruolo: salvato.ruolo || "",
         sede: salvato.sede || "",
+    punto_partenza:
+      salvato.punto_partenza ||
+      puntoPartenzaDraft.trim() ||
+      "", 
       in_servizio_dal:
         salvato.in_servizio_dal ?? null,
             codice_gpg:
         salvato.codice_gpg ||
         profilo?.codice_gpg ||
         "",
-};
+  };
 
       setProfilo(nuovoProfilo);
       setNomeDraft(nuovoProfilo.nome);
@@ -3727,6 +3757,10 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
       setAziendaDraft(nuovoProfilo.azienda);
       setRuoloDraft(nuovoProfilo.ruolo);
       setSedeDraft(nuovoProfilo.sede);
+
+    setPuntoPartenzaDraft(
+      nuovoProfilo.punto_partenza || ''
+    );
 
       Alert.alert("Profilo salvato", "Il profilo è stato salvato sul tuo account.");
     } catch (error) {
@@ -3774,6 +3808,7 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
         azienda: aziendaDraft.trim(),
         ruolo: ruoloDraft.trim(),
         sede: sedeDraft.trim(),
+      punto_partenza: puntoPartenzaDraft.trim(),
         foto_url: fotoUrl,
       });
 
@@ -3782,6 +3817,11 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
       setProfilo((precedente) => ({
         ...precedente,
         foto_url: profiloAggiornato.foto_url || fotoUrl,
+      punto_partenza:
+        profiloAggiornato.punto_partenza ||
+        puntoPartenzaDraft.trim() ||
+        precedente.punto_partenza ||
+        '',
       }));
 
       Alert.alert(
@@ -11389,6 +11429,11 @@ if (screen === 'configuraStipendio') {
           ] || ''
         : '';
 
+  const indirizzoServizioProssimoTurno =
+    String(
+      prossimoServizioMeteo?.turno?.indirizzo_servizio || ''
+    ).trim();
+
 
 
 
@@ -11907,6 +11952,8 @@ if (screen === 'configuraStipendio') {
                       'Non indicato nel turno'}
                   </Text>
                 </View>
+
+        
               </View>
 
               {previsioneTurno ? (
@@ -15814,6 +15861,24 @@ if (screen === 'profiloCollega') {
           }
         />
 
+          <Field
+            profile
+            label="PUNTO DI PARTENZA ABITUALE"
+            value={puntoPartenzaDraft}
+            onChange={setPuntoPartenzaDraft}
+          />
+
+          <Text
+            style={{
+              color: '#8fa5cc',
+              fontSize: 11,
+              marginTop: -4,
+              marginBottom: 10,
+            }}
+          >
+            Facoltativo · casa, parcheggio o altro punto da cui parti di solito
+          </Text>
+
       <Field
         profile
         label="IN SERVIZIO DAL"
@@ -16792,6 +16857,23 @@ if (screen === 'profiloCollega') {
           value={luogo}
           onChange={setLuogo}
         />
+
+          <Field
+            label="INDIRIZZO DEL SERVIZIO"
+            value={indirizzoServizio}
+            onChange={setIndirizzoServizio}
+          />
+
+          <Text
+            style={{
+              color: '#8fa5cc',
+              fontSize: 11,
+              marginTop: -4,
+              marginBottom: 10,
+            }}
+          >
+            Facoltativo · servirà per percorso, traffico e orario di partenza
+          </Text>
       </View>
 
             <Field
@@ -17983,7 +18065,127 @@ if (screen === 'profiloCollega') {
       })()}
 
 {/* STIPENDIO */}
-        <TouchableOpacity
+        
+<TouchableOpacity
+          activeOpacity={0.85}
+          onPress={async () => {
+            const partenza = String(
+              profilo?.punto_partenza || ''
+            ).trim();
+
+            const turnoPercorso =
+              turnoInCorso ||
+              turnoOggi ||
+              prossimoServizioMeteo?.turno ||
+              null;
+
+            const destinazione = String(
+              turnoPercorso?.indirizzo_servizio || ''
+            ).trim();
+
+            if (!partenza) {
+              Alert.alert(
+                'Punto di partenza mancante',
+                'Inserisci il tuo punto di partenza abituale nel profilo.'
+              );
+              return;
+            }
+
+            if (!destinazione) {
+              Alert.alert(
+                'Indirizzo del servizio mancante',
+                'Apri il prossimo turno e inserisci l’indirizzo del servizio.'
+              );
+              return;
+            }
+
+            try {
+              const url =
+                'https://www.google.com/maps/dir/?api=1' +
+                '&origin=' +
+                encodeURIComponent(partenza) +
+                '&destination=' +
+                encodeURIComponent(destinazione) +
+                '&travelmode=driving';
+
+              await Linking.openURL(url);
+            } catch (error) {
+              Alert.alert(
+                'Percorso non disponibile',
+                'Non riesco ad aprire le indicazioni stradali in questo momento.'
+              );
+            }
+          }}
+          style={{
+            marginTop: 12,
+            backgroundColor: '#10264A',
+            borderWidth: 1,
+            borderColor: '#315D92',
+            borderRadius: 16,
+            paddingVertical: 13,
+            paddingHorizontal: 14,
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+          }}
+        >
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              flex: 1,
+            }}
+          >
+            <View
+              style={{
+                width: 38,
+                height: 38,
+                borderRadius: 12,
+                backgroundColor: '#12365D',
+                alignItems: 'center',
+                justifyContent: 'center',
+                marginRight: 11,
+              }}
+            >
+              <Ionicons
+                name="navigate-outline"
+                size={20}
+                color="#6FEAFF"
+              />
+            </View>
+
+            <View style={{ flex: 1 }}>
+              <Text
+                style={{
+                  color: '#FFFFFF',
+                  fontSize: 13,
+                  fontWeight: '900',
+                }}
+              >
+                🗺 PERCORSO AL SERVIZIO
+              </Text>
+
+              <Text
+                style={{
+                  color: '#8FA5CC',
+                  fontSize: 10,
+                  fontWeight: '700',
+                  marginTop: 3,
+                }}
+              >
+                Apri indicazioni stradali
+              </Text>
+            </View>
+          </View>
+
+          <Ionicons
+            name="chevron-forward"
+            size={18}
+            color="#6FEAFF"
+          />
+        </TouchableOpacity>
+
+<TouchableOpacity
           activeOpacity={0.85}
           onPress={() => setScreen('stipendio')}
           style={{
