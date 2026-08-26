@@ -1228,6 +1228,9 @@ if (dati.tariffaStraordinario != null) {
         'Postazione salvata',
         'Le consegne sono state memorizzate.'
       );
+
+    setPostazioneSelezionata(null);
+    setScreen('postazioni');
     } catch (e) {
       console.log(
         'Errore salvataggio postazione:',
@@ -2293,6 +2296,7 @@ if (dati.tariffaStraordinario != null) {
 
   const [luogo, setLuogo] =
     useState('Fiumicino');
+  const [localitaMeteoTurno, setLocalitaMeteoTurno] = useState('');
 
   const [indirizzoServizio, setIndirizzoServizio] =
     useState('');
@@ -3711,6 +3715,9 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
       record.luogo ||
         ''
     );
+    setLocalitaMeteoTurno(
+      String(record.localita_meteo || '').trim()
+    );
 
     setIndirizzoServizio(
       record.indirizzo_servizio || ''
@@ -3780,6 +3787,11 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
     indirizzo_servizio:
       tipo === 'turno'
         ? String(indirizzoServizio || '').trim()
+        : null,
+
+    localita_meteo:
+      tipo === 'turno'
+        ? String(localitaMeteoTurno || '').trim()
         : null,
 
       ore,
@@ -12190,10 +12202,15 @@ if (screen === 'strumenti') {
   if (screen === 'meteoServizio') {
 
     const zonaMeteo =
-      localitaMeteo.trim() ||
+    String(
+      turnoInCorso?.localita_meteo ||
+      turnoOggi?.localita_meteo ||
+      prossimoServizioMeteo?.turno?.localita_meteo ||
+      localitaMeteo ||
       profilo?.sede ||
       sedeDraft ||
-      '';
+      ''
+    ).trim();
 
     const codiceMeteo = meteoServizio?.current?.weather_code;
 
@@ -17779,6 +17796,23 @@ if (screen === 'profiloCollega') {
         />
 
           <Field
+        label="POSIZIONE PER IL METEO"
+        value={localitaMeteoTurno}
+        onChange={setLocalitaMeteoTurno}
+      />
+
+      <Text
+        style={{
+          color: '#8fa5cc',
+          fontSize: 10,
+          marginTop: -4,
+          marginBottom: 10,
+        }}
+      >
+        📍 Es. Fiumicino, Roma · Ciampino, Roma · Treviso
+      </Text>
+
+      <Field
             label="INDIRIZZO DEL SERVIZIO"
             value={indirizzoServizio}
             onChange={setIndirizzoServizio}
@@ -18558,6 +18592,824 @@ if (screen === 'profiloCollega') {
     );
   }
 
+
+  /* ===== HOME V2 IDEA 3 ===== */
+  if (true) {
+    const turnoHomeV2 = turnoInCorso || turnoOggi;
+
+    const meseHomeV2 = new Date()
+      .toLocaleDateString('it-IT', {
+        month: 'long',
+        year: 'numeric',
+      })
+      .toUpperCase();
+
+    const avanzamentoHomeV2 = Math.round(
+      (
+        new Date().getDate() /
+        new Date(
+          new Date().getFullYear(),
+          new Date().getMonth() + 1,
+          0
+        ).getDate()
+      ) * 100
+    );
+
+    const minutiEtaHomeV2 =
+      Number(etaServizio?.minuti || 0);
+
+    const ritardoHomeV2 =
+      Number(etaServizio?.ritardo_traffico || 0);
+
+    return (
+      <Screen>
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{
+            paddingBottom: 125,
+          }}
+        >
+
+          {/* ================= HEADER ================= */}
+          <View
+            style={{
+              paddingHorizontal: 18,
+              paddingTop: 6,
+              paddingBottom: 10,
+            }}
+          >
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+              }}
+            >
+              <TouchableOpacity
+                onPress={apriProfilo}
+                activeOpacity={0.85}
+                style={{ flex: 1 }}
+              >
+                <Text
+                  style={{
+                    color: '#FFFFFF',
+                    fontSize: 23,
+                    fontWeight: '900',
+                  }}
+                >
+                  Ciao {profilo.nome} 👋
+                </Text>
+
+                <Text
+                  style={{
+                    color: '#AEB9D6',
+                    fontSize: 12,
+                    fontWeight: '700',
+                    marginTop: 4,
+                  }}
+                >
+                  {profilo.azienda} · {profilo.ruolo}
+                </Text>
+
+                <View
+                  style={{
+                    alignSelf: 'flex-start',
+                    marginTop: 9,
+                    backgroundColor: 'rgba(24,190,88,0.17)',
+                    borderRadius: 18,
+                    paddingHorizontal: 12,
+                    paddingVertical: 6,
+                  }}
+                >
+                  <Text
+                    style={{
+                      color: '#42F56C',
+                      fontSize: 11,
+                      fontWeight: '900',
+                    }}
+                  >
+                    ● IN SERVIZIO
+                  </Text>
+                </View>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={apriProfilo}
+                activeOpacity={0.85}
+                style={{
+                  width: 58,
+                  height: 58,
+                  borderRadius: 29,
+                  borderWidth: 2,
+                  borderColor: '#8DB8FF',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  overflow: 'hidden',
+                  backgroundColor: '#142044',
+                }}
+              >
+                {fotoProfilo ? (
+                  <Image
+                    source={{ uri: fotoProfilo }}
+                    style={{
+                      width: '100%',
+                      height: '100%',
+                    }}
+                  />
+                ) : (
+                  <Ionicons
+                    name="person"
+                    size={27}
+                    color="#FFFFFF"
+                  />
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* ================= TURNO ================= */}
+          <View
+            style={{
+              marginHorizontal: 16,
+              marginTop: 10,
+              padding: 18,
+              borderRadius: 25,
+
+              backgroundColor: turnoInCorso
+                ? '#06170E'
+                : '#09182C',
+
+              borderWidth: 1.5,
+              borderColor: turnoInCorso
+                ? '#55F47C'
+                : '#42CFFF',
+
+              shadowColor: turnoInCorso
+                ? '#55F47C'
+                : '#42CFFF',
+
+              shadowOpacity: turnoInCorso ? 0.28 : 0.14,
+              shadowRadius: 17,
+              shadowOffset: {
+                width: 0,
+                height: 7,
+              },
+            }}
+          >
+            <TouchableOpacity
+              activeOpacity={0.86}
+              onPress={() => setScreen('calendar')}
+            >
+              <Text
+                style={{
+                  color: '#4BE66B',
+                  textAlign: 'center',
+                  fontSize: 12,
+                  fontWeight: '900',
+                  letterSpacing: 0.4,
+                }}
+              >
+                TURNO DI OGGI
+              </Text>
+
+              <Text
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.8}
+                style={{
+                  color: '#FFFFFF',
+                  textAlign: 'center',
+                  fontSize: 31,
+                  fontWeight: '900',
+                  marginTop: 12,
+                }}
+              >
+                {turnoHomeV2?.tipo === 'turno'
+                  ? `${turnoHomeV2.inizio || '--:--'} - ${turnoHomeV2.fine || '--:--'}`
+                  : turnoHomeV2?.tipo === 'riposo'
+                  ? 'RIPOSO'
+                  : 'NESSUN TURNO'}
+              </Text>
+
+              <Text
+                style={{
+                  color: '#C8D0E0',
+                  textAlign: 'center',
+                  fontSize: 15,
+                  fontWeight: '700',
+                  marginTop: 8,
+                }}
+              >
+                📍 {turnoHomeV2?.luogo || 'Luogo non indicato'}
+              </Text>
+            </TouchableOpacity>
+
+            {/* separatore */}
+            <View
+              style={{
+                height: 1,
+                backgroundColor: 'rgba(85,244,124,0.18)',
+                marginTop: 16,
+                marginBottom: 12,
+              }}
+            />
+
+            {/* COUNTDOWN */}
+            <View
+              style={{
+                alignItems: 'center',
+              }}
+            >
+              <Text
+                style={{
+                  color: '#55F47C',
+                  fontSize: 10,
+                  fontWeight: '900',
+                  letterSpacing: 1.2,
+                }}
+              >
+                {countdownLabel}
+              </Text>
+
+              <Text
+                style={{
+                  color: '#FFFFFF',
+                  fontSize: 24,
+                  fontWeight: '900',
+                  marginTop: 2,
+                }}
+              >
+                {countdownTurno}
+              </Text>
+            </View>
+
+            {/* PERCORSO + TRAFFICO */}
+            <View
+              style={{
+                height: 1,
+                backgroundColor: 'rgba(85,244,124,0.18)',
+                marginTop: 13,
+                marginBottom: 11,
+              }}
+            />
+
+            <View
+              style={{
+                minHeight: 38,
+                flexDirection: 'row',
+                alignItems: 'center',
+              }}
+            >
+              <View
+                style={{
+                  width: 34,
+                  height: 34,
+                  borderRadius: 11,
+                  backgroundColor: 'rgba(71,221,255,0.11)',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <Ionicons
+                  name="car-outline"
+                  size={21}
+                  color="#63DFFF"
+                />
+              </View>
+
+              <View
+                style={{
+                  flex: 1,
+                  marginLeft: 11,
+                }}
+              >
+                <Text
+                  style={{
+                    color: '#FFFFFF',
+                    fontSize: 13,
+                    fontWeight: '800',
+                  }}
+                >
+                  {etaServizioLoading
+                    ? 'Calcolo traffico in corso...'
+                    : minutiEtaHomeV2 > 0
+                    ? `${minutiEtaHomeV2} min${
+                        ritardoHomeV2 > 0
+                          ? ` · traffico +${ritardoHomeV2} min`
+                          : ' · traffico regolare'
+                      }`
+                    : 'Percorso al servizio'}
+                </Text>
+
+                {!etaServizioLoading && minutiEtaHomeV2 <= 0 ? (
+                  <Text
+                    style={{
+                      color: '#8FA5CC',
+                      fontSize: 10,
+                      marginTop: 2,
+                    }}
+                  >
+                    Apri indicazioni stradali
+                  </Text>
+                ) : null}
+              </View>
+
+              <Ionicons
+                name="chevron-forward"
+                size={19}
+                color="#8FEAFF"
+              />
+            </View>
+          </View>
+
+          {/* ================= MESE ================= */}
+          <TouchableOpacity
+            activeOpacity={0.86}
+            onPress={() => setScreen('calendar')}
+            style={{
+              marginHorizontal: 16,
+              marginTop: 13,
+              paddingHorizontal: 15,
+              paddingVertical: 13,
+              borderRadius: 19,
+
+              backgroundColor: '#0B1930',
+
+              borderWidth: 1,
+              borderColor: 'rgba(78,112,255,0.60)',
+            }}
+          >
+            <View
+              style={{
+                flexDirection: 'row',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+              }}
+            >
+              <Text
+                style={{
+                  color: '#FFFFFF',
+                  fontSize: 13,
+                  fontWeight: '900',
+                }}
+              >
+                {meseHomeV2}
+              </Text>
+
+              <Text
+                style={{
+                  color: '#FFFFFF',
+                  fontSize: 12,
+                  fontWeight: '900',
+                }}
+              >
+                {avanzamentoHomeV2}%
+              </Text>
+            </View>
+
+            <View
+              style={{
+                height: 5,
+                borderRadius: 10,
+                backgroundColor: '#19264A',
+                marginTop: 9,
+                overflow: 'hidden',
+              }}
+            >
+              <View
+                style={{
+                  height: '100%',
+                  width: `${avanzamentoHomeV2}%`,
+                  borderRadius: 10,
+                  backgroundColor: '#72FF45',
+                }}
+              />
+            </View>
+
+            <View
+              style={{
+                flexDirection: 'row',
+                marginTop: 12,
+              }}
+            >
+              <View
+                style={{
+                  flex: 1,
+                  alignItems: 'center',
+                }}
+              >
+                <Text
+                  style={{
+                    color: '#FFFFFF',
+                    fontSize: 19,
+                    fontWeight: '900',
+                  }}
+                >
+                  {Number(oreStipendioMese || 0).toFixed(1)}h
+                </Text>
+
+                <Text
+                  style={{
+                    color: '#9DA9C8',
+                    fontSize: 9,
+                    fontWeight: '800',
+                  }}
+                >
+                  LAVORATE
+                </Text>
+              </View>
+
+              <View
+                style={{
+                  width: 1,
+                  backgroundColor: 'rgba(160,180,220,0.25)',
+                }}
+              />
+
+              <View
+                style={{
+                  flex: 1,
+                  alignItems: 'center',
+                }}
+              >
+                <Text
+                  style={{
+                    color: '#FFFFFF',
+                    fontSize: 19,
+                    fontWeight: '900',
+                  }}
+                >
+                  {Number(extraStipendioMese || 0).toFixed(0)}h
+                </Text>
+
+                <Text
+                  style={{
+                    color: '#9DA9C8',
+                    fontSize: 9,
+                    fontWeight: '800',
+                  }}
+                >
+                  EXTRA
+                </Text>
+              </View>
+
+              <View
+                style={{
+                  width: 1,
+                  backgroundColor: 'rgba(160,180,220,0.25)',
+                }}
+              />
+
+              <View
+                style={{
+                  flex: 1,
+                  alignItems: 'center',
+                }}
+              >
+                <Text
+                  style={{
+                    color: '#FFFFFF',
+                    fontSize: 19,
+                    fontWeight: '900',
+                  }}
+                >
+                  {giornateStipendioMese.length}
+                </Text>
+
+                <Text
+                  style={{
+                    color: '#9DA9C8',
+                    fontSize: 9,
+                    fontWeight: '800',
+                  }}
+                >
+                  GIORNI
+                </Text>
+              </View>
+            </View>
+          </TouchableOpacity>
+
+          {/* ================= STIPENDIO ================= */}
+          <TouchableOpacity
+            activeOpacity={0.84}
+            onPress={() => setScreen('stipendio')}
+            style={{
+              marginHorizontal: 16,
+              marginTop: 12,
+              minHeight: 58,
+              paddingHorizontal: 16,
+              borderRadius: 18,
+              backgroundColor: '#0B1930',
+              borderWidth: 1,
+              borderColor: '#315C87',
+              flexDirection: 'row',
+              alignItems: 'center',
+            }}
+          >
+            <Ionicons
+              name="wallet-outline"
+              size={23}
+              color="#55E86E"
+            />
+
+            <Text
+              style={{
+                color: '#FFFFFF',
+                fontSize: 15,
+                fontWeight: '900',
+                marginLeft: 13,
+                flex: 1,
+              }}
+            >
+              STIPENDIO
+            </Text>
+
+            <Ionicons
+              name="chevron-forward"
+              size={21}
+              color="#FFFFFF"
+            />
+          </TouchableOpacity>
+
+          {/* ================= STRUMENTI ================= */}
+          <TouchableOpacity
+            activeOpacity={0.84}
+            onPress={() => setScreen('strumenti')}
+            style={{
+              marginHorizontal: 16,
+              marginTop: 8,
+              minHeight: 58,
+              paddingHorizontal: 16,
+              borderRadius: 18,
+              backgroundColor: 'rgba(16,38,78,0.95)',
+              borderWidth: 1,
+              borderColor: 'rgba(91,218,255,0.42)',
+              flexDirection: 'row',
+              alignItems: 'center',
+            }}
+          >
+            <Ionicons
+              name="briefcase-outline"
+              size={23}
+              color="#63DFFF"
+            />
+
+            <Text
+              style={{
+                color: '#FFFFFF',
+                fontSize: 15,
+                fontWeight: '900',
+                marginLeft: 13,
+                flex: 1,
+              }}
+            >
+              STRUMENTI
+            </Text>
+
+            <Ionicons
+              name="chevron-forward"
+              size={21}
+              color="#63DFFF"
+            />
+          </TouchableOpacity>
+
+          {/* ================= IN SERVIZIO CON TE ================= */}
+          <TouchableOpacity
+            activeOpacity={0.84}
+            onPress={() => setScreen('colleghi')}
+            style={{
+              marginHorizontal: 16,
+              marginTop: 8,
+              paddingHorizontal: 16,
+              paddingVertical: 13,
+              borderRadius: 18,
+              backgroundColor: '#0B1930',
+              borderWidth: 1,
+              borderColor: '#315C87',
+            }}
+          >
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+              }}
+            >
+              <Ionicons
+                name="people-outline"
+                size={23}
+                color="#63DFFF"
+              />
+
+              <Text
+                style={{
+                  color: '#FFFFFF',
+                  fontSize: 14,
+                  fontWeight: '900',
+                  marginLeft: 13,
+                  flex: 1,
+                }}
+              >
+                IN SERVIZIO CON TE
+              </Text>
+
+              <Ionicons
+                name="chevron-forward"
+                size={20}
+                color="#FFFFFF"
+              />
+            </View>
+
+            <Text
+              style={{
+                color: '#C8D0E0',
+                fontSize: 12,
+                fontWeight: '700',
+                marginTop: 9,
+              }}
+            >
+              {colleghiInServizio.length > 0
+                ? `${colleghiInServizio.length} ${
+                    colleghiInServizio.length === 1
+                      ? 'collega collegato'
+                      : 'colleghi collegati'
+                  } in servizio oggi`
+                : 'Nessun collega collegato in servizio oggi'}
+            </Text>
+
+            <TouchableOpacity
+              onPress={async () => {
+                try {
+                  await aggiornaColleghi();
+                  await aggiornaColleghiInServizioOggi();
+                } catch (e) {
+                  console.log(
+                    'Errore aggiornamento colleghi Home V2:',
+                    e
+                  );
+                }
+              }}
+              activeOpacity={0.75}
+              style={{
+                alignSelf: 'flex-start',
+                marginTop: 8,
+              }}
+            >
+              <Text
+                style={{
+                  color: '#4BE66B',
+                  fontSize: 12,
+                  fontWeight: '900',
+                }}
+              >
+                ↻ Aggiorna
+              </Text>
+            </TouchableOpacity>
+          </TouchableOpacity>
+
+          {/* ================= BARRA RAPIDA ================= */}
+          <View
+            style={{
+              marginHorizontal: 16,
+              marginTop: 12,
+              marginBottom: 15,
+              minHeight: 82,
+              borderRadius: 21,
+              borderWidth: 1,
+              borderColor: '#31516F',
+              backgroundColor: '#071526',
+
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'space-around',
+
+              paddingHorizontal: 8,
+              paddingVertical: 10,
+            }}
+          >
+            {/* TURNI */}
+            <TouchableOpacity
+              onPress={() => setScreen('turni')}
+              activeOpacity={0.75}
+              style={{
+                flex: 1,
+                alignItems: 'center',
+              }}
+            >
+              <Ionicons
+                name="calendar-outline"
+                size={25}
+                color="#55E86E"
+              />
+
+              <Text
+                style={{
+                  color: '#55E86E',
+                  fontSize: 9,
+                  fontWeight: '900',
+                  marginTop: 6,
+                }}
+              >
+                TURNI
+              </Text>
+            </TouchableOpacity>
+
+            {/* CALENDARIO */}
+            <TouchableOpacity
+              onPress={() => setScreen('calendar')}
+              activeOpacity={0.75}
+              style={{
+                flex: 1,
+                alignItems: 'center',
+              }}
+            >
+              <Ionicons
+                name="calendar-number-outline"
+                size={25}
+                color="#7FDBFF"
+              />
+
+              <Text
+                style={{
+                  color: '#FFFFFF',
+                  fontSize: 9,
+                  fontWeight: '900',
+                  marginTop: 6,
+                }}
+              >
+                CALENDARIO
+              </Text>
+            </TouchableOpacity>
+
+            {/* COLLEGHI */}
+            <TouchableOpacity
+              onPress={async () => {
+                try {
+                  setScreen('colleghi');
+                  await aggiornaColleghi();
+                } catch (e) {
+                  console.log(
+                    'Errore apertura colleghi Home V2:',
+                    e
+                  );
+                }
+              }}
+              activeOpacity={0.75}
+              style={{
+                flex: 1,
+                alignItems: 'center',
+              }}
+            >
+              <Ionicons
+                name="people-outline"
+                size={25}
+                color="#7FDBFF"
+              />
+
+              <Text
+                style={{
+                  color: '#FFFFFF',
+                  fontSize: 9,
+                  fontWeight: '900',
+                  marginTop: 6,
+                }}
+              >
+                COLLEGHI
+              </Text>
+            </TouchableOpacity>
+
+            {/* CHAT */}
+            <TouchableOpacity
+              onPress={() => setScreen('listaChat')}
+              activeOpacity={0.75}
+              style={{
+                flex: 1,
+                alignItems: 'center',
+              }}
+            >
+              <Ionicons
+                name="chatbubble-ellipses-outline"
+                size={25}
+                color="#7FDBFF"
+              />
+
+              <Text
+                style={{
+                  color: '#FFFFFF',
+                  fontSize: 9,
+                  fontWeight: '900',
+                  marginTop: 6,
+                }}
+              >
+                CHAT
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+        </ScrollView>
+      </Screen>
+    );
+  }
+
   return (
     <Screen>
       <ScrollView
@@ -18566,13 +19418,13 @@ if (screen === 'profiloCollega') {
       >
 
         {/* HEADER WOW */}
-        <View style={{paddingHorizontal:20,paddingTop:10,paddingBottom:18}}>
+        <View style={{paddingHorizontal:18,paddingTop:6,paddingBottom:10}}>
           <View style={{flexDirection:'row',alignItems:'center',justifyContent:'space-between'}}>
             <TouchableOpacity onPress={apriProfilo} style={{flex:1}}>
               <Text style={{color:'#FFFFFF',fontSize:19,fontWeight:'700'}}>
                 Buon servizio,
               </Text>
-              <Text style={{color:'#FFFFFF',fontSize:32,fontWeight:'900',lineHeight:35}}>
+              <Text style={{color:'#FFFFFF',fontSize:27,fontWeight:'900',lineHeight:29}}>
                 {profilo.nome} 👋
               </Text>
               <Text style={{color:'#AEB9D6',fontSize:13,fontWeight:'700',marginTop:5}}>
@@ -18583,7 +19435,7 @@ if (screen === 'profiloCollega') {
             <TouchableOpacity
               onPress={apriProfilo}
               style={{
-                width:64,height:64,borderRadius:32,
+                width:52,height:52,borderRadius:26,
                 borderWidth:2,borderColor:'#8DB8FF',
                 alignItems:'center',justifyContent:'center',
                 overflow:'hidden',backgroundColor:'#142044'
@@ -18854,15 +19706,15 @@ if (screen === 'profiloCollega') {
             }
             style={{
               marginHorizontal: 16,
-              marginBottom: 15,
+              marginBottom: 9,
 
               paddingHorizontal: 15,
-              paddingVertical: 13,
+              paddingVertical: 9,
 
               flexDirection: 'row',
               alignItems: 'center',
 
-              borderRadius: 20,
+              borderRadius: 17,
 
               backgroundColor: urgente
                 ? 'rgba(77,30,39,0.82)'
@@ -19042,7 +19894,7 @@ if (screen === 'profiloCollega') {
             borderWidth: 1,
             borderColor: '#315D92',
             borderRadius: 16,
-            paddingVertical: 13,
+            paddingVertical: 9,
             paddingHorizontal: 14,
             flexDirection: 'row',
             alignItems: 'center',
@@ -19197,9 +20049,9 @@ if (screen === 'profiloCollega') {
           onPress={() => setScreen('stipendio')}
           style={{
         marginHorizontal: 16,
-        marginBottom: 15,
+        marginBottom: 8,
         backgroundColor: '#0B1930',
-        borderRadius: 20,
+        borderRadius: 17,
         borderWidth: 1,
         borderColor: '#3B6EA5',
         padding: 16,
@@ -19230,15 +20082,15 @@ if (screen === 'profiloCollega') {
         onPress={() => setScreen('strumenti')}
         style={{
           marginHorizontal: 16,
-          marginBottom: 15,
-          minHeight: 64,
+          marginBottom: 9,
+          minHeight: 54,
           paddingHorizontal: 17,
-          paddingVertical: 13,
+          paddingVertical: 9,
 
           flexDirection: 'row',
           alignItems: 'center',
 
-          borderRadius: 20,
+          borderRadius: 17,
 
           backgroundColor: 'rgba(16,38,78,0.94)',
 
@@ -19315,9 +20167,9 @@ if (screen === 'profiloCollega') {
       {/* COLLEGA */}
         <View style={{
         marginHorizontal: 16,
-        marginBottom: 18,
-        padding: 17,
-        borderRadius: 21,
+        marginBottom: 10,
+        padding: 14,
+        borderRadius: 18,
         backgroundColor: '#0C1728',
         borderWidth: 1,
         borderColor: '#2B4568',
