@@ -335,6 +335,19 @@ export default function App() {
  const [accessoTest, setAccessoTest] = useState(false);
   const [screen, setScreen] = useState("home");
   const [stipendioCCNL, setStipendioCCNL] = useState('Vigilanza Privata e Servizi di Sicurezza');
+
+  // ===== TIPO OPERATORE STIPENDIO =====
+  // Default GPG = retrocompatibilità per utenti già esistenti
+  const [stipendioTipoOperatore, setStipendioTipoOperatore] =
+    useState('gpg');
+
+  const isFiduciario =
+    stipendioTipoOperatore === 'fiduciario';
+
+  const livelliGPG = ['1', '2', '3', '4', '5', '6'];
+  const livelliFiduciario = ['A', 'B', 'C', 'D', 'E'];
+
+
   const [stipendioLivello, setStipendioLivello] = useState('');
   const [stipendioOreSettimanali, setStipendioOreSettimanali] = useState('40');
 
@@ -401,12 +414,1017 @@ export default function App() {
     return Number.isFinite(numero) && numero > 0 ? numero : 7;
   })();
   const [stipendioNettoBase, setStipendioNettoBase] = useState('');
+
+  // Base mensile lorda personalizzata - solo Servizi di Sicurezza
+  const [stipendioLordoBaseFiduciario, setStipendioLordoBaseFiduciario] =
+    useState('');
+
+  // Superminimo / indennità fissa mensile Fiduciario
+  const [stipendioSuperminimoFiduciario, setStipendioSuperminimoFiduciario] =
+    useState('');
+
+
+
+
   const [stipendioIndennita20724, setStipendioIndennita20724] = useState('103.64');
   const [chatMessaggio, setChatMessaggio] = useState('');
   const [chatMessaggi, setChatMessaggi] = useState([]);
   const [chatMioId, setChatMioId] = useState(null);
   const [chatLoading, setChatLoading] = useState(false);
   const chatScrollRef = useRef(null);
+
+  
+  /* =========================================================
+     BLOCK PUZZLE - STATI GLOBALI
+     ========================================================= */
+  
+  /* =========================================================
+     PONG - STATI + MOTORE
+     ========================================================= */
+
+  
+  /* =========================================================
+     SPACE PATROL - STATI + MOTORE
+     ========================================================= */
+
+  
+  /* =========================================================
+     CAMPO MINATO - STATI + MOTORE
+     ========================================================= */
+
+  const MINES_SIZE = 9;
+  const MINES_COUNT = 10;
+
+  const creaCampoMinato = () => {
+    const celle = Array.from(
+      { length: MINES_SIZE },
+      (_, r) =>
+        Array.from(
+          { length: MINES_SIZE },
+          (_, c) => ({
+            r,
+            c,
+            mina: false,
+            aperta: false,
+            bandiera: false,
+            numero: 0,
+          })
+        )
+    );
+
+    let piazzate = 0;
+
+    while (piazzate < MINES_COUNT) {
+      const r = Math.floor(
+        Math.random() * MINES_SIZE
+      );
+
+      const c = Math.floor(
+        Math.random() * MINES_SIZE
+      );
+
+      if (!celle[r][c].mina) {
+        celle[r][c].mina = true;
+        piazzate += 1;
+      }
+    }
+
+    const vicini = [
+      [-1, -1],
+      [-1, 0],
+      [-1, 1],
+      [0, -1],
+      [0, 1],
+      [1, -1],
+      [1, 0],
+      [1, 1],
+    ];
+
+    for (let r = 0; r < MINES_SIZE; r++) {
+      for (let c = 0; c < MINES_SIZE; c++) {
+        if (celle[r][c].mina) continue;
+
+        let numero = 0;
+
+        vicini.forEach(([dr, dc]) => {
+          const rr = r + dr;
+          const cc = c + dc;
+
+          if (
+            rr >= 0 &&
+            rr < MINES_SIZE &&
+            cc >= 0 &&
+            cc < MINES_SIZE &&
+            celle[rr][cc].mina
+          ) {
+            numero += 1;
+          }
+        });
+
+        celle[r][c].numero = numero;
+      }
+    }
+
+    return celle;
+  };
+
+  const [mineCampo, setMineCampo] =
+    useState(() => creaCampoMinato());
+
+  const [mineModalitaBandiera, setMineModalitaBandiera] =
+    useState(false);
+
+  const [mineGameOver, setMineGameOver] =
+    useState(false);
+
+  const [mineVittoria, setMineVittoria] =
+    useState(false);
+
+  const [mineSecondi, setMineSecondi] =
+    useState(0);
+
+  const [mineAvviato, setMineAvviato] =
+    useState(false);
+
+  const nuovaPartitaMine = () => {
+    setMineCampo(creaCampoMinato());
+    setMineModalitaBandiera(false);
+    setMineGameOver(false);
+    setMineVittoria(false);
+    setMineSecondi(0);
+    setMineAvviato(false);
+  };
+
+  const contaBandiereMine = (campo) =>
+    campo.flat().filter((x) => x.bandiera).length;
+
+  const apriZonaMine = (campo, r, c) => {
+    const nuovo = campo.map((row) =>
+      row.map((cell) => ({ ...cell }))
+    );
+
+    const visitati = new Set();
+    const coda = [[r, c]];
+
+    const vicini = [
+      [-1, -1],
+      [-1, 0],
+      [-1, 1],
+      [0, -1],
+      [0, 1],
+      [1, -1],
+      [1, 0],
+      [1, 1],
+    ];
+
+    while (coda.length > 0) {
+      const [rr, cc] = coda.shift();
+
+      const key = `${rr}-${cc}`;
+
+      if (visitati.has(key)) continue;
+      visitati.add(key);
+
+      if (
+        rr < 0 ||
+        rr >= MINES_SIZE ||
+        cc < 0 ||
+        cc >= MINES_SIZE
+      ) {
+        continue;
+      }
+
+      const cella = nuovo[rr][cc];
+
+      if (
+        cella.aperta ||
+        cella.bandiera ||
+        cella.mina
+      ) {
+        continue;
+      }
+
+      cella.aperta = true;
+
+      if (cella.numero === 0) {
+        vicini.forEach(([dr, dc]) => {
+          coda.push([
+            rr + dr,
+            cc + dc,
+          ]);
+        });
+      }
+    }
+
+    return nuovo;
+  };
+
+  const verificaVittoriaMine = (campo) => {
+    const sicure = campo
+      .flat()
+      .filter((x) => !x.mina);
+
+    return sicure.every((x) => x.aperta);
+  };
+
+  const premiCellaMine = (r, c) => {
+    if (
+      mineGameOver ||
+      mineVittoria
+    ) {
+      return;
+    }
+
+    if (!mineAvviato) {
+      setMineAvviato(true);
+    }
+
+    const cella = mineCampo[r][c];
+
+    if (cella.aperta) return;
+
+    if (mineModalitaBandiera) {
+      const nuovo = mineCampo.map((row) =>
+        row.map((cell) => ({ ...cell }))
+      );
+
+      nuovo[r][c].bandiera =
+        !nuovo[r][c].bandiera;
+
+      setMineCampo(nuovo);
+      return;
+    }
+
+    if (cella.bandiera) return;
+
+    if (cella.mina) {
+      const nuovo = mineCampo.map((row) =>
+        row.map((cell) => ({
+          ...cell,
+          aperta: cell.mina
+            ? true
+            : cell.aperta,
+        }))
+      );
+
+      setMineCampo(nuovo);
+      setMineGameOver(true);
+      setMineAvviato(false);
+      return;
+    }
+
+    const nuovo =
+      apriZonaMine(
+        mineCampo,
+        r,
+        c
+      );
+
+    setMineCampo(nuovo);
+
+    if (verificaVittoriaMine(nuovo)) {
+      setMineVittoria(true);
+      setMineAvviato(false);
+    }
+  };
+
+  useEffect(() => {
+    if (
+      screen !== 'campoMinatoGame' ||
+      !mineAvviato ||
+      mineGameOver ||
+      mineVittoria
+    ) {
+      return;
+    }
+
+    const timer = setInterval(() => {
+      setMineSecondi((s) => s + 1);
+    }, 1000);
+
+    return () => clearInterval(timer);
+
+  }, [
+    screen,
+    mineAvviato,
+    mineGameOver,
+    mineVittoria,
+  ]);
+
+
+  const SPACE_WIDTH = 300;
+  const SPACE_HEIGHT = 430;
+
+  const SPACE_SHIP_W = 36;
+  const SPACE_SHIP_H = 34;
+
+  const SPACE_ENEMY_W = 28;
+  const SPACE_ENEMY_H = 28;
+
+  const SPACE_BULLET_W = 4;
+  const SPACE_BULLET_H = 14;
+
+  const creaSpaceGame = () => ({
+    shipX: SPACE_WIDTH / 2 - SPACE_SHIP_W / 2,
+    bullets: [],
+    enemies: [],
+    score: 0,
+    lives: 3,
+    running: true,
+    gameOver: false,
+    tick: 0,
+  });
+
+  const [spaceGame, setSpaceGame] =
+    useState(() => creaSpaceGame());
+
+  const nuovaPartitaSpace = () => {
+    setSpaceGame(creaSpaceGame());
+  };
+
+  const muoviNavicellaSpace = (x) => {
+    setSpaceGame((prev) => {
+      if (prev.gameOver) return prev;
+
+      const nuovoX = Math.max(
+        0,
+        Math.min(
+          SPACE_WIDTH - SPACE_SHIP_W,
+          x - SPACE_SHIP_W / 2
+        )
+      );
+
+      return {
+        ...prev,
+        shipX: nuovoX,
+      };
+    });
+  };
+
+  const sparaSpace = () => {
+    setSpaceGame((prev) => {
+      if (
+        prev.gameOver ||
+        !prev.running
+      ) {
+        return prev;
+      }
+
+      const nuovoProiettile = {
+        id: `${Date.now()}-${Math.random()}`,
+        x:
+          prev.shipX +
+          SPACE_SHIP_W / 2 -
+          SPACE_BULLET_W / 2,
+        y:
+          SPACE_HEIGHT -
+          SPACE_SHIP_H -
+          18,
+      };
+
+      return {
+        ...prev,
+        bullets: [
+          ...prev.bullets,
+          nuovoProiettile,
+        ],
+      };
+    });
+  };
+
+  useEffect(() => {
+    if (
+      screen !== 'spacePatrolGame' ||
+      !spaceGame.running ||
+      spaceGame.gameOver
+    ) {
+      return;
+    }
+
+    const timer = setInterval(() => {
+      setSpaceGame((prev) => {
+        if (
+          !prev.running ||
+          prev.gameOver
+        ) {
+          return prev;
+        }
+
+        const nuovoTick =
+          prev.tick + 1;
+
+        // Più punti = nemici leggermente più veloci
+        const enemySpeed =
+          2.0 +
+          Math.min(
+            2.2,
+            prev.score / 180
+          );
+
+        let bullets =
+          prev.bullets
+            .map((b) => ({
+              ...b,
+              y: b.y - 7.5,
+            }))
+            .filter(
+              (b) =>
+                b.y >
+                -SPACE_BULLET_H
+            );
+
+        let enemies =
+          prev.enemies
+            .map((e) => ({
+              ...e,
+              y: e.y + enemySpeed,
+            }));
+
+        // Generazione nemici
+        const spawnChance =
+          Math.min(
+            0.045,
+            0.020 +
+              prev.score / 12000
+          );
+
+        if (
+          Math.random() <
+          spawnChance
+        ) {
+          enemies.push({
+            id: `${Date.now()}-${Math.random()}`,
+            x:
+              4 +
+              Math.random() *
+                (
+                  SPACE_WIDTH -
+                  SPACE_ENEMY_W -
+                  8
+                ),
+            y: -SPACE_ENEMY_H,
+          });
+        }
+
+        let puntiGuadagnati = 0;
+
+        const bulletsDaRimuovere =
+          new Set();
+
+        const enemiesDaRimuovere =
+          new Set();
+
+        // Collisioni proiettile / nemico
+        bullets.forEach(
+          (bullet, bi) => {
+            enemies.forEach(
+              (enemy, ei) => {
+                if (
+                  bulletsDaRimuovere.has(bi) ||
+                  enemiesDaRimuovere.has(ei)
+                ) {
+                  return;
+                }
+
+                const collisione =
+                  bullet.x <
+                    enemy.x +
+                      SPACE_ENEMY_W &&
+                  bullet.x +
+                    SPACE_BULLET_W >
+                    enemy.x &&
+                  bullet.y <
+                    enemy.y +
+                      SPACE_ENEMY_H &&
+                  bullet.y +
+                    SPACE_BULLET_H >
+                    enemy.y;
+
+                if (collisione) {
+                  bulletsDaRimuovere.add(
+                    bi
+                  );
+                  enemiesDaRimuovere.add(
+                    ei
+                  );
+
+                  puntiGuadagnati += 10;
+                }
+              }
+            );
+          }
+        );
+
+        bullets =
+          bullets.filter(
+            (_, i) =>
+              !bulletsDaRimuovere.has(i)
+          );
+
+        enemies =
+          enemies.filter(
+            (_, i) =>
+              !enemiesDaRimuovere.has(i)
+          );
+
+        let vitePerse = 0;
+
+        const shipY =
+          SPACE_HEIGHT -
+          SPACE_SHIP_H -
+          10;
+
+        const enemiesFinali = [];
+
+        enemies.forEach((enemy) => {
+          const colpisceNavicella =
+            enemy.x <
+              prev.shipX +
+                SPACE_SHIP_W &&
+            enemy.x +
+              SPACE_ENEMY_W >
+              prev.shipX &&
+            enemy.y <
+              shipY +
+                SPACE_SHIP_H &&
+            enemy.y +
+              SPACE_ENEMY_H >
+              shipY;
+
+          const arrivatoInFondo =
+            enemy.y >
+            SPACE_HEIGHT;
+
+          if (
+            colpisceNavicella ||
+            arrivatoInFondo
+          ) {
+            vitePerse += 1;
+          } else {
+            enemiesFinali.push(
+              enemy
+            );
+          }
+        });
+
+        const nuoveVite =
+          Math.max(
+            0,
+            prev.lives -
+              vitePerse
+          );
+
+        const gameOver =
+          nuoveVite <= 0;
+
+        return {
+          ...prev,
+
+          tick: nuovoTick,
+
+          bullets,
+
+          enemies: enemiesFinali,
+
+          score:
+            prev.score +
+            puntiGuadagnati,
+
+          lives:
+            nuoveVite,
+
+          running:
+            gameOver
+              ? false
+              : prev.running,
+
+          gameOver,
+        };
+      });
+    }, 30);
+
+    return () =>
+      clearInterval(timer);
+
+  }, [
+    screen,
+    spaceGame.running,
+    spaceGame.gameOver,
+  ]);
+
+
+  const PONG_WIDTH = 300;
+  const PONG_HEIGHT = 400;
+  const PONG_PADDLE_H = 76;
+  const PONG_PADDLE_W = 10;
+  const PONG_BALL = 12;
+
+  const [pongPlayerY, setPongPlayerY] = useState(
+    (PONG_HEIGHT - PONG_PADDLE_H) / 2
+  );
+
+  const [pongCpuY, setPongCpuY] = useState(
+    (PONG_HEIGHT - PONG_PADDLE_H) / 2
+  );
+
+  const pongPlayerYRef = useRef(
+    (PONG_HEIGHT - PONG_PADDLE_H) / 2
+  );
+
+  const pongCpuYRef = useRef(
+    (PONG_HEIGHT - PONG_PADDLE_H) / 2
+  );
+
+  const [pongBall, setPongBall] = useState({
+    x: PONG_WIDTH / 2 - PONG_BALL / 2,
+    y: PONG_HEIGHT / 2 - PONG_BALL / 2,
+    vx: 4.2,
+    vy: 2.6,
+  });
+
+  const [pongPlayerScore, setPongPlayerScore] = useState(0);
+  const [pongCpuScore, setPongCpuScore] = useState(0);
+
+  const [pongRunning, setPongRunning] = useState(false);
+  const [pongGameOver, setPongGameOver] = useState(false);
+  const [pongWinner, setPongWinner] = useState('');
+
+  const limitaPong = (v, min, max) =>
+    Math.max(min, Math.min(max, v));
+
+  const muoviPongGiocatore = (y) => {
+    const nuovaY = limitaPong(
+      y - PONG_PADDLE_H / 2,
+      0,
+      PONG_HEIGHT - PONG_PADDLE_H
+    );
+
+    pongPlayerYRef.current = nuovaY;
+    setPongPlayerY(nuovaY);
+  };
+
+  const centraPallaPong = (direzione = 1) => ({
+    x: PONG_WIDTH / 2 - PONG_BALL / 2,
+    y: PONG_HEIGHT / 2 - PONG_BALL / 2,
+    vx: 4.2 * direzione,
+    vy: (Math.random() > 0.5 ? 1 : -1) *
+        (2.2 + Math.random() * 1.5),
+  });
+
+  const nuovaPartitaPong = () => {
+    const centro =
+      (PONG_HEIGHT - PONG_PADDLE_H) / 2;
+
+    pongPlayerYRef.current = centro;
+    pongCpuYRef.current = centro;
+
+    setPongPlayerY(centro);
+    setPongCpuY(centro);
+
+    setPongPlayerScore(0);
+    setPongCpuScore(0);
+
+    setPongWinner('');
+    setPongGameOver(false);
+
+    setPongBall(centraPallaPong(1));
+    setPongRunning(true);
+  };
+
+  useEffect(() => {
+    if (
+      screen !== 'pongGame' ||
+      !pongRunning ||
+      pongGameOver
+    ) {
+      return;
+    }
+
+    const timer = setInterval(() => {
+      setPongBall((prev) => {
+        let x = prev.x + prev.vx;
+        let y = prev.y + prev.vy;
+        let vx = prev.vx;
+        let vy = prev.vy;
+
+        // Rimbalzo alto / basso
+        if (y <= 0) {
+          y = 0;
+          vy = Math.abs(vy);
+        }
+
+        if (y >= PONG_HEIGHT - PONG_BALL) {
+          y = PONG_HEIGHT - PONG_BALL;
+          vy = -Math.abs(vy);
+        }
+
+        // CPU segue la palla con velocità limitata
+        const targetCpu =
+          y + PONG_BALL / 2 - PONG_PADDLE_H / 2;
+
+        let cpuNow = pongCpuYRef.current;
+
+        if (targetCpu > cpuNow + 3.5) {
+          cpuNow += 3.5;
+        } else if (targetCpu < cpuNow - 3.5) {
+          cpuNow -= 3.5;
+        }
+
+        cpuNow = limitaPong(
+          cpuNow,
+          0,
+          PONG_HEIGHT - PONG_PADDLE_H
+        );
+
+        pongCpuYRef.current = cpuNow;
+        setPongCpuY(cpuNow);
+
+        // Racchetta giocatore - sinistra
+        if (
+          vx < 0 &&
+          x <= 24 &&
+          x + PONG_BALL >= 12 &&
+          y + PONG_BALL >= pongPlayerYRef.current &&
+          y <= pongPlayerYRef.current + PONG_PADDLE_H
+        ) {
+          x = 24;
+          vx = Math.abs(vx) * 1.025;
+
+          const centroPaddle =
+            pongPlayerYRef.current + PONG_PADDLE_H / 2;
+
+          const centroPalla = y + PONG_BALL / 2;
+
+          vy +=
+            ((centroPalla - centroPaddle) /
+              (PONG_PADDLE_H / 2)) *
+            1.25;
+        }
+
+        // Racchetta CPU - destra
+        if (
+          vx > 0 &&
+          x + PONG_BALL >= PONG_WIDTH - 24 &&
+          x <= PONG_WIDTH - 12 &&
+          y + PONG_BALL >= cpuNow &&
+          y <= cpuNow + PONG_PADDLE_H
+        ) {
+          x = PONG_WIDTH - 24 - PONG_BALL;
+          vx = -Math.abs(vx) * 1.025;
+
+          const centroPaddle =
+            cpuNow + PONG_PADDLE_H / 2;
+
+          const centroPalla = y + PONG_BALL / 2;
+
+          vy +=
+            ((centroPalla - centroPaddle) /
+              (PONG_PADDLE_H / 2)) *
+            0.8;
+        }
+
+        // Punto CPU
+        if (x < -PONG_BALL) {
+          setPongCpuScore((score) => {
+            const nuovo = score + 1;
+
+            if (nuovo >= 5) {
+              setPongWinner('CPU');
+              setPongGameOver(true);
+              setPongRunning(false);
+            }
+
+            return nuovo;
+          });
+
+          return centraPallaPong(-1);
+        }
+
+        // Punto giocatore
+        if (x > PONG_WIDTH) {
+          setPongPlayerScore((score) => {
+            const nuovo = score + 1;
+
+            if (nuovo >= 5) {
+              setPongWinner('TU');
+              setPongGameOver(true);
+              setPongRunning(false);
+            }
+
+            return nuovo;
+          });
+
+          return centraPallaPong(1);
+        }
+
+        return { x, y, vx, vy };
+      });
+    }, 30);
+
+    return () => clearInterval(timer);
+
+  }, [screen, pongRunning, pongGameOver]);
+
+
+  const BLOCK_SIZE = 8;
+
+  const BLOCK_SHAPES = [
+    [{ x: 0, y: 0 }],
+    [{ x: 0, y: 0 }, { x: 1, y: 0 }],
+    [{ x: 0, y: 0 }, { x: 0, y: 1 }],
+    [{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 2, y: 0 }],
+    [{ x: 0, y: 0 }, { x: 0, y: 1 }, { x: 0, y: 2 }],
+    [
+      { x: 0, y: 0 },
+      { x: 1, y: 0 },
+      { x: 0, y: 1 },
+      { x: 1, y: 1 },
+    ],
+    [
+      { x: 0, y: 0 },
+      { x: 0, y: 1 },
+      { x: 1, y: 1 },
+    ],
+    [
+      { x: 1, y: 0 },
+      { x: 0, y: 1 },
+      { x: 1, y: 1 },
+    ],
+    [
+      { x: 0, y: 0 },
+      { x: 1, y: 0 },
+      { x: 1, y: 1 },
+    ],
+    [
+      { x: 0, y: 0 },
+      { x: 1, y: 0 },
+      { x: 2, y: 0 },
+      { x: 1, y: 1 },
+    ],
+  ];
+
+  const generaPezziBlock = () =>
+    Array.from({ length: 3 }, (_, index) => ({
+      id: `${Date.now()}-${index}-${Math.random()}`,
+      celle:
+        BLOCK_SHAPES[
+          Math.floor(Math.random() * BLOCK_SHAPES.length)
+        ],
+      usato: false,
+    }));
+
+  const creaGrigliaBlockVuota = () =>
+    Array.from(
+      { length: BLOCK_SIZE },
+      () => Array(BLOCK_SIZE).fill(false)
+    );
+
+  const [blockGriglia, setBlockGriglia] =
+    useState(() => creaGrigliaBlockVuota());
+
+  const [blockPezzi, setBlockPezzi] =
+    useState(() => generaPezziBlock());
+
+  const [blockPezzoSelezionato, setBlockPezzoSelezionato] =
+    useState(null);
+
+  const [blockPunteggio, setBlockPunteggio] = useState(0);
+  const [blockRecord, setBlockRecord] = useState(0);
+  const [blockGameOver, setBlockGameOver] = useState(false);
+
+  const resetBlockGame = () => {
+    setBlockGriglia(creaGrigliaBlockVuota());
+    setBlockPezzi(generaPezziBlock());
+    setBlockPezzoSelezionato(null);
+    setBlockPunteggio(0);
+    setBlockGameOver(false);
+  };
+
+  const blockPuoEntrare = (griglia, celle, riga, colonna) =>
+    celle.every(({ x, y }) => {
+      const rr = riga + y;
+      const cc = colonna + x;
+
+      return (
+        rr >= 0 &&
+        rr < BLOCK_SIZE &&
+        cc >= 0 &&
+        cc < BLOCK_SIZE &&
+        !griglia[rr][cc]
+      );
+    });
+
+  const blockEsisteMossa = (griglia, pezzi) =>
+    pezzi
+      .filter((pezzo) => !pezzo.usato)
+      .some((pezzo) =>
+        Array.from({ length: BLOCK_SIZE }).some((_, riga) =>
+          Array.from({ length: BLOCK_SIZE }).some((__, colonna) =>
+            blockPuoEntrare(
+              griglia,
+              pezzo.celle,
+              riga,
+              colonna
+            )
+          )
+        )
+      );
+
+  const piazzaPezzoBlock = (riga, colonna) => {
+    if (blockGameOver) return;
+    if (blockPezzoSelezionato === null) return;
+
+    const pezzo = blockPezzi[blockPezzoSelezionato];
+
+    if (!pezzo || pezzo.usato) return;
+
+    if (
+      !blockPuoEntrare(
+        blockGriglia,
+        pezzo.celle,
+        riga,
+        colonna
+      )
+    ) {
+      return;
+    }
+
+    let nuovaGriglia =
+      blockGriglia.map((r) => [...r]);
+
+    pezzo.celle.forEach(({ x, y }) => {
+      nuovaGriglia[riga + y][colonna + x] = true;
+    });
+
+    const righeComplete = [];
+    const colonneComplete = [];
+
+    for (let r = 0; r < BLOCK_SIZE; r++) {
+      if (nuovaGriglia[r].every(Boolean)) {
+        righeComplete.push(r);
+      }
+    }
+
+    for (let c = 0; c < BLOCK_SIZE; c++) {
+      let completa = true;
+
+      for (let r = 0; r < BLOCK_SIZE; r++) {
+        if (!nuovaGriglia[r][c]) {
+          completa = false;
+          break;
+        }
+      }
+
+      if (completa) colonneComplete.push(c);
+    }
+
+    righeComplete.forEach((r) => {
+      for (let c = 0; c < BLOCK_SIZE; c++) {
+        nuovaGriglia[r][c] = false;
+      }
+    });
+
+    colonneComplete.forEach((c) => {
+      for (let r = 0; r < BLOCK_SIZE; r++) {
+        nuovaGriglia[r][c] = false;
+      }
+    });
+
+    const linee =
+      righeComplete.length + colonneComplete.length;
+
+    const punti =
+      pezzo.celle.length + linee * 10;
+
+    const nuovoPunteggio =
+      blockPunteggio + punti;
+
+    setBlockPunteggio(nuovoPunteggio);
+
+    if (nuovoPunteggio > blockRecord) {
+      setBlockRecord(nuovoPunteggio);
+    }
+
+    let nuoviPezzi =
+      blockPezzi.map((p, index) =>
+        index === blockPezzoSelezionato
+          ? { ...p, usato: true }
+          : p
+      );
+
+    if (nuoviPezzi.every((p) => p.usato)) {
+      nuoviPezzi = generaPezziBlock();
+    }
+
+    setBlockGriglia(nuovaGriglia);
+    setBlockPezzi(nuoviPezzi);
+    setBlockPezzoSelezionato(null);
+
+    if (!blockEsisteMossa(nuovaGriglia, nuoviPezzi)) {
+      setBlockGameOver(true);
+    }
+  };
+
 
   const SNAKE_SIZE = 18;
 
@@ -689,6 +1707,16 @@ useEffect(() => {
           setStipendioCCNL(dati.ccnl);
         }
 
+    // Categoria contrattuale
+    // Configurazioni vecchie senza tipoOperatore = GPG
+    setStipendioTipoOperatore(
+      dati.tipoOperatore === 'fiduciario'
+        ? 'fiduciario'
+        : 'gpg'
+    );
+
+
+
         if (dati.livello) {
           setStipendioLivello(String(dati.livello));
         }
@@ -759,6 +1787,26 @@ if (dati.tariffaStraordinario != null) {
             String(dati.nettoBase)
           );
         }
+
+    if (
+      dati.lordoBaseFiduciario !== undefined &&
+      dati.lordoBaseFiduciario !== null
+    ) {
+      setStipendioLordoBaseFiduciario(
+        String(dati.lordoBaseFiduciario)
+      );
+
+      if (
+        dati.superminimoFiduciario !== undefined &&
+        dati.superminimoFiduciario !== null
+      ) {
+        setStipendioSuperminimoFiduciario(
+          String(dati.superminimoFiduciario)
+        );
+      }
+    }
+
+
       } catch (error) {
         console.log(
           'Errore caricamento configurazione stipendio:',
@@ -1879,6 +2927,462 @@ if (dati.tariffaStraordinario != null) {
 
 
   const [recentiMeteo, setRecentiMeteo] = useState([]);
+
+  /* ===== DOTAZIONE PERSONALE STATE ===== */
+  const [dotazionePersonale, setDotazionePersonale] = useState([]);
+  const [dotazioneCaricata, setDotazioneCaricata] = useState(false);
+
+  const [dotazioneNome, setDotazioneNome] = useState('');
+  const [dotazioneCategoria, setDotazioneCategoria] = useState('Abbigliamento');
+  const [dotazioneQuantita, setDotazioneQuantita] = useState('1');
+  const [dotazioneTaglia, setDotazioneTaglia] = useState('');
+  const [dotazioneDataConsegna, setDotazioneDataConsegna] = useState('');
+  const [dotazioneStato, setDotazioneStato] = useState('Buono');
+  const [dotazioneNote, setDotazioneNote] = useState('');
+
+  /* ===== STORICO SOSTITUZIONI STATE ===== */
+  const [dotazioneSostituzioneId, setDotazioneSostituzioneId] =
+    useState(null);
+
+  const [dotazioneSostituzioneQuantita, setDotazioneSostituzioneQuantita] =
+    useState('1');
+
+  const [dotazioneSostituzioneData, setDotazioneSostituzioneData] =
+    useState('');
+
+  const [dotazioneSostituzioneMotivo, setDotazioneSostituzioneMotivo] =
+    useState('');
+
+
+
+  useEffect(() => {
+    let attivo = true;
+
+    (async () => {
+      try {
+        const raw = await AsyncStorage.getItem('vigilanza_dotazione_personale');
+
+        if (!attivo) return;
+
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          setDotazionePersonale(
+            Array.isArray(parsed) ? parsed : []
+          );
+        }
+      } catch (e) {
+        console.log('Errore caricamento dotazione personale:', e);
+      } finally {
+        if (attivo) {
+          setDotazioneCaricata(true);
+        }
+      }
+    })();
+
+    return () => {
+      attivo = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!dotazioneCaricata) return;
+
+    AsyncStorage.setItem(
+      'vigilanza_dotazione_personale',
+      JSON.stringify(dotazionePersonale)
+    ).catch((e) =>
+      console.log('Errore salvataggio dotazione personale:', e)
+    );
+  }, [dotazionePersonale, dotazioneCaricata]);
+
+  const aggiungiDotazionePersonale = () => {
+    const nome = String(dotazioneNome || '').trim();
+
+    if (!nome) {
+      Alert.alert(
+        'Articolo mancante',
+        'Inserisci il nome dell’articolo.'
+      );
+      return;
+    }
+
+    const quantita =
+      Math.max(
+        1,
+        Number(
+          String(dotazioneQuantita || '1')
+            .replace(',', '.')
+        ) || 1
+      );
+
+    const nuovo = {
+      id: `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+      nome,
+      categoria: dotazioneCategoria,
+      quantita,
+      taglia: String(dotazioneTaglia || '').trim(),
+      dataConsegna: String(dotazioneDataConsegna || '').trim(),
+      stato: dotazioneStato,
+      note: String(dotazioneNote || '').trim(),
+      restituito: false,
+      dataRestituzione: '',
+      dataInserimento: new Date().toISOString(),
+    };
+
+    setDotazionePersonale((prev) => [nuovo, ...prev]);
+
+    setDotazioneNome('');
+    setDotazioneQuantita('1');
+    setDotazioneTaglia('');
+    setDotazioneDataConsegna('');
+    setDotazioneStato('Buono');
+    setDotazioneNote('');
+  };
+
+  
+  const salvaSostituzioneDotazione = (id) => {
+    const articolo =
+      dotazionePersonale.find((item) => item.id === id);
+
+    if (!articolo) {
+      Alert.alert('Errore', 'Articolo non trovato.');
+      return;
+    }
+
+    const motivo =
+      String(dotazioneSostituzioneMotivo || '').trim();
+
+    if (!motivo) {
+      Alert.alert(
+        'Motivo mancante',
+        'Indica perché l’articolo è stato sostituito.'
+      );
+      return;
+    }
+
+    const quantitaDisponibile =
+      Math.max(
+        1,
+        Number(articolo.quantita || 1)
+      );
+
+    const quantita =
+      Math.min(
+        quantitaDisponibile,
+        Math.max(
+          1,
+          Number(
+            String(dotazioneSostituzioneQuantita || '1')
+              .replace(',', '.')
+          ) || 1
+        )
+      );
+
+    const data =
+      String(dotazioneSostituzioneData || '').trim() ||
+      new Date().toLocaleDateString('it-IT');
+
+    const evento = {
+      id: `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+      data,
+      quantita,
+      motivo,
+      statoPrecedente: articolo.stato || 'Buono',
+      creatoIl: new Date().toISOString(),
+    };
+
+    setDotazionePersonale((prev) =>
+      prev.map((item) =>
+        item.id === id
+          ? {
+              ...item,
+              stato: 'Buono',
+              dataUltimaSostituzione: data,
+              storicoSostituzioni: [
+                evento,
+                ...(Array.isArray(item.storicoSostituzioni)
+                  ? item.storicoSostituzioni
+                  : []),
+              ],
+            }
+          : item
+      )
+    );
+
+    setDotazioneSostituzioneId(null);
+    setDotazioneSostituzioneQuantita('1');
+    setDotazioneSostituzioneData('');
+    setDotazioneSostituzioneMotivo('');
+  };
+
+
+  /* ===== FOTO RICEVUTA DOTAZIONE ===== */
+
+  const salvaFotoDotazione = async (id, modalita = 'galleria') => {
+    try {
+      let risultato;
+
+      if (modalita === 'camera') {
+        const permesso =
+          await ImagePicker.requestCameraPermissionsAsync();
+
+        if (!permesso.granted) {
+          Alert.alert(
+            'Permesso necessario',
+            'Consenti l’accesso alla fotocamera per fotografare la dotazione o la ricevuta.'
+          );
+          return;
+        }
+
+        risultato =
+          await ImagePicker.launchCameraAsync({
+            mediaTypes: ['images'],
+            allowsEditing: false,
+            quality: 0.9,
+          });
+      } else {
+        const permesso =
+          await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+        if (!permesso.granted) {
+          Alert.alert(
+            'Permesso necessario',
+            'Consenti l’accesso alle foto per allegare una ricevuta o un’immagine.'
+          );
+          return;
+        }
+
+        risultato =
+          await ImagePicker.launchImageLibraryAsync({
+            mediaTypes: ['images'],
+            allowsEditing: false,
+            quality: 0.9,
+          });
+      }
+
+      if (
+        risultato.canceled ||
+        !risultato.assets?.[0]
+      ) {
+        return;
+      }
+
+      const asset = risultato.assets[0];
+
+      const allegato =
+        await copiaAllegatoDocumento(
+          asset.uri,
+          asset.fileName ||
+            `dotazione_${Date.now()}.jpg`,
+          'immagine'
+        );
+
+      if (!allegato?.uri) {
+        throw new Error(
+          'Impossibile salvare permanentemente la fotografia.'
+        );
+      }
+
+      const articoloPrecedente =
+        dotazionePersonale.find(
+          (item) => item.id === id
+        );
+
+      const vecchiaUri =
+        articoloPrecedente?.fotoRicevuta?.uri;
+
+      setDotazionePersonale((prev) =>
+        prev.map((item) =>
+          item.id === id
+            ? {
+                ...item,
+                fotoRicevuta: {
+                  ...allegato,
+                  aggiuntaIl:
+                    new Date().toISOString(),
+                },
+              }
+            : item
+        )
+      );
+
+      // Se sostituiamo una vecchia immagine salvata dall'app,
+      // proviamo a cancellarla dalla memoria.
+      if (
+        vecchiaUri &&
+        vecchiaUri !== allegato.uri
+      ) {
+        try {
+          const info =
+            await FileSystem.getInfoAsync(
+              vecchiaUri
+            );
+
+          if (info.exists) {
+            await FileSystem.deleteAsync(
+              vecchiaUri,
+              { idempotent: true }
+            );
+          }
+        } catch (e) {
+          console.log(
+            'Vecchia foto dotazione non eliminata:',
+            e
+          );
+        }
+      }
+
+    } catch (e) {
+      console.log(
+        'Errore foto/ricevuta dotazione:',
+        e
+      );
+
+      Alert.alert(
+        'Errore',
+        'Non è stato possibile allegare la foto.'
+      );
+    }
+  };
+
+
+  const scegliFotoDotazione = (id) => {
+    Alert.alert(
+      'Foto / ricevuta',
+      'Come vuoi aggiungere l’immagine?',
+      [
+        {
+          text: 'Fotocamera',
+          onPress: () =>
+            salvaFotoDotazione(
+              id,
+              'camera'
+            ),
+        },
+        {
+          text: 'Galleria',
+          onPress: () =>
+            salvaFotoDotazione(
+              id,
+              'galleria'
+            ),
+        },
+        {
+          text: 'Annulla',
+          style: 'cancel',
+        },
+      ]
+    );
+  };
+
+
+  const eliminaFotoDotazione = (id) => {
+    const articolo =
+      dotazionePersonale.find(
+        (item) => item.id === id
+      );
+
+    if (!articolo?.fotoRicevuta?.uri) {
+      return;
+    }
+
+    Alert.alert(
+      'Elimina foto',
+      'Vuoi rimuovere la foto/ricevuta da questo articolo?',
+      [
+        {
+          text: 'Annulla',
+          style: 'cancel',
+        },
+        {
+          text: 'Elimina',
+          style: 'destructive',
+          onPress: async () => {
+            const uri =
+              articolo.fotoRicevuta.uri;
+
+            setDotazionePersonale(
+              (prev) =>
+                prev.map((item) =>
+                  item.id === id
+                    ? {
+                        ...item,
+                        fotoRicevuta: null,
+                      }
+                    : item
+                )
+            );
+
+            try {
+              const info =
+                await FileSystem.getInfoAsync(
+                  uri
+                );
+
+              if (info.exists) {
+                await FileSystem.deleteAsync(
+                  uri,
+                  { idempotent: true }
+                );
+              }
+            } catch (e) {
+              console.log(
+                'Errore eliminazione foto dotazione:',
+                e
+              );
+            }
+          },
+        },
+      ]
+    );
+  };
+
+const cambiaStatoDotazione = (id, stato) => {
+    setDotazionePersonale((prev) =>
+      prev.map((item) =>
+        item.id === id
+          ? { ...item, stato }
+          : item
+      )
+    );
+  };
+
+  const toggleRestituzioneDotazione = (id) => {
+    setDotazionePersonale((prev) =>
+      prev.map((item) => {
+        if (item.id !== id) return item;
+
+        const nuovoRestituito = !item.restituito;
+
+        return {
+          ...item,
+          restituito: nuovoRestituito,
+          dataRestituzione: nuovoRestituito
+            ? new Date().toISOString().slice(0, 10)
+            : '',
+        };
+      })
+    );
+  };
+
+  const eliminaDotazionePersonale = (id) => {
+    Alert.alert(
+      'Elimina articolo',
+      'Vuoi eliminare questo articolo dalla dotazione?',
+      [
+        { text: 'Annulla', style: 'cancel' },
+        {
+          text: 'Elimina',
+          style: 'destructive',
+          onPress: () =>
+            setDotazionePersonale((prev) =>
+              prev.filter((item) => item.id !== id)
+            ),
+        },
+      ]
+    );
+  };
+
   const [meteoPreferenzeCaricate, setMeteoPreferenzeCaricate] =
     useState(false);
 
@@ -2901,6 +4405,606 @@ const totaleCompetenzeStimate =
   importoRiposoLavoratoMese +
   indennita20724Numero;
 
+  // ===== MOTORE ECONOMICO FIDUCIARIO =====
+
+  /*
+   * CCNL Vigilanza Privata e Servizi di Sicurezza
+   * Sezione SERVIZI DI SICUREZZA
+   * Tabelle in vigore da aprile 2026.
+   *
+   * Il ramo GPG sopra resta completamente invariato.
+   */
+
+  const tabellaPagaFiduciari2026 = {
+    A: 1701.42,
+    B: 1548.57,
+    C: 1304.00,
+    D: 1090.00,
+    E: 1028.86,
+  };
+
+  const livelloFiduciarioCorrente =
+    ['A', 'B', 'C', 'D', 'E'].includes(
+      String(stipendioLivello || '').toUpperCase()
+    )
+      ? String(stipendioLivello).toUpperCase()
+      : 'D';
+
+  const lordoBaseFiduciarioPersonalizzatoNumero =
+    Number(
+      String(stipendioLordoBaseFiduciario || '')
+        .trim()
+        .replace(',', '.')
+    );
+
+  const usaLordoBaseFiduciarioPersonalizzato =
+    stipendioProfiloCalcolo === 'personalizzato' &&
+    Number.isFinite(lordoBaseFiduciarioPersonalizzatoNumero) &&
+    lordoBaseFiduciarioPersonalizzatoNumero > 0;
+
+  const pagaConglobataFiduciario =
+    usaLordoBaseFiduciarioPersonalizzato
+      ? lordoBaseFiduciarioPersonalizzatoNumero
+      : tabellaPagaFiduciari2026[
+          livelloFiduciarioCorrente
+        ];
+
+  // Part-time: riproporziona la paga mensile rispetto alle 40h.
+  const oreSettimanaliFiduciario =
+    Math.max(
+      1,
+      Math.min(
+        40,
+        Number(
+          String(stipendioOreSettimanali || '40')
+            .replace(',', '.')
+        ) || 40
+      )
+    );
+
+  const coefficientePartTimeFiduciario =
+    oreSettimanaliFiduciario / 40;
+
+  const lordoBaseFiduciario =
+    pagaConglobataFiduciario *
+    coefficientePartTimeFiduciario;
+
+  // Divisore contrattuale Servizi di Sicurezza.
+  const divisoreFiduciario = 173;
+
+  const pagaOrariaFiduciario =
+    pagaConglobataFiduciario /
+    divisoreFiduciario;
+
+  /*
+   * Le ore straordinarie vengono già determinate dal calendario
+   * dell'app. Per ora distinguiamo correttamente il ramo
+   * Fiduciario dal ramo GPG.
+   *
+   * Straordinario feriale diurno:
+   * retribuzione oraria + maggiorazione 25%.
+   */
+  const tariffaStraordinarioFiduciario =
+    pagaOrariaFiduciario * 1.25;
+
+  const importoStraordinarioFiduciario =
+    Number(extraStipendioMese || 0) *
+    tariffaStraordinarioFiduciario;
+
+  /*
+   * Ore domenicali già calcolate dall'app.
+   * Lavoro domenicale ordinario:
+   * maggiorazione del 15% dal 01/01/2025.
+   *
+   * Qui aggiungiamo SOLO la maggiorazione perché
+   * la paga ordinaria è già compresa nella mensilità.
+   */
+  const maggiorazioneDomenicaleFiduciario =
+    pagaOrariaFiduciario * 0.15;
+
+  const importoDomenicaleFiduciario =
+    Number(oreDomenicaliMese || 0) *
+    maggiorazioneDomenicaleFiduciario;
+
+
+  /*
+   * Calcolo reale delle ore comprese tra le 22:00 e le 06:00.
+   * Non usiamo il numero dei "turni notturni": calcoliamo
+   * effettivamente quante ore del turno cadono nella fascia.
+   */
+  const calcolaOreNotturneFiduciario = (turno) => {
+    if (
+      !turno ||
+      turno.tipo !== 'turno' ||
+      !turno.inizio ||
+      !turno.fine
+    ) {
+      return 0;
+    }
+
+    const [hi, mi] =
+      String(turno.inizio).split(':').map(Number);
+
+    const [hf, mf] =
+      String(turno.fine).split(':').map(Number);
+
+    const inizio =
+      hi * 60 + mi;
+
+    let fineTurno =
+      hf * 60 + mf;
+
+    if (fineTurno <= inizio) {
+      fineTurno += 24 * 60;
+    }
+
+    let minutiNotte = 0;
+
+    // Consideriamo abbastanza finestre per coprire
+    // anche i turni che superano la mezzanotte.
+    [
+      [-120, 360],      // 22:00 giorno precedente -> 06:00
+      [1320, 1800],    // 22:00 -> 06:00 giorno seguente
+      [2760, 3240],
+    ].forEach(([inizioNotte, fineNotte]) => {
+      const da =
+        Math.max(inizio, inizioNotte);
+
+      const a =
+        Math.min(fineTurno, fineNotte);
+
+      if (a > da) {
+        minutiNotte += a - da;
+      }
+    });
+
+    return minutiNotte / 60;
+  };
+
+  const oreNotturneFiduciario =
+    giornateStipendioMese.reduce(
+      (tot, turno) =>
+        tot +
+        calcolaOreNotturneFiduciario(turno),
+      0
+    );
+
+  /*
+   * Maggiorazione notturna ordinaria.
+   * Per non attribuire al fiduciario le indennità GPG,
+   * questa voce è calcolata esclusivamente sulla sua
+   * paga oraria.
+   *
+   * 35% viene utilizzato per lo straordinario notturno.
+   * Sulle ore ordinarie notturne manteniamo questo valore
+   * come stima prudenziale finché non distinguiamo nel
+   * calendario ordinario/straordinario ora per ora.
+   */
+  const maggiorazioneNotturnaFiduciario =
+    pagaOrariaFiduciario * 0.35;
+
+  const importoNotturnoFiduciario =
+    oreNotturneFiduciario *
+    maggiorazioneNotturnaFiduciario;
+
+
+  /*
+   * Il Fiduciario NON eredita:
+   * - piantonamento diurno GPG
+   * - piantonamento notturno GPG
+   * - indennità compensativa GPG
+   * - tariffa riposo lavorato calibrata sul cedolino GPG
+   */
+
+    const importoSuperminimoFiduciario =
+    stipendioProfiloCalcolo === 'personalizzato'
+      ? Math.max(
+          0,
+          Number(
+            String(stipendioSuperminimoFiduciario || '0')
+              .trim()
+              .replace(',', '.')
+          ) || 0
+        )
+      : 0;
+
+const totaleCompetenzeFiduciario =
+    lordoBaseFiduciario +
+    importoSuperminimoFiduciario +
+    importoStraordinarioFiduciario +
+    importoDomenicaleFiduciario +
+    importoNotturnoFiduciario;
+
+  // ===== MATURATO REALE AD OGGI =====
+
+  const adessoMaturato = new Date();
+
+  const creaIntervalloTurnoStipendio = (t) => {
+    if (
+      !t ||
+      t.tipo !== 'turno' ||
+      !t.inizio ||
+      !t.fine
+    ) {
+      return null;
+    }
+
+    const [hi, mi] =
+      String(t.inizio).split(':').map(Number);
+
+    const [hf, mf] =
+      String(t.fine).split(':').map(Number);
+
+    const inizioTurno = new Date(
+      Number(t.anno),
+      Number(t.mese) - 1,
+      Number(t.giorno),
+      hi,
+      mi,
+      0
+    );
+
+    const fineTurno = new Date(
+      Number(t.anno),
+      Number(t.mese) - 1,
+      Number(t.giorno),
+      hf,
+      mf,
+      0
+    );
+
+    if (fineTurno <= inizioTurno) {
+      fineTurno.setDate(
+        fineTurno.getDate() + 1
+      );
+    }
+
+    return {
+      inizio: inizioTurno,
+      fine: fineTurno,
+    };
+  };
+
+
+  // Solo turni realmente terminati
+  const giornateStipendioCompletate =
+    giornateStipendioMese.filter((t) => {
+      const intervallo =
+        creaIntervalloTurnoStipendio(t);
+
+      return (
+        intervallo &&
+        intervallo.fine <= adessoMaturato
+      );
+    });
+
+
+  // Turni non ancora terminati
+  const giornateStipendioFuture =
+    giornateStipendioMese.filter((t) => {
+      const intervallo =
+        creaIntervalloTurnoStipendio(t);
+
+      return (
+        intervallo &&
+        intervallo.fine > adessoMaturato
+      );
+    });
+
+
+  const oreCompletateStipendio =
+    giornateStipendioCompletate.reduce(
+      (tot, t) => tot + Number(t.ore || 0),
+      0
+    );
+
+  const oreFutureStipendio =
+    giornateStipendioFuture.reduce(
+      (tot, t) => tot + Number(t.ore || 0),
+      0
+    );
+
+
+  // Straordinari maturati sui soli turni conclusi
+  const extraCompletatoStipendio =
+    calcolaStraordinariConfigurati({
+      giornateMese: giornateStipendioCompletate,
+      tuttiTurni: turni,
+      modalita: stipendioCalcoloStraordinari,
+      sogliaGiornaliera: oreOrdinarieGiornaliereNumero,
+      sogliaSettimanale: Number(
+        String(stipendioOreSettimanali || '40')
+          .replace(',', '.')
+      ),
+      meseTarget: mese + 1,
+      annoTarget: anno,
+    });
+
+
+  // Ore domenicali dei soli turni conclusi
+  const calcolaDomenicaliCompletate = (lista) =>
+    lista.reduce((tot, t) => {
+      const intervallo =
+        creaIntervalloTurnoStipendio(t);
+
+      if (!intervallo) return tot;
+
+      let cursor = new Date(
+        intervallo.inizio.getFullYear(),
+        intervallo.inizio.getMonth(),
+        intervallo.inizio.getDate(),
+        0, 0, 0
+      );
+
+      let minuti = 0;
+
+      while (cursor < intervallo.fine) {
+        const fineGiorno =
+          new Date(cursor);
+
+        fineGiorno.setDate(
+          fineGiorno.getDate() + 1
+        );
+
+        if (cursor.getDay() === 0) {
+          const da = new Date(
+            Math.max(
+              cursor.getTime(),
+              intervallo.inizio.getTime()
+            )
+          );
+
+          const a = new Date(
+            Math.min(
+              fineGiorno.getTime(),
+              intervallo.fine.getTime()
+            )
+          );
+
+          if (a > da) {
+            minuti +=
+              (a - da) / 60000;
+          }
+        }
+
+        cursor = fineGiorno;
+      }
+
+      return tot + minuti / 60;
+    }, 0);
+
+
+  const oreDomenicaliCompletate =
+    calcolaDomenicaliCompletate(
+      giornateStipendioCompletate
+    );
+
+
+  // Stessa classificazione GPG già utilizzata dal motore
+  const serviziCompletati =
+    giornateStipendioCompletate.filter(
+      (t) => t.tipo === 'turno'
+    );
+
+  const serviziNotturniCompletati =
+    serviziCompletati.filter((t) => {
+      if (!t.inizio || !t.fine) {
+        return false;
+      }
+
+      const [hi, mi] =
+        String(t.inizio).split(':').map(Number);
+
+      const [hf, mf] =
+        String(t.fine).split(':').map(Number);
+
+      return (
+        hf * 60 + mf <=
+        hi * 60 + mi
+      );
+    }).length;
+
+  const serviziDiurniCompletati =
+    Math.max(
+      0,
+      serviziCompletati.length -
+      serviziNotturniCompletati
+    );
+
+
+  const oreRiposoCompletate =
+    giornateStipendioCompletate.reduce(
+      (tot, t) =>
+        t.riposo_lavorato === true
+          ? tot + Number(t.ore || 0)
+          : tot,
+      0
+    );
+
+
+  // Ore notturne reali Fiduciario
+  const oreNotturneFiduciarioCompletate =
+    giornateStipendioCompletate.reduce(
+      (tot, turno) =>
+        tot +
+        calcolaOreNotturneFiduciario(
+          turno
+        ),
+      0
+    );
+
+
+  // Helper: prende la quota già maturata di una componente
+  const quotaMaturata = (
+    importoTotale,
+    unitaCompletate,
+    unitaTotali
+  ) => {
+    const totale =
+      Number(unitaTotali || 0);
+
+    if (totale <= 0) {
+      return 0;
+    }
+
+    return (
+      Number(importoTotale || 0) *
+      Math.min(
+        1,
+        Math.max(
+          0,
+          Number(unitaCompletate || 0) /
+          totale
+        )
+      )
+    );
+  };
+
+
+  // Quota temporale della paga mensile
+  const dataInizioMeseMaturato =
+    new Date(
+      Number(anno),
+      Number(mese),
+      1
+    );
+
+  const dataFineMeseMaturato =
+    new Date(
+      Number(anno),
+      Number(mese) + 1,
+      1
+    );
+
+  let quotaTempoMese = 0;
+
+  if (adessoMaturato >= dataFineMeseMaturato) {
+    quotaTempoMese = 1;
+  } else if (
+    adessoMaturato >= dataInizioMeseMaturato
+  ) {
+    const durata =
+      dataFineMeseMaturato -
+      dataInizioMeseMaturato;
+
+    quotaTempoMese =
+      Math.min(
+        1,
+        Math.max(
+          0,
+          (adessoMaturato -
+            dataInizioMeseMaturato) /
+            durata
+        )
+      );
+  }
+
+
+  // ===== GPG: componenti realmente maturate =====
+
+  const maturatoGpgAdOggi =
+    (
+      Number(lordoBaseLivello || 0) *
+      quotaTempoMese
+    ) +
+
+    quotaMaturata(
+      importoStraordinarioMese,
+      extraCompletatoStipendio,
+      extraStipendioMese
+    ) +
+
+    quotaMaturata(
+      importoDomenicaleMese,
+      oreDomenicaliCompletate,
+      oreDomenicaliMese
+    ) +
+
+    quotaMaturata(
+      importoPiantonamentoDiurnoMese,
+      serviziDiurniCompletati,
+      serviziDiurniMese
+    ) +
+
+    quotaMaturata(
+      importoIndennitaCompensativaMese,
+      serviziCompletati.length,
+      serviziPiantonamentoMese.length
+    ) +
+
+    quotaMaturata(
+      importoPiantonamentoNotturnoMese,
+      serviziNotturniCompletati,
+      serviziNotturniMese
+    ) +
+
+    quotaMaturata(
+      importoRiposoLavoratoMese,
+      oreRiposoCompletate,
+      oreRiposoLavoratoMese
+    ) +
+
+    (
+      Number(indennita20724Numero || 0) *
+      quotaTempoMese
+    );
+
+
+  // ===== FIDUCIARIO: componenti realmente maturate =====
+
+  const maturatoFiduciarioAdOggi =
+    (
+      Number(lordoBaseFiduciario || 0) *
+      quotaTempoMese
+    ) +
+
+    (
+      Number(importoSuperminimoFiduciario || 0) *
+      quotaTempoMese
+    ) +
+
+    quotaMaturata(
+      importoStraordinarioFiduciario,
+      extraCompletatoStipendio,
+      extraStipendioMese
+    ) +
+
+    quotaMaturata(
+      importoDomenicaleFiduciario,
+      oreDomenicaliCompletate,
+      oreDomenicaliMese
+    ) +
+
+    quotaMaturata(
+      importoNotturnoFiduciario,
+      oreNotturneFiduciarioCompletate,
+      oreNotturneFiduciario
+    );
+
+
+  const maturatoAdOggi =
+    stipendioTipoOperatore === 'fiduciario'
+      ? maturatoFiduciarioAdOggi
+      : maturatoGpgAdOggi;
+
+
+  const coefficienteNettoAdOggi =
+    stipendioTipoOperatore === 'fiduciario'
+      ? 0.78
+      : (1992.00 / 2577.16);
+
+  const nettoStimatoAdOggi =
+    Number(maturatoAdOggi || 0) *
+    coefficienteNettoAdOggi;
+
+
+  const numeroTurniFuturi =
+    giornateStipendioFuture.length;
+
+
+
+
+
 console.log('💰 MOTORE STIPENDIO', {
   lordoBaseLivello,
   straordinario: importoStraordinarioMese,
@@ -2916,15 +5020,78 @@ console.log('💰 MOTORE STIPENDIO', {
 const nettoBaseNumero =
     lordoBaseLivello * 0.78;
   const pagaOrariaStimata = nettoBaseNumero > 0 ? nettoBaseNumero / 173 : 0;
-  const maturatoMese = totaleCompetenzeStimate;
+  const maturatoMese =
+    stipendioTipoOperatore === 'fiduciario'
+      ? totaleCompetenzeFiduciario
+      : totaleCompetenzeStimate;
 
 // Netto stimato calibrato sul cedolino reale di luglio 2026:
 // 1992,00 / 2577,16 = circa 0,7729
 const coefficienteNettoStimato = 1992.00 / 2577.16;
-const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
-  const mediaNettaGiornata = giornateStipendioMese.length > 0 ? maturatoMese / giornateStipendioMese.length : 0;
-  const giorniNelMese = new Date(anno, mese + 1, 0).getDate();
-  const previsioneFineMese = giornateStipendioMese.length > 0 ? mediaNettaGiornata * Math.min(giorniNelMese, 26) : nettoBaseNumero;
+const coefficienteNettoFiduciario = 0.78;
+
+  const nettoStimatoMese =
+    maturatoMese *
+    (
+      stipendioTipoOperatore === 'fiduciario'
+        ? coefficienteNettoFiduciario
+        : coefficienteNettoStimato
+    );
+  const mediaNettaGiornata =
+    giornateStipendioMese.length > 0
+      ? maturatoMese / giornateStipendioMese.length
+      : 0;
+
+  const giorniNelMese =
+    new Date(anno, mese + 1, 0).getDate();
+
+  /*
+   * PREVISIONE FINE MESE
+   *
+   * Se sono già presenti turni futuri nel mese selezionato,
+   * il maturato contiene già quelle giornate:
+   * NON facciamo una seconda proiezione.
+   *
+   * Se invece nel mese corrente sono registrati solo i turni
+   * svolti fino a oggi, stimiamo fino a un massimo di 26
+   * giornate lavorative.
+   */
+  const oggiPrevisione = new Date();
+
+  const meseSelezionatoCorrente =
+    Number(anno) === oggiPrevisione.getFullYear() &&
+    Number(mese) === oggiPrevisione.getMonth();
+
+  const haTurniFuturiInseriti =
+    giornateStipendioMese.some((t) => {
+      if (!t || t.tipo !== 'turno') return false;
+
+      const dataTurno = new Date(
+        Number(t.anno),
+        Number(t.mese) - 1,
+        Number(t.giorno),
+        23,
+        59,
+        59
+      );
+
+      return dataTurno > oggiPrevisione;
+    });
+
+  const previsioneFineMese =
+    giornateStipendioMese.length > 0
+      ? maturatoMese
+      : nettoBaseNumero;
+
+  // ===== NETTO PREVISTO FINE MESE =====
+  const nettoPrevistoFineMese =
+    Number(previsioneFineMese || 0) *
+    (
+      stipendioTipoOperatore === 'fiduciario'
+        ? 0.78
+        : (1992.00 / 2577.16)
+    );
+
 
   const turnoOggi = turniMese.find(
     (t) =>
@@ -4908,7 +7075,7 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
               fontWeight: '900',
             }}
           >
-            ORE LAVORATE
+            ORE PROGRAMMATE NEL MESE
           </Text>
 
           <Text
@@ -4943,14 +7110,62 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
             marginBottom: 16,
           }}
         >
+          
+        {/* ===== BADGE MOTORE STIPENDIO ===== */}
+        <View
+          style={{
+            alignSelf: 'flex-start',
+            marginBottom: 9,
+            paddingHorizontal: 10,
+            paddingVertical: 5,
+            borderRadius: 999,
+
+            backgroundColor:
+              stipendioTipoOperatore === 'fiduciario'
+                ? 'rgba(111,234,255,0.11)'
+                : 'rgba(80,222,122,0.11)',
+
+            borderWidth: 1,
+
+            borderColor:
+              stipendioTipoOperatore === 'fiduciario'
+                ? 'rgba(111,234,255,0.40)'
+                : 'rgba(80,222,122,0.40)',
+          }}
+        >
           <Text
+            style={{
+              color:
+                stipendioTipoOperatore === 'fiduciario'
+                  ? '#6FEAFF'
+                  : '#50DE7A',
+              fontSize: 9,
+              fontWeight: '900',
+              letterSpacing: 0.5,
+            }}
+          >
+            {stipendioTipoOperatore === 'fiduciario'
+              ? (
+                  stipendioProfiloCalcolo === 'personalizzato'
+                    ? 'FIDUCIARIO · PERSONALIZZATO'
+                    : 'FIDUCIARIO · AUTOMATICO CCNL'
+                )
+              : (
+                  stipendioProfiloCalcolo === 'personalizzato'
+                    ? 'GPG · PERSONALIZZATO'
+                    : 'GPG · AUTOMATICO'
+                )}
+          </Text>
+        </View>
+
+<Text
             style={{
               color: '#dfe6ff',
               fontSize: 11,
               fontWeight: '900',
             }}
           >
-            MATURATO DEL MESE
+            MATURATO AD OGGI
           </Text>
 
           <Text
@@ -4961,7 +7176,7 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
               marginTop: 5,
             }}
           >
-            € {maturatoMese.toFixed(2)}
+            € {maturatoAdOggi.toFixed(2)}
           </Text>
 
     <Text
@@ -4983,7 +7198,7 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
         marginTop: 2,
       }}
     >
-      € {nettoStimatoMese.toFixed(2)}
+      € {nettoStimatoAdOggi.toFixed(2)}
     </Text>
         </View>
 
@@ -5022,6 +7237,31 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
             € {previsioneFineMese.toFixed(2)}
           </Text>
 
+        {/* ===== NETTO PREVISTO UI ===== */}
+        <View style={{ marginTop: 7 }}>
+          <Text
+            style={{
+              color: '#8FA5CC',
+              fontSize: 10,
+              fontWeight: '800',
+            }}
+          >
+            Netto previsto
+          </Text>
+
+          <Text
+            style={{
+              color: '#43E6A3',
+              fontSize: 18,
+              fontWeight: '900',
+              marginTop: 2,
+            }}
+          >
+            ≈ € {nettoPrevistoFineMese.toFixed(2)}
+          </Text>
+        </View>
+
+
           <Text
             style={{
               color: '#9fb2d9',
@@ -5029,7 +7269,9 @@ const nettoStimatoMese = maturatoMese * coefficienteNettoStimato;
               marginTop: 7,
             }}
           >
-            Media maturata: € {mediaNettaGiornata.toFixed(2)} per giornata
+            {numeroTurniFuturi > 0
+              ? `${numeroTurniFuturi} ${numeroTurniFuturi === 1 ? 'turno futuro' : 'turni futuri'} · ${oreFutureStipendio.toFixed(1)} h programmate`
+              : 'Nessun turno futuro programmato'}
           </Text>
         </View>
 
@@ -6238,12 +8480,215 @@ if (screen === 'configuraStipendio') {
             gap: 14,
           }}
         >
-          <Text style={{ color: 'white', fontWeight: '800' }}>
+          
+      {/* ===== SELETTORE TIPO OPERATORE STIPENDIO ===== */}
+      <View style={{ marginBottom: 6 }}>
+        <Text
+          style={{
+            color: '#8FA5CC',
+            fontSize: 10,
+            fontWeight: '900',
+            letterSpacing: 0.8,
+            marginBottom: 8,
+          }}
+        >
+          TIPO OPERATORE
+        </Text>
+
+        <View
+          style={{
+            flexDirection: 'row',
+            gap: 10,
+          }}
+        >
+          <TouchableOpacity
+            activeOpacity={0.82}
+            onPress={() => {
+              setStipendioTipoOperatore('gpg');
+
+              if (
+                !['1', '2', '3', '4', '5', '6'].includes(
+                  String(stipendioLivello)
+                )
+              ) {
+                setStipendioLivello('4');
+              }
+            }}
+            style={{
+              flex: 1,
+              minHeight: 68,
+              borderRadius: 16,
+              alignItems: 'center',
+              justifyContent: 'center',
+
+              backgroundColor:
+                stipendioTipoOperatore === 'gpg'
+                  ? 'rgba(80,222,122,0.14)'
+                  : '#091936',
+
+              borderWidth:
+                stipendioTipoOperatore === 'gpg'
+                  ? 2
+                  : 1,
+
+              borderColor:
+                stipendioTipoOperatore === 'gpg'
+                  ? '#50DE7A'
+                  : '#29496E',
+            }}
+          >
+            <Text
+              style={{
+                color:
+                  stipendioTipoOperatore === 'gpg'
+                    ? '#50DE7A'
+                    : '#FFFFFF',
+                fontSize: 15,
+                fontWeight: '900',
+              }}
+            >
+              🛡️ GPG
+            </Text>
+
+            <Text
+              style={{
+                color: '#8FA5CC',
+                fontSize: 9,
+                fontWeight: '700',
+                marginTop: 4,
+              }}
+            >
+              Vigilanza privata
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            activeOpacity={0.82}
+            onPress={() => {
+              setStipendioTipoOperatore('fiduciario');
+
+              if (
+                !['A', 'B', 'C', 'D', 'E'].includes(
+                  String(stipendioLivello).toUpperCase()
+                )
+              ) {
+                setStipendioLivello('D');
+              }
+            }}
+            style={{
+              flex: 1,
+              minHeight: 68,
+              borderRadius: 16,
+              alignItems: 'center',
+              justifyContent: 'center',
+
+              backgroundColor:
+                stipendioTipoOperatore === 'fiduciario'
+                  ? 'rgba(111,234,255,0.14)'
+                  : '#091936',
+
+              borderWidth:
+                stipendioTipoOperatore === 'fiduciario'
+                  ? 2
+                  : 1,
+
+              borderColor:
+                stipendioTipoOperatore === 'fiduciario'
+                  ? '#6FEAFF'
+                  : '#29496E',
+            }}
+          >
+            <Text
+              style={{
+                color:
+                  stipendioTipoOperatore === 'fiduciario'
+                    ? '#6FEAFF'
+                    : '#FFFFFF',
+                fontSize: 15,
+                fontWeight: '900',
+              }}
+            >
+              👤 FIDUCIARIO
+            </Text>
+
+            <Text
+              style={{
+                color: '#8FA5CC',
+                fontSize: 9,
+                fontWeight: '700',
+                marginTop: 4,
+              }}
+            >
+              Servizi di sicurezza
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        <Text
+          style={{
+            color:
+              stipendioTipoOperatore === 'fiduciario'
+                ? '#6FEAFF'
+                : '#50DE7A',
+            fontSize: 9,
+            fontWeight: '800',
+            marginTop: 8,
+          }}
+        >
+          {stipendioTipoOperatore === 'fiduciario'
+            ? 'Livelli disponibili: A · B · C · D · E'
+            : 'Livelli disponibili: 1 · 2 · 3 · 4 · 5 · 6'}
+        </Text>
+      </View>
+
+<Text style={{ color: 'white', fontWeight: '800' }}>
             Livello
           </Text>
 
-          <TextInput
-            placeholder="Es. 4"
+          
+      {/* ===== NOTA FIDUCIARIO CCNL ===== */}
+      {stipendioTipoOperatore === 'fiduciario' ? (
+        <View
+          style={{
+            marginBottom: 16,
+            padding: 12,
+            borderRadius: 14,
+            backgroundColor: 'rgba(111,234,255,0.07)',
+            borderWidth: 1,
+            borderColor: 'rgba(111,234,255,0.22)',
+          }}
+        >
+          <Text
+            style={{
+              color: '#6FEAFF',
+              fontSize: 10,
+              fontWeight: '900',
+            }}
+          >
+            STIMA SERVIZI DI SICUREZZA
+          </Text>
+
+          <Text
+            style={{
+              color: '#AEB9D6',
+              fontSize: 9.5,
+              lineHeight: 14,
+              marginTop: 4,
+            }}
+          >
+            Stima basata sul CCNL e sui turni registrati.
+            Accordi aziendali, superminimi e condizioni personali
+            possono modificare la busta paga reale.
+          </Text>
+        </View>
+      ) : null}
+
+<TextInput
+            placeholder={
+          stipendioTipoOperatore === 'fiduciario'
+            ? 'Es. D'
+            : 'Es. 4'
+        }
             placeholderTextColor="#7184aa"
             value={stipendioLivello}
             onChangeText={setStipendioLivello}
@@ -6444,7 +8889,9 @@ if (screen === 'configuraStipendio') {
                     fontWeight: '900',
                   }}
                 >
-                  Automatico
+                  {stipendioTipoOperatore === 'fiduciario'
+                  ? 'Automatico CCNL'
+                  : 'Automatico'}
                 </Text>
               </TouchableOpacity>
 
@@ -6562,7 +9009,143 @@ if (screen === 'configuraStipendio') {
                   <Text style={{ color: '#dfe6ff', fontWeight: '800' }}>
                     Straordinario · €/h
                   </Text>
-                  <TextInput
+                  
+      {/* ===== BASE LORDA PERSONALIZZATA FIDUCIARIO ===== */}
+      {stipendioTipoOperatore === 'fiduciario' &&
+       stipendioProfiloCalcolo === 'personalizzato' ? (
+        <View
+          style={{
+            marginBottom: 18,
+            padding: 14,
+            borderRadius: 16,
+            backgroundColor: 'rgba(111,234,255,0.07)',
+            borderWidth: 1,
+            borderColor: 'rgba(111,234,255,0.28)',
+          }}
+        >
+          <Text
+            style={{
+              color: '#6FEAFF',
+              fontSize: 11,
+              fontWeight: '900',
+              marginBottom: 4,
+            }}
+          >
+            RETRIBUZIONE BASE MENSILE LORDA
+          </Text>
+
+          <Text
+            style={{
+              color: '#8FA5CC',
+              fontSize: 9,
+              lineHeight: 13,
+              marginBottom: 9,
+            }}
+          >
+            Inserisci la base mensile lorda prevista per 40 ore settimanali.
+            L'app la riproporziona automaticamente se sei part-time.
+          </Text>
+
+          <TextInput
+            value={stipendioLordoBaseFiduciario}
+            onChangeText={setStipendioLordoBaseFiduciario}
+            keyboardType="decimal-pad"
+            placeholder="Es. 1250,00"
+            placeholderTextColor="#7184aa"
+            style={{
+              backgroundColor: '#091936',
+              color: 'white',
+              borderRadius: 12,
+              borderWidth: 1,
+              borderColor: 'rgba(111,234,255,0.32)',
+              padding: 13,
+              fontSize: 16,
+              fontWeight: '800',
+            }}
+          />
+
+          <Text
+            style={{
+              color: '#FFD66B',
+              fontSize: 9,
+              lineHeight: 13,
+              marginTop: 8,
+            }}
+          >
+            In modalità Automatico CCNL questo valore viene ignorato.
+          </Text>
+        </View>
+      ) : null}
+
+
+      {/* ===== SUPERMINIMO FIDUCIARIO ===== */}
+      {stipendioTipoOperatore === 'fiduciario' &&
+       stipendioProfiloCalcolo === 'personalizzato' ? (
+        <View
+          style={{
+            marginBottom: 18,
+            padding: 14,
+            borderRadius: 16,
+            backgroundColor: 'rgba(255,214,107,0.06)',
+            borderWidth: 1,
+            borderColor: 'rgba(255,214,107,0.25)',
+          }}
+        >
+          <Text
+            style={{
+              color: '#FFD66B',
+              fontSize: 11,
+              fontWeight: '900',
+              marginBottom: 4,
+            }}
+          >
+            SUPERMINIMO / INDENNITÀ FISSA
+          </Text>
+
+          <Text
+            style={{
+              color: '#8FA5CC',
+              fontSize: 9,
+              lineHeight: 13,
+              marginBottom: 9,
+            }}
+          >
+            Importo lordo aggiuntivo riconosciuto ogni mese.
+            Se non previsto, lascia 0.
+          </Text>
+
+          <TextInput
+            value={stipendioSuperminimoFiduciario}
+            onChangeText={setStipendioSuperminimoFiduciario}
+            keyboardType="decimal-pad"
+            placeholder="Es. 100,00"
+            placeholderTextColor="#7184aa"
+            style={{
+              backgroundColor: '#091936',
+              color: 'white',
+              borderRadius: 12,
+              borderWidth: 1,
+              borderColor: 'rgba(255,214,107,0.30)',
+              padding: 13,
+              fontSize: 16,
+              fontWeight: '800',
+            }}
+          />
+
+          <Text
+            style={{
+              color: '#7184AA',
+              fontSize: 8.5,
+              lineHeight: 12,
+              marginTop: 7,
+            }}
+          >
+            Inserisci l'importo mensile effettivamente riconosciuto.
+          </Text>
+        </View>
+      ) : null}
+
+<TextInput
                     value={stipendioTariffaStraordinario}
                     editable={stipendioProfiloCalcolo === 'personalizzato'}
                     onChangeText={setStipendioTariffaStraordinario}
@@ -6722,6 +9305,7 @@ if (screen === 'configuraStipendio') {
                 '@vigilanza_gpg_stipendio',
                 JSON.stringify({
                   ccnl: stipendioCCNL,
+                  tipoOperatore: stipendioTipoOperatore,
                   livello: stipendioLivello,
                   oreSettimanali: stipendioOreSettimanali,
               oreGiornaliere: stipendioOreGiornaliere,
@@ -6735,6 +9319,8 @@ if (screen === 'configuraStipendio') {
               tariffaNotturno: stipendioTariffaNotturno,
               tariffaRiposo: stipendioTariffaRiposo,
                   nettoBase: stipendioNettoBase,
+                  lordoBaseFiduciario: stipendioLordoBaseFiduciario,
+                  superminimoFiduciario: stipendioSuperminimoFiduciario,
                 })
               );
 
@@ -8304,7 +10890,1932 @@ if (screen === 'configuraStipendio') {
     );
   }
 
-if (screen === 'passatempo') {
+
+  /* =========================================================
+     BLOCK PUZZLE 8x8
+     ========================================================= */
+  if (screen === 'blockGame') {
+    const blockCellSize = 34;
+
+    return (
+      <Screen>
+        <Back onPress={() => setScreen('passatempo')} />
+
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{
+            paddingHorizontal: 18,
+            paddingBottom: 40,
+          }}
+        >
+          {/* HEADER */}
+          <View
+            style={{
+              marginTop: 8,
+              padding: 18,
+              borderRadius: 23,
+              backgroundColor: 'rgba(14,32,72,0.96)',
+              borderWidth: 1,
+              borderColor: 'rgba(111,234,255,0.55)',
+              shadowColor: '#6FEAFF',
+              shadowOpacity: 0.16,
+              shadowRadius: 15,
+              shadowOffset: {
+                width: 0,
+                height: 6,
+              },
+            }}
+          >
+            <Text
+              style={{
+                color: '#6FEAFF',
+                fontSize: 10,
+                fontWeight: '900',
+                letterSpacing: 1.3,
+              }}
+            >
+              ARCADE BREAK
+            </Text>
+
+            <Text
+              style={{
+                color: '#FFFFFF',
+                fontSize: 28,
+                fontWeight: '900',
+                marginTop: 4,
+              }}
+            >
+              Block
+            </Text>
+
+            <Text
+              style={{
+                color: '#AEB9D6',
+                fontSize: 12,
+                fontWeight: '700',
+                marginTop: 3,
+              }}
+            >
+              Incastra i pezzi e libera righe e colonne.
+            </Text>
+          </View>
+
+          {/* PUNTEGGIO */}
+          <View
+            style={{
+              flexDirection: 'row',
+              gap: 10,
+              marginTop: 13,
+            }}
+          >
+            <View
+              style={{
+                flex: 1,
+                paddingVertical: 10,
+                borderRadius: 16,
+                backgroundColor: '#0B1930',
+                borderWidth: 1,
+                borderColor: 'rgba(111,234,255,0.30)',
+                alignItems: 'center',
+              }}
+            >
+              <Text
+                style={{
+                  color: '#8FA5CC',
+                  fontSize: 9,
+                  fontWeight: '900',
+                }}
+              >
+                PUNTI
+              </Text>
+
+              <Text
+                style={{
+                  color: '#FFFFFF',
+                  fontSize: 22,
+                  fontWeight: '900',
+                  marginTop: 2,
+                }}
+              >
+                {blockPunteggio}
+              </Text>
+            </View>
+
+            <View
+              style={{
+                flex: 1,
+                paddingVertical: 10,
+                borderRadius: 16,
+                backgroundColor: '#0B1930',
+                borderWidth: 1,
+                borderColor: 'rgba(255,210,76,0.30)',
+                alignItems: 'center',
+              }}
+            >
+              <Text
+                style={{
+                  color: '#8FA5CC',
+                  fontSize: 9,
+                  fontWeight: '900',
+                }}
+              >
+                RECORD
+              </Text>
+
+              <Text
+                style={{
+                  color: '#FFD24C',
+                  fontSize: 22,
+                  fontWeight: '900',
+                  marginTop: 2,
+                }}
+              >
+                {blockRecord}
+              </Text>
+            </View>
+          </View>
+
+          {/* GRIGLIA */}
+          <View
+            style={{
+              alignSelf: 'center',
+              marginTop: 16,
+              padding: 7,
+              borderRadius: 19,
+              backgroundColor: 'rgba(4,14,35,0.98)',
+              borderWidth: 1.5,
+              borderColor: 'rgba(111,234,255,0.46)',
+              shadowColor: '#6FEAFF',
+              shadowOpacity: 0.12,
+              shadowRadius: 13,
+              shadowOffset: {
+                width: 0,
+                height: 5,
+              },
+            }}
+          >
+            {blockGriglia.map((riga, r) => (
+              <View
+                key={`block-r-${r}`}
+                style={{
+                  flexDirection: 'row',
+                }}
+              >
+                {riga.map((piena, c) => (
+                  <TouchableOpacity
+                    key={`block-${r}-${c}`}
+                    activeOpacity={0.72}
+                    onPress={() =>
+                      piazzaPezzoBlock(r, c)
+                    }
+                    style={{
+                      width: blockCellSize,
+                      height: blockCellSize,
+                      margin: 1.5,
+                      borderRadius: 7,
+
+                      backgroundColor: piena
+                        ? '#6FEAFF'
+                        : 'rgba(56,87,145,0.20)',
+
+                      borderWidth: 1,
+                      borderColor: piena
+                        ? '#BDF7FF'
+                        : 'rgba(111,234,255,0.16)',
+
+                      shadowColor: piena
+                        ? '#6FEAFF'
+                        : 'transparent',
+
+                      shadowOpacity: piena
+                        ? 0.35
+                        : 0,
+
+                      shadowRadius: piena
+                        ? 5
+                        : 0,
+                    }}
+                  />
+                ))}
+              </View>
+            ))}
+          </View>
+
+          {/* ISTRUZIONE */}
+          <Text
+            style={{
+              color: blockGameOver
+                ? '#FF8797'
+                : '#AEB9D6',
+              fontSize: 11,
+              fontWeight: '800',
+              textAlign: 'center',
+              marginTop: 13,
+            }}
+          >
+            {blockGameOver
+              ? 'PARTITA TERMINATA · nessun pezzo entra più'
+              : blockPezzoSelezionato === null
+              ? '1. Scegli un pezzo · 2. Tocca la griglia'
+              : 'Pezzo selezionato · scegli dove posizionarlo'}
+          </Text>
+
+          {/* TRE PEZZI */}
+          <View
+            style={{
+              flexDirection: 'row',
+              gap: 9,
+              marginTop: 12,
+            }}
+          >
+            {blockPezzi.map((pezzo, index) => {
+              const selezionato =
+                blockPezzoSelezionato === index;
+
+              const maxX = Math.max(
+                ...pezzo.celle.map((c) => c.x)
+              );
+
+              const maxY = Math.max(
+                ...pezzo.celle.map((c) => c.y)
+              );
+
+              return (
+                <TouchableOpacity
+                  key={pezzo.id}
+                  activeOpacity={0.78}
+                  disabled={pezzo.usato || blockGameOver}
+                  onPress={() =>
+                    setBlockPezzoSelezionato(index)
+                  }
+                  style={{
+                    flex: 1,
+                    minHeight: 100,
+                    borderRadius: 17,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+
+                    opacity: pezzo.usato
+                      ? 0.22
+                      : 1,
+
+                    backgroundColor: selezionato
+                      ? 'rgba(111,234,255,0.17)'
+                      : '#0B1930',
+
+                    borderWidth: selezionato
+                      ? 2
+                      : 1,
+
+                    borderColor: selezionato
+                      ? '#6FEAFF'
+                      : 'rgba(111,234,255,0.28)',
+                  }}
+                >
+                  <View
+                    style={{
+                      width: (maxX + 1) * 18,
+                      height: (maxY + 1) * 18,
+                      position: 'relative',
+                    }}
+                  >
+                    {pezzo.celle.map((c, ci) => (
+                      <View
+                        key={`${pezzo.id}-${ci}`}
+                        style={{
+                          position: 'absolute',
+                          left: c.x * 18,
+                          top: c.y * 18,
+                          width: 15,
+                          height: 15,
+                          borderRadius: 4,
+                          backgroundColor: '#6FEAFF',
+                          borderWidth: 1,
+                          borderColor: '#C5F9FF',
+                        }}
+                      />
+                    ))}
+                  </View>
+
+                  <Text
+                    style={{
+                      color: selezionato
+                        ? '#6FEAFF'
+                        : '#8FA5CC',
+                      fontSize: 8,
+                      fontWeight: '900',
+                      marginTop: 8,
+                    }}
+                  >
+                    {pezzo.usato
+                      ? 'USATO'
+                      : selezionato
+                      ? 'SELEZIONATO'
+                      : 'SCEGLI'}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
+          {/* NUOVA PARTITA */}
+          <TouchableOpacity
+            activeOpacity={0.82}
+            onPress={resetBlockGame}
+            style={{
+              marginTop: 14,
+              minHeight: 50,
+              borderRadius: 17,
+              backgroundColor: 'rgba(111,234,255,0.12)',
+              borderWidth: 1,
+              borderColor: 'rgba(111,234,255,0.42)',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <Text
+              style={{
+                color: '#6FEAFF',
+                fontSize: 12,
+                fontWeight: '900',
+              }}
+            >
+              ↻ NUOVA PARTITA
+            </Text>
+          </TouchableOpacity>
+        </ScrollView>
+      </Screen>
+    );
+  }
+
+
+  
+  /* =========================================================
+     PONG - PLAYER VS CPU
+     ========================================================= */
+
+  if (screen === 'pongGame') {
+    return (
+      <Screen>
+        <Back
+          onPress={() => {
+            setPongRunning(false);
+            setScreen('passatempo');
+          }}
+        />
+
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{
+            paddingHorizontal: 18,
+            paddingBottom: 40,
+          }}
+        >
+
+          {/* HEADER */}
+          <View
+            style={{
+              marginTop: 8,
+              padding: 17,
+              borderRadius: 23,
+
+              backgroundColor: 'rgba(25,27,72,0.97)',
+
+              borderWidth: 1,
+              borderColor: 'rgba(255,212,90,0.55)',
+
+              shadowColor: '#FFD45A',
+              shadowOpacity: 0.15,
+              shadowRadius: 14,
+              shadowOffset: {
+                width: 0,
+                height: 6,
+              },
+            }}
+          >
+            <Text
+              style={{
+                color: '#FFD45A',
+                fontSize: 10,
+                fontWeight: '900',
+                letterSpacing: 1.3,
+              }}
+            >
+              ARCADE BREAK
+            </Text>
+
+            <Text
+              style={{
+                color: '#FFFFFF',
+                fontSize: 28,
+                fontWeight: '900',
+                marginTop: 4,
+              }}
+            >
+              Pong
+            </Text>
+
+            <Text
+              style={{
+                color: '#AEB9D6',
+                fontSize: 12,
+                fontWeight: '700',
+                marginTop: 3,
+              }}
+            >
+              Sfida la CPU · il primo a 5 vince.
+            </Text>
+          </View>
+
+
+          {/* PUNTEGGIO */}
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              marginTop: 13,
+              marginBottom: 13,
+            }}
+          >
+            <View
+              style={{
+                flex: 1,
+                alignItems: 'center',
+              }}
+            >
+              <Text
+                style={{
+                  color: '#63DFFF',
+                  fontSize: 10,
+                  fontWeight: '900',
+                }}
+              >
+                TU
+              </Text>
+
+              <Text
+                style={{
+                  color: '#FFFFFF',
+                  fontSize: 30,
+                  fontWeight: '900',
+                }}
+              >
+                {pongPlayerScore}
+              </Text>
+            </View>
+
+            <Text
+              style={{
+                color: '#66799D',
+                fontSize: 19,
+                fontWeight: '900',
+              }}
+            >
+              :
+            </Text>
+
+            <View
+              style={{
+                flex: 1,
+                alignItems: 'center',
+              }}
+            >
+              <Text
+                style={{
+                  color: '#FFD45A',
+                  fontSize: 10,
+                  fontWeight: '900',
+                }}
+              >
+                CPU
+              </Text>
+
+              <Text
+                style={{
+                  color: '#FFFFFF',
+                  fontSize: 30,
+                  fontWeight: '900',
+                }}
+              >
+                {pongCpuScore}
+              </Text>
+            </View>
+          </View>
+
+
+          {/* CAMPO DA GIOCO */}
+          <View
+            onTouchStart={(e) => {
+              muoviPongGiocatore(
+                e.nativeEvent.locationY
+              );
+            }}
+            onTouchMove={(e) => {
+              muoviPongGiocatore(
+                e.nativeEvent.locationY
+              );
+            }}
+            style={{
+              width: PONG_WIDTH,
+              height: PONG_HEIGHT,
+
+              alignSelf: 'center',
+
+              position: 'relative',
+              overflow: 'hidden',
+
+              borderRadius: 18,
+
+              backgroundColor: '#030B1C',
+
+              borderWidth: 1.5,
+              borderColor: 'rgba(255,212,90,0.46)',
+
+              shadowColor: '#FFD45A',
+              shadowOpacity: 0.12,
+              shadowRadius: 12,
+            }}
+          >
+
+            {/* LINEA CENTRALE */}
+            {Array.from({ length: 12 }).map((_, i) => (
+              <View
+                key={`pong-line-${i}`}
+                style={{
+                  position: 'absolute',
+                  width: 2,
+                  height: 18,
+
+                  left: PONG_WIDTH / 2 - 1,
+                  top: i * 34 + 5,
+
+                  backgroundColor:
+                    'rgba(255,255,255,0.16)',
+                }}
+              />
+            ))}
+
+
+            {/* RACCHETTA GIOCATORE */}
+            <View
+              style={{
+                position: 'absolute',
+
+                left: 12,
+                top: pongPlayerY,
+
+                width: PONG_PADDLE_W,
+                height: PONG_PADDLE_H,
+
+                borderRadius: 6,
+
+                backgroundColor: '#63DFFF',
+
+                shadowColor: '#63DFFF',
+                shadowOpacity: 0.65,
+                shadowRadius: 8,
+              }}
+            />
+
+
+            {/* RACCHETTA CPU */}
+            <View
+              style={{
+                position: 'absolute',
+
+                right: 12,
+                top: pongCpuY,
+
+                width: PONG_PADDLE_W,
+                height: PONG_PADDLE_H,
+
+                borderRadius: 6,
+
+                backgroundColor: '#FFD45A',
+
+                shadowColor: '#FFD45A',
+                shadowOpacity: 0.55,
+                shadowRadius: 7,
+              }}
+            />
+
+
+            {/* PALLA */}
+            <View
+              style={{
+                position: 'absolute',
+
+                left: pongBall.x,
+                top: pongBall.y,
+
+                width: PONG_BALL,
+                height: PONG_BALL,
+
+                borderRadius: PONG_BALL / 2,
+
+                backgroundColor: '#FFFFFF',
+
+                shadowColor: '#FFFFFF',
+                shadowOpacity: 0.8,
+                shadowRadius: 7,
+              }}
+            />
+
+
+            {/* GAME OVER */}
+            {pongGameOver ? (
+              <View
+                style={{
+                  position: 'absolute',
+                  left: 0,
+                  right: 0,
+                  top: 0,
+                  bottom: 0,
+
+                  backgroundColor:
+                    'rgba(2,8,22,0.82)',
+
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <Text
+                  style={{
+                    color:
+                      pongWinner === 'TU'
+                        ? '#63DFFF'
+                        : '#FFD45A',
+
+                    fontSize: 29,
+                    fontWeight: '900',
+                  }}
+                >
+                  {pongWinner === 'TU'
+                    ? 'HAI VINTO!'
+                    : 'VINCE LA CPU'}
+                </Text>
+
+                <Text
+                  style={{
+                    color: '#FFFFFF',
+                    fontSize: 13,
+                    fontWeight: '800',
+                    marginTop: 6,
+                  }}
+                >
+                  {pongPlayerScore} - {pongCpuScore}
+                </Text>
+              </View>
+            ) : null}
+
+          </View>
+
+
+          {/* ISTRUZIONI */}
+          <Text
+            style={{
+              color: '#AEB9D6',
+              fontSize: 11,
+              fontWeight: '700',
+              textAlign: 'center',
+              marginTop: 12,
+            }}
+          >
+            ↕ Trascina il dito sul campo per muovere la racchetta
+          </Text>
+
+
+          {/* CONTROLLI */}
+          <View
+            style={{
+              flexDirection: 'row',
+              gap: 9,
+              marginTop: 13,
+            }}
+          >
+
+            <TouchableOpacity
+              activeOpacity={0.82}
+              disabled={pongGameOver}
+              onPress={() =>
+                setPongRunning((v) => !v)
+              }
+              style={{
+                flex: 1,
+                minHeight: 48,
+
+                borderRadius: 16,
+
+                alignItems: 'center',
+                justifyContent: 'center',
+
+                backgroundColor:
+                  'rgba(255,212,90,0.10)',
+
+                borderWidth: 1,
+                borderColor:
+                  'rgba(255,212,90,0.38)',
+
+                opacity: pongGameOver
+                  ? 0.35
+                  : 1,
+              }}
+            >
+              <Text
+                style={{
+                  color: '#FFD45A',
+                  fontSize: 11,
+                  fontWeight: '900',
+                }}
+              >
+                {pongRunning
+                  ? 'Ⅱ PAUSA'
+                  : '▶ RIPRENDI'}
+              </Text>
+            </TouchableOpacity>
+
+
+            <TouchableOpacity
+              activeOpacity={0.82}
+              onPress={nuovaPartitaPong}
+              style={{
+                flex: 1,
+                minHeight: 48,
+
+                borderRadius: 16,
+
+                alignItems: 'center',
+                justifyContent: 'center',
+
+                backgroundColor:
+                  'rgba(99,223,255,0.10)',
+
+                borderWidth: 1,
+                borderColor:
+                  'rgba(99,223,255,0.38)',
+              }}
+            >
+              <Text
+                style={{
+                  color: '#63DFFF',
+                  fontSize: 11,
+                  fontWeight: '900',
+                }}
+              >
+                ↻ NUOVA PARTITA
+              </Text>
+            </TouchableOpacity>
+
+          </View>
+
+        </ScrollView>
+      </Screen>
+    );
+  }
+
+
+  
+  /* =========================================================
+     SPACE PATROL
+     ========================================================= */
+
+  if (screen === 'spacePatrolGame') {
+    const shipY =
+      SPACE_HEIGHT -
+      SPACE_SHIP_H -
+      10;
+
+    return (
+      <Screen>
+
+        <Back
+          onPress={() => {
+            setSpaceGame(
+              (prev) => ({
+                ...prev,
+                running: false,
+              })
+            );
+
+            setScreen(
+              'passatempo'
+            );
+          }}
+        />
+
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{
+            paddingHorizontal: 18,
+            paddingBottom: 35,
+          }}
+        >
+
+          {/* HEADER */}
+          <View
+            style={{
+              marginTop: 8,
+
+              padding: 17,
+
+              borderRadius: 23,
+
+              backgroundColor:
+                'rgba(26,20,75,0.97)',
+
+              borderWidth: 1,
+
+              borderColor:
+                'rgba(169,151,255,0.58)',
+
+              shadowColor:
+                '#A997FF',
+
+              shadowOpacity: 0.17,
+
+              shadowRadius: 15,
+
+              shadowOffset: {
+                width: 0,
+                height: 6,
+              },
+            }}
+          >
+
+            <Text
+              style={{
+                color: '#A997FF',
+                fontSize: 10,
+                fontWeight: '900',
+                letterSpacing: 1.3,
+              }}
+            >
+              ARCADE BREAK
+            </Text>
+
+            <Text
+              style={{
+                color: '#FFFFFF',
+                fontSize: 27,
+                fontWeight: '900',
+                marginTop: 4,
+              }}
+            >
+              Space Patrol
+            </Text>
+
+            <Text
+              style={{
+                color: '#AEB9D6',
+                fontSize: 12,
+                fontWeight: '700',
+                marginTop: 3,
+              }}
+            >
+              Difendi il settore e abbatti gli intrusi.
+            </Text>
+
+          </View>
+
+
+          {/* SCORE + VITE */}
+          <View
+            style={{
+              flexDirection: 'row',
+              gap: 10,
+              marginTop: 12,
+              marginBottom: 12,
+            }}
+          >
+
+            <View
+              style={{
+                flex: 1,
+
+                paddingVertical: 9,
+
+                borderRadius: 15,
+
+                backgroundColor:
+                  '#0B1930',
+
+                borderWidth: 1,
+
+                borderColor:
+                  'rgba(169,151,255,0.32)',
+
+                alignItems:
+                  'center',
+              }}
+            >
+
+              <Text
+                style={{
+                  color: '#8FA5CC',
+                  fontSize: 9,
+                  fontWeight: '900',
+                }}
+              >
+                PUNTI
+              </Text>
+
+              <Text
+                style={{
+                  color: '#FFFFFF',
+                  fontSize: 22,
+                  fontWeight: '900',
+                  marginTop: 1,
+                }}
+              >
+                {spaceGame.score}
+              </Text>
+
+            </View>
+
+
+            <View
+              style={{
+                flex: 1,
+
+                paddingVertical: 9,
+
+                borderRadius: 15,
+
+                backgroundColor:
+                  '#0B1930',
+
+                borderWidth: 1,
+
+                borderColor:
+                  'rgba(255,111,153,0.32)',
+
+                alignItems:
+                  'center',
+              }}
+            >
+
+              <Text
+                style={{
+                  color: '#8FA5CC',
+                  fontSize: 9,
+                  fontWeight: '900',
+                }}
+              >
+                VITE
+              </Text>
+
+              <Text
+                style={{
+                  color: '#FF7AA5',
+                  fontSize: 19,
+                  fontWeight: '900',
+                  marginTop: 3,
+                }}
+              >
+                {'♥'.repeat(
+                  spaceGame.lives
+                )}
+              </Text>
+
+            </View>
+
+          </View>
+
+
+          {/* CAMPO */}
+          <View
+            onTouchStart={(e) => {
+              muoviNavicellaSpace(
+                e.nativeEvent.locationX
+              );
+            }}
+            onTouchMove={(e) => {
+              muoviNavicellaSpace(
+                e.nativeEvent.locationX
+              );
+            }}
+            style={{
+              width:
+                SPACE_WIDTH,
+
+              height:
+                SPACE_HEIGHT,
+
+              alignSelf:
+                'center',
+
+              position:
+                'relative',
+
+              overflow:
+                'hidden',
+
+              borderRadius:
+                18,
+
+              backgroundColor:
+                '#020719',
+
+              borderWidth:
+                1.5,
+
+              borderColor:
+                'rgba(169,151,255,0.48)',
+
+              shadowColor:
+                '#A997FF',
+
+              shadowOpacity:
+                0.13,
+
+              shadowRadius:
+                13,
+            }}
+          >
+
+            {/* STELLE */}
+            {[
+              [26, 36],
+              [230, 72],
+              [92, 113],
+              [268, 149],
+              [50, 189],
+              [181, 215],
+              [112, 267],
+              [252, 299],
+              [38, 336],
+              [211, 375],
+              [144, 55],
+              [281, 242],
+            ].map(
+              ([x, y], i) => (
+                <View
+                  key={`star-${i}`}
+                  style={{
+                    position:
+                      'absolute',
+
+                    left: x,
+                    top: y,
+
+                    width:
+                      i % 3 === 0
+                        ? 3
+                        : 2,
+
+                    height:
+                      i % 3 === 0
+                        ? 3
+                        : 2,
+
+                    borderRadius:
+                      3,
+
+                    backgroundColor:
+                      'rgba(255,255,255,0.65)',
+                  }}
+                />
+              )
+            )}
+
+
+            {/* NEMICI */}
+            {spaceGame.enemies.map(
+              (enemy) => (
+                <View
+                  key={enemy.id}
+                  style={{
+                    position:
+                      'absolute',
+
+                    left:
+                      enemy.x,
+
+                    top:
+                      enemy.y,
+
+                    width:
+                      SPACE_ENEMY_W,
+
+                    height:
+                      SPACE_ENEMY_H,
+
+                    borderRadius:
+                      9,
+
+                    alignItems:
+                      'center',
+
+                    justifyContent:
+                      'center',
+
+                    backgroundColor:
+                      'rgba(255,87,132,0.16)',
+
+                    borderWidth:
+                      1,
+
+                    borderColor:
+                      '#FF5784',
+
+                    shadowColor:
+                      '#FF5784',
+
+                    shadowOpacity:
+                      0.45,
+
+                    shadowRadius:
+                      6,
+                  }}
+                >
+                  <Ionicons
+                    name="warning-outline"
+                    size={18}
+                    color="#FF789C"
+                  />
+                </View>
+              )
+            )}
+
+
+            {/* PROIETTILI */}
+            {spaceGame.bullets.map(
+              (bullet) => (
+                <View
+                  key={bullet.id}
+                  style={{
+                    position:
+                      'absolute',
+
+                    left:
+                      bullet.x,
+
+                    top:
+                      bullet.y,
+
+                    width:
+                      SPACE_BULLET_W,
+
+                    height:
+                      SPACE_BULLET_H,
+
+                    borderRadius:
+                      4,
+
+                    backgroundColor:
+                      '#77F8FF',
+
+                    shadowColor:
+                      '#77F8FF',
+
+                    shadowOpacity:
+                      0.85,
+
+                    shadowRadius:
+                      6,
+                  }}
+                />
+              )
+            )}
+
+
+            {/* NAVICELLA */}
+            <View
+              style={{
+                position:
+                  'absolute',
+
+                left:
+                  spaceGame.shipX,
+
+                top:
+                  shipY,
+
+                width:
+                  SPACE_SHIP_W,
+
+                height:
+                  SPACE_SHIP_H,
+
+                alignItems:
+                  'center',
+
+                justifyContent:
+                  'center',
+
+                borderRadius:
+                  12,
+
+                backgroundColor:
+                  'rgba(109,234,255,0.13)',
+
+                borderWidth:
+                  1,
+
+                borderColor:
+                  '#6FEAFF',
+
+                shadowColor:
+                  '#6FEAFF',
+
+                shadowOpacity:
+                  0.55,
+
+                shadowRadius:
+                  7,
+              }}
+            >
+              <Ionicons
+                name="rocket"
+                size={24}
+                color="#8EF4FF"
+              />
+            </View>
+
+
+            {/* GAME OVER */}
+            {spaceGame.gameOver ? (
+              <View
+                style={{
+                  position:
+                    'absolute',
+
+                  left: 0,
+                  right: 0,
+                  top: 0,
+                  bottom: 0,
+
+                  backgroundColor:
+                    'rgba(2,7,25,0.86)',
+
+                  alignItems:
+                    'center',
+
+                  justifyContent:
+                    'center',
+                }}
+              >
+
+                <Text
+                  style={{
+                    color:
+                      '#FF789C',
+
+                    fontSize:
+                      28,
+
+                    fontWeight:
+                      '900',
+                  }}
+                >
+                  MISSIONE FALLITA
+                </Text>
+
+                <Text
+                  style={{
+                    color:
+                      '#FFFFFF',
+
+                    fontSize:
+                      13,
+
+                    fontWeight:
+                      '800',
+
+                    marginTop:
+                      7,
+                  }}
+                >
+                  Punteggio {spaceGame.score}
+                </Text>
+
+              </View>
+            ) : null}
+
+          </View>
+
+
+          {/* TESTO GUIDA */}
+          <Text
+            style={{
+              color:
+                '#AEB9D6',
+
+              fontSize:
+                11,
+
+              fontWeight:
+                '700',
+
+              textAlign:
+                'center',
+
+              marginTop:
+                11,
+            }}
+          >
+            ↔ Trascina il dito sul campo per muovere la navicella
+          </Text>
+
+
+          {/* PULSANTI */}
+          <View
+            style={{
+              flexDirection:
+                'row',
+
+              gap:
+                9,
+
+              marginTop:
+                12,
+            }}
+          >
+
+            {/* FUOCO */}
+            <TouchableOpacity
+              activeOpacity={0.78}
+
+              disabled={
+                spaceGame.gameOver ||
+                !spaceGame.running
+              }
+
+              onPress={
+                sparaSpace
+              }
+
+              style={{
+                flex: 1,
+
+                minHeight: 52,
+
+                borderRadius: 17,
+
+                alignItems:
+                  'center',
+
+                justifyContent:
+                  'center',
+
+                backgroundColor:
+                  'rgba(255,87,132,0.12)',
+
+                borderWidth:
+                  1,
+
+                borderColor:
+                  'rgba(255,87,132,0.48)',
+
+                opacity:
+                  spaceGame.gameOver ||
+                  !spaceGame.running
+                    ? 0.4
+                    : 1,
+              }}
+            >
+
+              <Text
+                style={{
+                  color:
+                    '#FF789C',
+
+                  fontSize:
+                    12,
+
+                  fontWeight:
+                    '900',
+                }}
+              >
+                🔥 FUOCO
+              </Text>
+
+            </TouchableOpacity>
+
+
+            {/* PAUSA */}
+            <TouchableOpacity
+              activeOpacity={0.78}
+
+              disabled={
+                spaceGame.gameOver
+              }
+
+              onPress={() =>
+                setSpaceGame(
+                  (prev) => ({
+                    ...prev,
+                    running:
+                      !prev.running,
+                  })
+                )
+              }
+
+              style={{
+                flex: 1,
+
+                minHeight: 52,
+
+                borderRadius: 17,
+
+                alignItems:
+                  'center',
+
+                justifyContent:
+                  'center',
+
+                backgroundColor:
+                  'rgba(169,151,255,0.11)',
+
+                borderWidth:
+                  1,
+
+                borderColor:
+                  'rgba(169,151,255,0.45)',
+
+                opacity:
+                  spaceGame.gameOver
+                    ? 0.4
+                    : 1,
+              }}
+            >
+
+              <Text
+                style={{
+                  color:
+                    '#A997FF',
+
+                  fontSize:
+                    11,
+
+                  fontWeight:
+                    '900',
+                }}
+              >
+                {spaceGame.running
+                  ? 'Ⅱ PAUSA'
+                  : '▶ RIPRENDI'}
+              </Text>
+
+            </TouchableOpacity>
+
+          </View>
+
+
+          {/* NUOVA PARTITA */}
+          <TouchableOpacity
+            activeOpacity={0.82}
+
+            onPress={
+              nuovaPartitaSpace
+            }
+
+            style={{
+              marginTop:
+                9,
+
+              minHeight:
+                48,
+
+              borderRadius:
+                16,
+
+              alignItems:
+                'center',
+
+              justifyContent:
+                'center',
+
+              backgroundColor:
+                'rgba(111,234,255,0.10)',
+
+              borderWidth:
+                1,
+
+              borderColor:
+                'rgba(111,234,255,0.40)',
+            }}
+          >
+
+            <Text
+              style={{
+                color:
+                  '#6FEAFF',
+
+                fontSize:
+                  11,
+
+                fontWeight:
+                  '900',
+              }}
+            >
+              ↻ NUOVA PARTITA
+            </Text>
+
+          </TouchableOpacity>
+
+        </ScrollView>
+      </Screen>
+    );
+  }
+
+
+  
+  /* =========================================================
+     CAMPO MINATO
+     ========================================================= */
+
+  if (screen === 'campoMinatoGame') {
+    const mineCellSize = 31;
+
+    const numeroColoreMine = (n) => {
+      if (n === 1) return '#6FEAFF';
+      if (n === 2) return '#63EA85';
+      if (n === 3) return '#FF7A91';
+      if (n === 4) return '#A997FF';
+      if (n === 5) return '#FFD45A';
+      return '#D7E2FF';
+    };
+
+    const bandiereMine =
+      contaBandiereMine(mineCampo);
+
+    return (
+      <Screen>
+        <Back
+          onPress={() => {
+            setMineAvviato(false);
+            setScreen('passatempo');
+          }}
+        />
+
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{
+            paddingHorizontal: 18,
+            paddingBottom: 40,
+          }}
+        >
+
+          {/* HEADER */}
+          <View
+            style={{
+              marginTop: 8,
+              padding: 17,
+              borderRadius: 23,
+              backgroundColor: 'rgba(52,20,58,0.96)',
+              borderWidth: 1,
+              borderColor: 'rgba(255,140,200,0.52)',
+              shadowColor: '#FF8CC8',
+              shadowOpacity: 0.16,
+              shadowRadius: 14,
+              shadowOffset: {
+                width: 0,
+                height: 6,
+              },
+            }}
+          >
+            <Text
+              style={{
+                color: '#FF8CC8',
+                fontSize: 10,
+                fontWeight: '900',
+                letterSpacing: 1.3,
+              }}
+            >
+              ARCADE BREAK
+            </Text>
+
+            <Text
+              style={{
+                color: '#FFFFFF',
+                fontSize: 27,
+                fontWeight: '900',
+                marginTop: 4,
+              }}
+            >
+              Campo Minato
+            </Text>
+
+            <Text
+              style={{
+                color: '#AEB9D6',
+                fontSize: 12,
+                fontWeight: '700',
+                marginTop: 3,
+              }}
+            >
+              Ragiona prima del click · 10 mine nascoste.
+            </Text>
+          </View>
+
+
+          {/* INFO */}
+          <View
+            style={{
+              flexDirection: 'row',
+              gap: 8,
+              marginTop: 12,
+            }}
+          >
+            <View
+              style={{
+                flex: 1,
+                paddingVertical: 9,
+                borderRadius: 15,
+                backgroundColor: '#0B1930',
+                borderWidth: 1,
+                borderColor: 'rgba(255,140,200,0.28)',
+                alignItems: 'center',
+              }}
+            >
+              <Text
+                style={{
+                  color: '#8FA5CC',
+                  fontSize: 8,
+                  fontWeight: '900',
+                }}
+              >
+                MINE
+              </Text>
+
+              <Text
+                style={{
+                  color: '#FF8CC8',
+                  fontSize: 20,
+                  fontWeight: '900',
+                }}
+              >
+                {Math.max(
+                  0,
+                  MINES_COUNT - bandiereMine
+                )}
+              </Text>
+            </View>
+
+            <View
+              style={{
+                flex: 1,
+                paddingVertical: 9,
+                borderRadius: 15,
+                backgroundColor: '#0B1930',
+                borderWidth: 1,
+                borderColor: 'rgba(111,234,255,0.28)',
+                alignItems: 'center',
+              }}
+            >
+              <Text
+                style={{
+                  color: '#8FA5CC',
+                  fontSize: 8,
+                  fontWeight: '900',
+                }}
+              >
+                TEMPO
+              </Text>
+
+              <Text
+                style={{
+                  color: '#FFFFFF',
+                  fontSize: 20,
+                  fontWeight: '900',
+                }}
+              >
+                {mineSecondi}s
+              </Text>
+            </View>
+
+            <TouchableOpacity
+              activeOpacity={0.78}
+              disabled={
+                mineGameOver ||
+                mineVittoria
+              }
+              onPress={() =>
+                setMineModalitaBandiera(
+                  (v) => !v
+                )
+              }
+              style={{
+                flex: 1,
+                paddingVertical: 9,
+                borderRadius: 15,
+                backgroundColor:
+                  mineModalitaBandiera
+                    ? 'rgba(255,212,90,0.18)'
+                    : '#0B1930',
+                borderWidth: mineModalitaBandiera
+                  ? 2
+                  : 1,
+                borderColor:
+                  mineModalitaBandiera
+                    ? '#FFD45A'
+                    : 'rgba(255,212,90,0.28)',
+                alignItems: 'center',
+              }}
+            >
+              <Text
+                style={{
+                  color: '#8FA5CC',
+                  fontSize: 8,
+                  fontWeight: '900',
+                }}
+              >
+                MODALITÀ
+              </Text>
+
+              <Text
+                style={{
+                  color: '#FFD45A',
+                  fontSize: 16,
+                  fontWeight: '900',
+                  marginTop: 2,
+                }}
+              >
+                {mineModalitaBandiera
+                  ? '🚩'
+                  : '👆'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+
+          {/* GRIGLIA */}
+          <View
+            style={{
+              alignSelf: 'center',
+              marginTop: 15,
+              padding: 6,
+              borderRadius: 18,
+              backgroundColor: '#040B1C',
+              borderWidth: 1.5,
+              borderColor: 'rgba(255,140,200,0.44)',
+              shadowColor: '#FF8CC8',
+              shadowOpacity: 0.12,
+              shadowRadius: 12,
+            }}
+          >
+            {mineCampo.map((riga, r) => (
+              <View
+                key={`mine-r-${r}`}
+                style={{
+                  flexDirection: 'row',
+                }}
+              >
+                {riga.map((cella, c) => {
+                  const mostraMina =
+                    cella.aperta && cella.mina;
+
+                  return (
+                    <TouchableOpacity
+                      key={`mine-${r}-${c}`}
+                      activeOpacity={0.72}
+                      onPress={() =>
+                        premiCellaMine(r, c)
+                      }
+                      style={{
+                        width: mineCellSize,
+                        height: mineCellSize,
+                        margin: 1,
+                        borderRadius: 6,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+
+                        backgroundColor:
+                          cella.aperta
+                            ? mostraMina
+                              ? 'rgba(255,71,112,0.28)'
+                              : 'rgba(43,68,112,0.42)'
+                            : cella.bandiera
+                            ? 'rgba(255,212,90,0.18)'
+                            : 'rgba(61,91,150,0.22)',
+
+                        borderWidth: 1,
+
+                        borderColor:
+                          mostraMina
+                            ? '#FF4770'
+                            : cella.bandiera
+                            ? '#FFD45A'
+                            : cella.aperta
+                            ? 'rgba(111,234,255,0.18)'
+                            : 'rgba(255,140,200,0.16)',
+                      }}
+                    >
+                      {cella.bandiera &&
+                      !cella.aperta ? (
+                        <Text
+                          style={{
+                            fontSize: 15,
+                          }}
+                        >
+                          🚩
+                        </Text>
+                      ) : mostraMina ? (
+                        <Text
+                          style={{
+                            fontSize: 15,
+                          }}
+                        >
+                          💣
+                        </Text>
+                      ) : cella.aperta &&
+                        cella.numero > 0 ? (
+                        <Text
+                          style={{
+                            color:
+                              numeroColoreMine(
+                                cella.numero
+                              ),
+                            fontSize: 14,
+                            fontWeight: '900',
+                          }}
+                        >
+                          {cella.numero}
+                        </Text>
+                      ) : null}
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            ))}
+          </View>
+
+
+          {/* STATO PARTITA */}
+          <Text
+            style={{
+              color: mineVittoria
+                ? '#63EA85'
+                : mineGameOver
+                ? '#FF789C'
+                : '#AEB9D6',
+              fontSize: 11,
+              fontWeight: '800',
+              textAlign: 'center',
+              marginTop: 12,
+            }}
+          >
+            {mineVittoria
+              ? `🎉 CAMPO BONIFICATO in ${mineSecondi}s`
+              : mineGameOver
+              ? '💥 BOOM! Hai trovato una mina'
+              : mineModalitaBandiera
+              ? '🚩 Modalità bandierina attiva'
+              : 'Tocca una casella per scoprirla'}
+          </Text>
+
+
+          {/* GUIDA */}
+          {!mineGameOver &&
+          !mineVittoria ? (
+            <Text
+              style={{
+                color: '#7184A8',
+                fontSize: 10,
+                fontWeight: '700',
+                textAlign: 'center',
+                marginTop: 5,
+              }}
+            >
+              Usa MODALITÀ per passare da scopri a bandierina
+            </Text>
+          ) : null}
+
+
+          {/* NUOVA PARTITA */}
+          <TouchableOpacity
+            activeOpacity={0.82}
+            onPress={nuovaPartitaMine}
+            style={{
+              marginTop: 14,
+              minHeight: 49,
+              borderRadius: 17,
+              backgroundColor: 'rgba(255,140,200,0.10)',
+              borderWidth: 1,
+              borderColor: 'rgba(255,140,200,0.40)',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <Text
+              style={{
+                color: '#FF8CC8',
+                fontSize: 11,
+                fontWeight: '900',
+              }}
+            >
+              ↻ NUOVA PARTITA
+            </Text>
+          </TouchableOpacity>
+
+        </ScrollView>
+      </Screen>
+    );
+  }
+
+
+  if (screen === 'passatempo') {
     const giochiPassatempo = [
       {
         id: 'snake',
@@ -8415,6 +12926,30 @@ if (screen === 'passatempo') {
                   return;
                 }
 
+                if (gioco.id === 'block') {
+                  setBlockPezzoSelezionato(null);
+                  setScreen('blockGame');
+                  return;
+                }
+
+                if (gioco.id === 'pong') {
+                  nuovaPartitaPong();
+                  setScreen('pongGame');
+                  return;
+                }
+
+                if (gioco.id === 'spacePatrol') {
+                  nuovaPartitaSpace();
+                  setScreen('spacePatrolGame');
+                  return;
+                }
+
+                if (gioco.id === 'campoMinato') {
+                  nuovaPartitaMine();
+                  setScreen('campoMinatoGame');
+                  return;
+                }
+
                 Alert.alert(
                   gioco.titolo,
                   'Questo gioco verrà aggiunto alla Sala Giochi.'
@@ -8507,8 +13042,1138 @@ if (screen === 'passatempo') {
     );
   }
 
+
+  /* ===== SCREEN DOTAZIONE PERSONALE ===== */
+  if (screen === 'dotazionePersonale') {
+    const categorieDotazione = [
+      'Abbigliamento',
+      'Equipaggiamento',
+      'DPI',
+      'Altro',
+    ];
+
+    const statiDotazione = [
+      'Nuovo',
+      'Buono',
+      'Da sostituire',
+      'Danneggiato',
+    ];
+
+    const totaleArticoliDotazione =
+      dotazionePersonale
+        .filter((item) => !item.restituito)
+        .reduce(
+          (tot, item) =>
+            tot + Number(item.quantita || 0),
+          0
+        );
+
+    const totaleDaSostituire =
+      dotazionePersonale
+        .filter(
+          (item) =>
+            !item.restituito &&
+            (
+              item.stato === 'Da sostituire' ||
+              item.stato === 'Danneggiato'
+            )
+        )
+        .reduce(
+          (tot, item) =>
+            tot + Number(item.quantita || 0),
+          0
+        );
+
+    const coloreStatoDotazione = (stato) => {
+      if (stato === 'Nuovo') return '#6FEAFF';
+      if (stato === 'Buono') return '#50DE7A';
+      if (stato === 'Da sostituire') return '#FFD45A';
+      if (stato === 'Danneggiato') return '#FF6B81';
+      return '#AEB9D6';
+    };
+
+    return (
+      <Screen>
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{
+            paddingBottom: 120,
+          }}
+        >
+          <Back onPress={() => setScreen('strumenti')} />
+
+          <View
+            style={{
+              marginTop: 8,
+              marginHorizontal: 16,
+              padding: 20,
+              borderRadius: 26,
+              backgroundColor: 'rgba(17,39,78,0.96)',
+              borderWidth: 1,
+              borderColor: 'rgba(111,234,255,0.40)',
+            }}
+          >
+            <Text
+              style={{
+                color: '#6FEAFF',
+                fontSize: 11,
+                fontWeight: '900',
+                letterSpacing: 1.3,
+              }}
+            >
+              DOTAZIONE PERSONALE
+            </Text>
+
+            <Text
+              style={{
+                color: '#FFFFFF',
+                fontSize: 28,
+                fontWeight: '900',
+                marginTop: 5,
+              }}
+            >
+              La mia dotazione 👔
+            </Text>
+
+            <Text
+              style={{
+                color: '#AEB9D6',
+                fontSize: 12,
+                lineHeight: 17,
+                marginTop: 5,
+              }}
+            >
+              Tieni sotto controllo divisa, equipaggiamento,
+              consegne e restituzioni.
+            </Text>
+
+            <View
+              style={{
+                flexDirection: 'row',
+                gap: 10,
+                marginTop: 18,
+              }}
+            >
+              <View
+                style={{
+                  flex: 1,
+                  padding: 14,
+                  borderRadius: 18,
+                  backgroundColor: '#091936',
+                }}
+              >
+                <Text
+                  style={{
+                    color: '#6FEAFF',
+                    fontSize: 24,
+                    fontWeight: '900',
+                  }}
+                >
+                  {totaleArticoliDotazione}
+                </Text>
+
+                <Text
+                  style={{
+                    color: '#8FA5CC',
+                    fontSize: 9,
+                    fontWeight: '800',
+                    marginTop: 3,
+                  }}
+                >
+                  ARTICOLI ATTIVI
+                </Text>
+              </View>
+
+              <View
+                style={{
+                  flex: 1,
+                  padding: 14,
+                  borderRadius: 18,
+                  backgroundColor: '#091936',
+                }}
+              >
+                <Text
+                  style={{
+                    color:
+                      totaleDaSostituire > 0
+                        ? '#FFD45A'
+                        : '#50DE7A',
+                    fontSize: 24,
+                    fontWeight: '900',
+                  }}
+                >
+                  {totaleDaSostituire}
+                </Text>
+
+                <Text
+                  style={{
+                    color: '#8FA5CC',
+                    fontSize: 9,
+                    fontWeight: '800',
+                    marginTop: 3,
+                  }}
+                >
+                  DA CONTROLLARE
+                </Text>
+              </View>
+            </View>
+          </View>
+
+
+          {/* ===== AGGIUNGI DOTAZIONE ===== */}
+          <View
+            style={{
+              marginTop: 16,
+              marginHorizontal: 16,
+              padding: 18,
+              borderRadius: 23,
+              backgroundColor: 'rgba(10,29,61,0.96)',
+              borderWidth: 1,
+              borderColor: 'rgba(91,218,255,0.32)',
+            }}
+          >
+            <Text
+              style={{
+                color: '#FFFFFF',
+                fontSize: 17,
+                fontWeight: '900',
+              }}
+            >
+              + Aggiungi articolo
+            </Text>
+
+            <Text
+              style={{
+                color: '#8FA5CC',
+                fontSize: 10,
+                marginTop: 4,
+                marginBottom: 14,
+              }}
+            >
+              Registra una nuova consegna della tua azienda.
+            </Text>
+
+            <TextInput
+              value={dotazioneNome}
+              onChangeText={setDotazioneNome}
+              placeholder="Articolo · es. Polo estiva"
+              placeholderTextColor="#7184AA"
+              style={{
+                backgroundColor: '#07152E',
+                color: '#FFFFFF',
+                borderRadius: 14,
+                padding: 13,
+                borderWidth: 1,
+                borderColor: '#203A67',
+              }}
+            />
+
+            <Text
+              style={{
+                color: '#AEB9D6',
+                fontSize: 10,
+                fontWeight: '800',
+                marginTop: 14,
+                marginBottom: 7,
+              }}
+            >
+              CATEGORIA
+            </Text>
+
+            <View
+              style={{
+                flexDirection: 'row',
+                flexWrap: 'wrap',
+                gap: 7,
+              }}
+            >
+              {categorieDotazione.map((categoria) => (
+                <TouchableOpacity
+                  key={categoria}
+                  activeOpacity={0.8}
+                  onPress={() =>
+                    setDotazioneCategoria(categoria)
+                  }
+                  style={{
+                    paddingHorizontal: 11,
+                    paddingVertical: 8,
+                    borderRadius: 999,
+                    backgroundColor:
+                      dotazioneCategoria === categoria
+                        ? 'rgba(111,234,255,0.18)'
+                        : '#07152E',
+                    borderWidth: 1,
+                    borderColor:
+                      dotazioneCategoria === categoria
+                        ? '#6FEAFF'
+                        : '#203A67',
+                  }}
+                >
+                  <Text
+                    style={{
+                      color:
+                        dotazioneCategoria === categoria
+                          ? '#6FEAFF'
+                          : '#AEB9D6',
+                      fontSize: 9,
+                      fontWeight: '900',
+                    }}
+                  >
+                    {categoria}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <View
+              style={{
+                flexDirection: 'row',
+                gap: 10,
+                marginTop: 13,
+              }}
+            >
+              <TextInput
+                value={dotazioneQuantita}
+                onChangeText={setDotazioneQuantita}
+                keyboardType="numeric"
+                placeholder="Quantità"
+                placeholderTextColor="#7184AA"
+                style={{
+                  flex: 1,
+                  backgroundColor: '#07152E',
+                  color: '#FFFFFF',
+                  borderRadius: 14,
+                  padding: 13,
+                  borderWidth: 1,
+                  borderColor: '#203A67',
+                }}
+              />
+
+              <TextInput
+                value={dotazioneTaglia}
+                onChangeText={setDotazioneTaglia}
+                placeholder="Taglia"
+                placeholderTextColor="#7184AA"
+                style={{
+                  flex: 1,
+                  backgroundColor: '#07152E',
+                  color: '#FFFFFF',
+                  borderRadius: 14,
+                  padding: 13,
+                  borderWidth: 1,
+                  borderColor: '#203A67',
+                }}
+              />
+            </View>
+
+            <TextInput
+              value={dotazioneDataConsegna}
+              onChangeText={setDotazioneDataConsegna}
+              placeholder="Data consegna · es. 27/08/2026"
+              placeholderTextColor="#7184AA"
+              style={{
+                marginTop: 10,
+                backgroundColor: '#07152E',
+                color: '#FFFFFF',
+                borderRadius: 14,
+                padding: 13,
+                borderWidth: 1,
+                borderColor: '#203A67',
+              }}
+            />
+
+            <Text
+              style={{
+                color: '#AEB9D6',
+                fontSize: 10,
+                fontWeight: '800',
+                marginTop: 14,
+                marginBottom: 7,
+              }}
+            >
+              STATO ALLA CONSEGNA
+            </Text>
+
+            <View
+              style={{
+                flexDirection: 'row',
+                flexWrap: 'wrap',
+                gap: 7,
+              }}
+            >
+              {statiDotazione.map((stato) => (
+                <TouchableOpacity
+                  key={stato}
+                  activeOpacity={0.8}
+                  onPress={() =>
+                    setDotazioneStato(stato)
+                  }
+                  style={{
+                    paddingHorizontal: 11,
+                    paddingVertical: 8,
+                    borderRadius: 999,
+                    backgroundColor:
+                      dotazioneStato === stato
+                        ? `${coloreStatoDotazione(stato)}20`
+                        : '#07152E',
+                    borderWidth: 1,
+                    borderColor:
+                      dotazioneStato === stato
+                        ? coloreStatoDotazione(stato)
+                        : '#203A67',
+                  }}
+                >
+                  <Text
+                    style={{
+                      color:
+                        dotazioneStato === stato
+                          ? coloreStatoDotazione(stato)
+                          : '#AEB9D6',
+                      fontSize: 9,
+                      fontWeight: '900',
+                    }}
+                  >
+                    {stato}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <TextInput
+              value={dotazioneNote}
+              onChangeText={setDotazioneNote}
+              multiline
+              placeholder="Note facoltative"
+              placeholderTextColor="#7184AA"
+              style={{
+                minHeight: 70,
+                marginTop: 12,
+                backgroundColor: '#07152E',
+                color: '#FFFFFF',
+                borderRadius: 14,
+                padding: 13,
+                borderWidth: 1,
+                borderColor: '#203A67',
+                textAlignVertical: 'top',
+              }}
+            />
+
+            <TouchableOpacity
+              activeOpacity={0.84}
+              onPress={aggiungiDotazionePersonale}
+              style={{
+                marginTop: 14,
+                minHeight: 50,
+                borderRadius: 16,
+                alignItems: 'center',
+                justifyContent: 'center',
+                backgroundColor: '#2956FF',
+              }}
+            >
+              <Text
+                style={{
+                  color: '#FFFFFF',
+                  fontSize: 13,
+                  fontWeight: '900',
+                }}
+              >
+                SALVA CONSEGNA
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+
+          {/* ===== INVENTARIO ===== */}
+          <View
+            style={{
+              marginHorizontal: 16,
+              marginTop: 18,
+            }}
+          >
+            <Text
+              style={{
+                color: '#6FEAFF',
+                fontSize: 11,
+                fontWeight: '900',
+                letterSpacing: 1,
+                marginBottom: 10,
+              }}
+            >
+              INVENTARIO
+            </Text>
+
+            {dotazionePersonale.length === 0 ? (
+              <View
+                style={{
+                  padding: 20,
+                  borderRadius: 20,
+                  backgroundColor: '#091936',
+                  borderWidth: 1,
+                  borderColor: '#203A67',
+                }}
+              >
+                <Text
+                  style={{
+                    color: '#FFFFFF',
+                    fontSize: 14,
+                    fontWeight: '900',
+                  }}
+                >
+                  Nessun articolo registrato
+                </Text>
+
+                <Text
+                  style={{
+                    color: '#8FA5CC',
+                    fontSize: 10,
+                    marginTop: 5,
+                  }}
+                >
+                  Quando ricevi la prossima dotazione,
+                  registrala qui.
+                </Text>
+              </View>
+            ) : (
+              dotazionePersonale.map((item) => (
+                <View
+                  key={item.id}
+                  style={{
+                    marginBottom: 11,
+                    padding: 15,
+                    borderRadius: 20,
+                    backgroundColor: item.restituito
+                      ? 'rgba(15,28,50,0.72)'
+                      : '#0A1D3D',
+                    borderWidth: 1,
+                    borderColor: item.restituito
+                      ? '#263650'
+                      : `${coloreStatoDotazione(item.stato)}70`,
+                    opacity: item.restituito ? 0.68 : 1,
+                  }}
+                >
+                  <View
+                    style={{
+                      flexDirection: 'row',
+                      justifyContent: 'space-between',
+                      alignItems: 'flex-start',
+                    }}
+                  >
+                    <View style={{ flex: 1, paddingRight: 10 }}>
+                      <Text
+                        style={{
+                          color: '#FFFFFF',
+                          fontSize: 16,
+                          fontWeight: '900',
+                        }}
+                      >
+                        {item.nome}
+                      </Text>
+
+                      <Text
+                        style={{
+                          color: '#8FA5CC',
+                          fontSize: 10,
+                          marginTop: 4,
+                        }}
+                      >
+                        {item.categoria}
+                        {item.taglia ? ` · Taglia ${item.taglia}` : ''}
+                        {` · Q.tà ${item.quantita}`}
+                      </Text>
+                    </View>
+
+                    <View
+                      style={{
+                        paddingHorizontal: 9,
+                        paddingVertical: 5,
+                        borderRadius: 999,
+                        backgroundColor:
+                          `${coloreStatoDotazione(item.stato)}18`,
+                        borderWidth: 1,
+                        borderColor:
+                          `${coloreStatoDotazione(item.stato)}70`,
+                      }}
+                    >
+                      <Text
+                        style={{
+                          color: coloreStatoDotazione(item.stato),
+                          fontSize: 8,
+                          fontWeight: '900',
+                        }}
+                      >
+                        {item.restituito
+                          ? 'RESTITUITO'
+                          : String(item.stato || '').toUpperCase()}
+                      </Text>
+                    </View>
+                  </View>
+
+                  {item.dataConsegna ? (
+                    <Text
+                      style={{
+                        color: '#AEB9D6',
+                        fontSize: 9.5,
+                        marginTop: 9,
+                      }}
+                    >
+                      📦 Consegnato: {item.dataConsegna}
+                    </Text>
+                  ) : null}
+
+                  {item.dataRestituzione ? (
+                    <Text
+                      style={{
+                        color: '#AEB9D6',
+                        fontSize: 9.5,
+                        marginTop: 4,
+                      }}
+                    >
+                      ↩️ Restituito: {item.dataRestituzione}
+                    </Text>
+                  ) : null}
+
+                  {item.note ? (
+                    <Text
+                      style={{
+                        color: '#8FA5CC',
+                        fontSize: 9.5,
+                        lineHeight: 14,
+                        marginTop: 7,
+                      }}
+                    >
+                      {item.note}
+                    </Text>
+                  ) : null}
+
+                  
+                  {/* ===== UI FOTO RICEVUTA DOTAZIONE ===== */}
+                  <View
+                    style={{
+                      marginTop: 12,
+                      paddingTop: 11,
+                      borderTopWidth: 1,
+                      borderTopColor: '#203A67',
+                    }}
+                  >
+                    <Text
+                      style={{
+                        color: '#A9D7FF',
+                        fontSize: 9,
+                        fontWeight: '900',
+                        marginBottom: 8,
+                      }}
+                    >
+                      📷 FOTO / RICEVUTA
+                    </Text>
+
+                    {item.fotoRicevuta?.uri ? (
+                      <>
+                        <Image
+                          source={{
+                            uri:
+                              item.fotoRicevuta.uri,
+                          }}
+                          resizeMode="cover"
+                          style={{
+                            width: '100%',
+                            height: 155,
+                            borderRadius: 15,
+                            backgroundColor:
+                              '#07152E',
+                            borderWidth: 1,
+                            borderColor:
+                              '#31598E',
+                          }}
+                        />
+
+                        <View
+                          style={{
+                            flexDirection: 'row',
+                            gap: 8,
+                            marginTop: 8,
+                          }}
+                        >
+                          <TouchableOpacity
+                            activeOpacity={0.8}
+                            onPress={() =>
+                              scegliFotoDotazione(
+                                item.id
+                              )
+                            }
+                            style={{
+                              flex: 1,
+                              minHeight: 38,
+                              borderRadius: 12,
+                              alignItems:
+                                'center',
+                              justifyContent:
+                                'center',
+                              backgroundColor:
+                                '#102B54',
+                              borderWidth: 1,
+                              borderColor:
+                                '#31598E',
+                            }}
+                          >
+                            <Text
+                              style={{
+                                color:
+                                  '#A9D7FF',
+                                fontSize: 9,
+                                fontWeight:
+                                  '900',
+                              }}
+                            >
+                              🔄 CAMBIA
+                            </Text>
+                          </TouchableOpacity>
+
+                          <TouchableOpacity
+                            activeOpacity={0.8}
+                            onPress={() =>
+                              eliminaFotoDotazione(
+                                item.id
+                              )
+                            }
+                            style={{
+                              flex: 1,
+                              minHeight: 38,
+                              borderRadius: 12,
+                              alignItems:
+                                'center',
+                              justifyContent:
+                                'center',
+                              backgroundColor:
+                                'rgba(255,107,129,0.10)',
+                              borderWidth: 1,
+                              borderColor:
+                                'rgba(255,107,129,0.35)',
+                            }}
+                          >
+                            <Text
+                              style={{
+                                color:
+                                  '#FF6B81',
+                                fontSize: 9,
+                                fontWeight:
+                                  '900',
+                              }}
+                            >
+                              🗑 ELIMINA
+                            </Text>
+                          </TouchableOpacity>
+                        </View>
+                      </>
+                    ) : (
+                      <TouchableOpacity
+                        activeOpacity={0.82}
+                        onPress={() =>
+                          scegliFotoDotazione(
+                            item.id
+                          )
+                        }
+                        style={{
+                          minHeight: 46,
+                          borderRadius: 14,
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          justifyContent:
+                            'center',
+                          gap: 7,
+                          backgroundColor:
+                            'rgba(111,234,255,0.07)',
+                          borderWidth: 1,
+                          borderColor:
+                            'rgba(111,234,255,0.28)',
+                        }}
+                      >
+                        <Ionicons
+                          name="camera-outline"
+                          size={17}
+                          color="#6FEAFF"
+                        />
+
+                        <Text
+                          style={{
+                            color: '#6FEAFF',
+                            fontSize: 9,
+                            fontWeight: '900',
+                          }}
+                        >
+                          AGGIUNGI FOTO / RICEVUTA
+                        </Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+
+{!item.restituito ? (
+                    <View
+                      style={{
+                        flexDirection: 'row',
+                        flexWrap: 'wrap',
+                        gap: 6,
+                        marginTop: 12,
+                      }}
+                    >
+                      {statiDotazione.map((stato) => (
+                        <TouchableOpacity
+                          key={stato}
+                          activeOpacity={0.8}
+                          onPress={() =>
+                            cambiaStatoDotazione(
+                              item.id,
+                              stato
+                            )
+                          }
+                          style={{
+                            paddingHorizontal: 8,
+                            paddingVertical: 6,
+                            borderRadius: 999,
+                            backgroundColor:
+                              item.stato === stato
+                                ? `${coloreStatoDotazione(stato)}20`
+                                : '#07152E',
+                            borderWidth: 1,
+                            borderColor:
+                              item.stato === stato
+                                ? coloreStatoDotazione(stato)
+                                : '#203A67',
+                          }}
+                        >
+                          <Text
+                            style={{
+                              color:
+                                item.stato === stato
+                                  ? coloreStatoDotazione(stato)
+                                  : '#7184AA',
+                              fontSize: 7.5,
+                              fontWeight: '900',
+                            }}
+                          >
+                            {stato}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  ) : null}
+
+                  <View
+                    style={{
+                      flexDirection: 'row',
+                      gap: 8,
+                      marginTop: 12,
+                    }}
+                  >
+                    
+                    <TouchableOpacity
+                      activeOpacity={0.8}
+                      onPress={() => {
+                        setDotazioneSostituzioneId(
+                          dotazioneSostituzioneId === item.id
+                            ? null
+                            : item.id
+                        );
+
+                        setDotazioneSostituzioneQuantita('1');
+                        setDotazioneSostituzioneData('');
+                        setDotazioneSostituzioneMotivo('');
+                      }}
+                      style={{
+                        flex: 1,
+                        minHeight: 38,
+                        borderRadius: 12,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        backgroundColor: 'rgba(255,212,90,0.10)',
+                        borderWidth: 1,
+                        borderColor: 'rgba(255,212,90,0.38)',
+                      }}
+                    >
+                      <Text
+                        style={{
+                          color: '#FFD45A',
+                          fontSize: 8.5,
+                          fontWeight: '900',
+                        }}
+                      >
+                        ♻️ SOSTITUISCI
+                      </Text>
+                    </TouchableOpacity>
+
+<TouchableOpacity
+                      activeOpacity={0.8}
+                      onPress={() =>
+                        toggleRestituzioneDotazione(item.id)
+                      }
+                      style={{
+                        flex: 1,
+                        minHeight: 38,
+                        borderRadius: 12,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        backgroundColor: '#102B54',
+                        borderWidth: 1,
+                        borderColor: '#31598E',
+                      }}
+                    >
+                      <Text
+                        style={{
+                          color: '#A9D7FF',
+                          fontSize: 9,
+                          fontWeight: '900',
+                        }}
+                      >
+                        {item.restituito
+                          ? 'ANNULLA RESTITUZIONE'
+                          : '↩ RESTITUITO'}
+                      </Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      activeOpacity={0.8}
+                      onPress={() =>
+                        eliminaDotazionePersonale(item.id)
+                      }
+                      style={{
+                        minWidth: 46,
+                        minHeight: 38,
+                        borderRadius: 12,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        backgroundColor: 'rgba(255,107,129,0.10)',
+                        borderWidth: 1,
+                        borderColor: 'rgba(255,107,129,0.35)',
+                      }}
+                    >
+                      <Ionicons
+                        name="trash-outline"
+                        size={17}
+                        color="#FF6B81"
+                      />
+                    </TouchableOpacity>
+                  </View>
+
+                  {/* ===== UI SOSTITUZIONE DOTAZIONE ===== */}
+                  {dotazioneSostituzioneId === item.id ? (
+                    <View
+                      style={{
+                        marginTop: 12,
+                        padding: 13,
+                        borderRadius: 16,
+                        backgroundColor: 'rgba(255,212,90,0.06)',
+                        borderWidth: 1,
+                        borderColor: 'rgba(255,212,90,0.30)',
+                      }}
+                    >
+                      <Text
+                        style={{
+                          color: '#FFD45A',
+                          fontSize: 10,
+                          fontWeight: '900',
+                        }}
+                      >
+                        REGISTRA SOSTITUZIONE
+                      </Text>
+
+                      <Text
+                        style={{
+                          color: '#8FA5CC',
+                          fontSize: 8.5,
+                          lineHeight: 12,
+                          marginTop: 3,
+                          marginBottom: 10,
+                        }}
+                      >
+                        Registra quantità, data e motivo.
+                        L’articolo rimane nel tuo inventario.
+                      </Text>
+
+                      <View
+                        style={{
+                          flexDirection: 'row',
+                          gap: 8,
+                        }}
+                      >
+                        <TextInput
+                          value={dotazioneSostituzioneQuantita}
+                          onChangeText={setDotazioneSostituzioneQuantita}
+                          keyboardType="numeric"
+                          placeholder="Quantità"
+                          placeholderTextColor="#7184AA"
+                          style={{
+                            flex: 0.7,
+                            backgroundColor: '#07152E',
+                            color: '#FFFFFF',
+                            borderRadius: 12,
+                            padding: 11,
+                            borderWidth: 1,
+                            borderColor: '#30476D',
+                          }}
+                        />
+
+                        <TextInput
+                          value={dotazioneSostituzioneData}
+                          onChangeText={setDotazioneSostituzioneData}
+                          placeholder="Data · 27/08/2026"
+                          placeholderTextColor="#7184AA"
+                          style={{
+                            flex: 1.3,
+                            backgroundColor: '#07152E',
+                            color: '#FFFFFF',
+                            borderRadius: 12,
+                            padding: 11,
+                            borderWidth: 1,
+                            borderColor: '#30476D',
+                          }}
+                        />
+                      </View>
+
+                      <TextInput
+                        value={dotazioneSostituzioneMotivo}
+                        onChangeText={setDotazioneSostituzioneMotivo}
+                        placeholder="Motivo · usura, rottura, cambio taglia..."
+                        placeholderTextColor="#7184AA"
+                        multiline
+                        style={{
+                          minHeight: 58,
+                          marginTop: 8,
+                          backgroundColor: '#07152E',
+                          color: '#FFFFFF',
+                          borderRadius: 12,
+                          padding: 11,
+                          borderWidth: 1,
+                          borderColor: '#30476D',
+                          textAlignVertical: 'top',
+                        }}
+                      />
+
+                      <TouchableOpacity
+                        activeOpacity={0.84}
+                        onPress={() =>
+                          salvaSostituzioneDotazione(item.id)
+                        }
+                        style={{
+                          minHeight: 42,
+                          marginTop: 9,
+                          borderRadius: 13,
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          backgroundColor: '#C99516',
+                        }}
+                      >
+                        <Text
+                          style={{
+                            color: '#FFFFFF',
+                            fontSize: 10,
+                            fontWeight: '900',
+                          }}
+                        >
+                          SALVA SOSTITUZIONE
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  ) : null}
+
+
+                  {Array.isArray(item.storicoSostituzioni) &&
+                   item.storicoSostituzioni.length > 0 ? (
+                    <View
+                      style={{
+                        marginTop: 12,
+                        paddingTop: 11,
+                        borderTopWidth: 1,
+                        borderTopColor: '#203A67',
+                      }}
+                    >
+                      <Text
+                        style={{
+                          color: '#A9D7FF',
+                          fontSize: 9,
+                          fontWeight: '900',
+                          marginBottom: 7,
+                        }}
+                      >
+                        📜 STORICO SOSTITUZIONI
+                      </Text>
+
+                      {item.storicoSostituzioni.map(
+                        (evento, index) => (
+                          <View
+                            key={evento.id || `${item.id}_${index}`}
+                            style={{
+                              marginBottom:
+                                index === item.storicoSostituzioni.length - 1
+                                  ? 0
+                                  : 7,
+                              padding: 9,
+                              borderRadius: 11,
+                              backgroundColor: '#07152E',
+                            }}
+                          >
+                            <View
+                              style={{
+                                flexDirection: 'row',
+                                justifyContent: 'space-between',
+                              }}
+                            >
+                              <Text
+                                style={{
+                                  color: '#FFFFFF',
+                                  fontSize: 9,
+                                  fontWeight: '900',
+                                }}
+                              >
+                                {evento.data || 'Data non indicata'}
+                              </Text>
+
+                              <Text
+                                style={{
+                                  color: '#FFD45A',
+                                  fontSize: 8.5,
+                                  fontWeight: '900',
+                                }}
+                              >
+                                Q.tà {evento.quantita || 1}
+                              </Text>
+                            </View>
+
+                            <Text
+                              style={{
+                                color: '#8FA5CC',
+                                fontSize: 8.5,
+                                lineHeight: 12,
+                                marginTop: 4,
+                              }}
+                            >
+                              {evento.motivo}
+                            </Text>
+                          </View>
+                        )
+                      )}
+                    </View>
+                  ) : null}
+
+
+                </View>
+              ))
+            )}
+          </View>
+        </ScrollView>
+      </Screen>
+    );
+  }
+
+
 if (screen === 'strumenti') {
     const strumentiCards = [
+      {
+        id: 'dotazionePersonale',
+        icon: 'shirt-outline',
+        titolo: 'Dotazione personale',
+        testo: 'Divisa, equipaggiamento e consegne',
+        colore: '#6FEAFF',
+      },
+
       {
         id: 'meteoServizio',
         icon: 'partly-sunny-outline',
