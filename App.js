@@ -29,6 +29,7 @@ import { caricaColleghi, aggiungiCollega, rimuoviCollega, accettaCollega, rifiut
 import { caricaColleghiInServizio } from './servizioApi';
 import React, { useRef, useEffect, useMemo, useState } from 'react';
 import BriscolaGame from './games/BriscolaGame';
+import ScopaGame from './games/ScopaGame';
 import * as Clipboard from 'expo-clipboard';
 
 import {
@@ -11726,6 +11727,15 @@ if (screen === 'configuraStipendio') {
     );
   }
 
+
+  if (screen === 'scopaGame') {
+    return (
+      <ScopaGame
+        onBack={() => setScreen('passatempo')}
+      />
+    );
+  }
+
   if (screen === 'snakeGame') {
     const nuovaPartitaSnake = () => {
       const corpo = [
@@ -14111,6 +14121,14 @@ if (screen === 'configuraStipendio') {
       icona: 'albums-outline',
       colore: '#65E49A',
     },
+
+    {
+      id: 'scopa',
+      titolo: 'SCOPA',
+      sottotitolo: 'La classica sfida a Scopa',
+      icona: 'diamond-outline',
+      colore: '#F3C969',
+    },
 ];
 
     return (
@@ -14280,6 +14298,12 @@ if (screen === 'configuraStipendio') {
                 setScreen('briscolaGame');
                 return;
               }
+
+
+        if (gioco.id === 'scopa') {
+          setScreen('scopaGame');
+          return;
+        }
 
 Alert.alert(
                   gioco.titolo,

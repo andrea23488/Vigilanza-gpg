@@ -854,6 +854,7 @@ function FronteCarta({ carta }) {
 
 
 export default function NapoletanaCard({
+  retroLabel = 'BRISCOLA',
   carta,
   coperta = false,
   onPress,
@@ -908,8 +909,8 @@ export default function NapoletanaCard({
           marginTop: 4,
         }}
       >
-        BRISCOLA
-      </Text>
+              {retroLabel}
+            </Text>
 
       <Text
         style={{
