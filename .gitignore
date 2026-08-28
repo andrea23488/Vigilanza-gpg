@@ -40,3 +40,12 @@ yarn-error.*
 /ios
 /android
 .env
+
+# Backup locali creati durante lo sviluppo
+App_BACKUP_*.js
+games/*_BACKUP_*.js
+*_BACKUP_*.js
+
+# File temporanei locali
+output.txt
+output2.txt
