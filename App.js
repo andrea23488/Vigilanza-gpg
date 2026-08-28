@@ -11,6 +11,9 @@ import LoginScreen from './LoginScreen';
 import {
   caricaMessaggi,
   inviaMessaggio,
+  inviaConsegna,
+  caricaConsegneRicevute,
+  segnaConsegnaComeLetta,
   mioUserId,
   eliminaMessaggio,
   eliminaConversazione,
@@ -25,6 +28,7 @@ import { caricaProfiloUtente, salvaProfiloUtente, caricaFotoProfilo, eliminaFoto
 import { caricaColleghi, aggiungiCollega, rimuoviCollega, accettaCollega, rifiutaCollega } from './colleghiApi';
 import { caricaColleghiInServizio } from './servizioApi';
 import React, { useRef, useEffect, useMemo, useState } from 'react';
+import BriscolaGame from './games/BriscolaGame';
 import * as Clipboard from 'expo-clipboard';
 
 import {
@@ -335,6 +339,125 @@ export default function App() {
   const giorniSettimana = ["Dom", "Lun", "Mar", "Mer", "Gio", "Ven", "Sab"];
  const [accessoTest, setAccessoTest] = useState(false);
   const [screen, setScreen] = useState("home");
+  const [consegnaSelezionata, setConsegnaSelezionata] = useState(null);
+  const [consegneRicevute, setConsegneRicevute] = useState([]);
+  const [notificheNascoste, setNotificheNascoste] = useState([]);
+  const tornaSuRef = useRef(null);
+  const [mostraTornaSu, setMostraTornaSu] = useState(false);
+
+  useEffect(() => {
+    let attivo = true;
+
+    (async () => {
+      try {
+        const raw = await AsyncStorage.getItem(
+          'vigilanza_notifiche_nascoste'
+        );
+
+        if (!attivo || !raw) return;
+
+        const parsed = JSON.parse(raw);
+
+        if (Array.isArray(parsed)) {
+          setNotificheNascoste(parsed);
+        }
+      } catch (error) {
+        console.log(
+          'Errore caricamento notifiche nascoste:',
+          error
+        );
+      }
+    })();
+
+    return () => {
+      attivo = false;
+    };
+  }, []);
+
+  const salvaNotificheNascoste = async (nuove) => {
+    setNotificheNascoste(nuove);
+
+    try {
+      await AsyncStorage.setItem(
+        'vigilanza_notifiche_nascoste',
+        JSON.stringify(nuove)
+      );
+    } catch (error) {
+      console.log(
+        'Errore salvataggio notifiche nascoste:',
+        error
+      );
+    }
+  };
+
+  const cancellaTutteNotifiche = () => {
+    Alert.alert(
+      'Cancella notifiche',
+      'Vuoi rimuovere tutte le notifiche dal Centro Notifiche?',
+      [
+        {
+          text: 'Annulla',
+          style: 'cancel',
+        },
+        {
+          text: 'Cancella tutto',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              // Segna come lette tutte le chat presenti
+              await Promise.all(
+                mittentiNonLetti.map((n) =>
+                  segnaMessaggiComeLetti(n.altroUserId)
+                )
+              );
+
+              // Segna come lette tutte le consegne presenti
+              await Promise.all(
+                consegneRicevute
+                  .filter((c) => !c.letta)
+                  .map((c) => segnaConsegnaComeLetta(c.id))
+              );
+
+              const nuoveNascoste = [
+                ...notificheNascoste,
+                ...mittentiNonLetti.map(
+                  (n) => `chat:${n.id}`
+                ),
+                ...consegneRicevute.map(
+                  (c) => `consegna:${c.id}`
+                ),
+              ];
+
+              const uniche = [...new Set(nuoveNascoste)];
+
+              await salvaNotificheNascoste(uniche);
+
+              setConsegneRicevute((prev) =>
+                prev.map((c) => ({
+                  ...c,
+                  letta: true,
+                }))
+              );
+
+              setNumeroNotifiche(0);
+            } catch (error) {
+              console.log(
+                'Errore cancellazione notifiche:',
+                error
+              );
+
+              Alert.alert(
+                'Errore',
+                'Non è stato possibile cancellare le notifiche.'
+              );
+            }
+          },
+        },
+      ]
+    );
+  };
+
+
   const [stipendioCCNL, setStipendioCCNL] = useState('Vigilanza Privata e Servizi di Sicurezza');
 
   // ===== TIPO OPERATORE STIPENDIO =====
@@ -1615,21 +1738,27 @@ export default function App() {
 
         if (!mioId) return;
 
-        const { data: messaggiNonLetti, error } = await supabase
-          .from('messaggi')
-          .select('id, mittente_id, destinatario_id, testo, created_at, letto_at')
-          .eq('destinatario_id', mioId)
-          .is('letto_at', null)
-          .order('created_at', { ascending: false });
+          const { data: messaggiRicevuti, error } = await supabase
+            .from('messaggi')
+            .select('id, mittente_id, destinatario_id, testo, created_at, letto_at')
+            .eq('destinatario_id', mioId)
+            .order('created_at', { ascending: false });
 
         if (error) throw error;
 
         const listaColleghiNotifiche = await caricaColleghi();
         const notifiche = [];
 
-        for (const msg of messaggiNonLetti || []) {
-          const mittenteId = String(msg.mittente_id || '');
-          if (!mittenteId) continue;
+          const mittentiGiaAggiunti = new Set();
+
+          for (const msg of messaggiRicevuti || []) {
+            const mittenteId = String(msg.mittente_id || '');
+
+            if (!mittenteId || mittentiGiaAggiunti.has(mittenteId)) {
+              continue;
+            }
+
+            mittentiGiaAggiunti.add(mittenteId);
 
           const collegaProfilo =
             (listaColleghiNotifiche || []).find(
@@ -1665,7 +1794,7 @@ export default function App() {
             nomeMittente,
             testo,
             ultimoMessaggio: testo,
-            nonLetti: 1,
+              nonLetti: msg.letto_at ? 0 : 1,
             isConsegna: testo.trim().startsWith('📦 CONSEGNA DI SERVIZIO'),
             created_at: msg.created_at,
           });
@@ -1916,10 +2045,21 @@ if (dati.tariffaStraordinario != null) {
   useEffect(() => {
     let attivo = true;
 
-    const aggiornaNumeroNotifiche = async () => {
-      try {
-        const totale = await contaMessaggiNonLetti();
-        if (attivo) setNumeroNotifiche(totale || 0);
+  const aggiornaNumeroNotifiche = async () => {
+    try {
+      const [totaleChat, consegne] = await Promise.all([
+        contaMessaggiNonLetti(),
+        caricaConsegneRicevute(),
+      ]);
+
+      const totaleConsegne = (consegne || []).filter(
+        (c) => !c.letta
+      ).length;
+
+      const totale =
+        Number(totaleChat || 0) + totaleConsegne;
+
+      if (attivo) setNumeroNotifiche(totale);
       } catch (error) {
         console.log('Errore conteggio notifiche:', error);
       }
@@ -3915,7 +4055,7 @@ const cambiaStatoDotazione = (id, stato) => {
     useState('14:00');
 
   const [luogo, setLuogo] =
-    useState('Fiumicino');
+    useState('');
   const [localitaMeteoTurno, setLocalitaMeteoTurno] = useState('');
 
   const [indirizzoServizio, setIndirizzoServizio] =
@@ -5943,7 +6083,7 @@ const coefficienteNettoFiduciario = 0.78;
     );
 
     setLuogo(
-      'Fiumicino'
+      ''
     );
 
     setIndirizzoServizio('');
@@ -6560,9 +6700,250 @@ const coefficienteNettoFiduciario = 0.78;
   }
 
   
+
+  if (screen === 'dettaglioConsegna') {
+    return (
+      <SafeAreaView
+        style={{
+          flex: 1,
+          backgroundColor: '#071426',
+        }}
+      >
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{
+            paddingHorizontal: 18,
+            paddingTop: 18,
+            paddingBottom: 120,
+          }}
+        >
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              marginBottom: 24,
+            }}
+          >
+            <TouchableOpacity
+              activeOpacity={0.8}
+              onPress={() => setScreen('centroNotifiche')}
+              style={{
+                width: 44,
+                height: 44,
+                borderRadius: 22,
+                alignItems: 'center',
+                justifyContent: 'center',
+                backgroundColor: 'rgba(255,255,255,0.08)',
+                borderWidth: 1,
+                borderColor: 'rgba(141,184,255,0.30)',
+              }}
+            >
+              <Ionicons
+                name="chevron-back"
+                size={24}
+                color="#FFFFFF"
+              />
+            </TouchableOpacity>
+
+            <View style={{ marginLeft: 14, flex: 1 }}>
+              <Text
+                style={{
+                  color: '#FFFFFF',
+                  fontSize: 22,
+                  fontWeight: '900',
+                }}
+              >
+                Consegna di servizio
+              </Text>
+
+              <Text
+                style={{
+                  color: '#AEB9D6',
+                  fontSize: 13,
+                  fontWeight: '700',
+                  marginTop: 3,
+                }}
+              >
+                Da {consegnaSelezionata?.nomeMittente || 'Collega'}
+              </Text>
+            </View>
+
+            <View
+              style={{
+                width: 44,
+                height: 44,
+                borderRadius: 14,
+                alignItems: 'center',
+                justifyContent: 'center',
+                backgroundColor: 'rgba(255,179,48,0.14)',
+              }}
+            >
+              <Ionicons
+                name="document-text-outline"
+                size={23}
+                color="#FFB330"
+              />
+            </View>
+          </View>
+
+          <View
+            style={{
+              borderRadius: 22,
+              padding: 18,
+              backgroundColor: 'rgba(255,255,255,0.07)',
+              borderWidth: 1,
+              borderColor: 'rgba(141,184,255,0.25)',
+            }}
+          >
+            <Text
+              style={{
+                color: '#8FAEFF',
+                fontSize: 11,
+                fontWeight: '900',
+                marginBottom: 5,
+              }}
+            >
+              DATA / ORA
+            </Text>
+            <Text
+              style={{
+                color: '#FFFFFF',
+                fontSize: 15,
+                fontWeight: '800',
+                marginBottom: 18,
+              }}
+            >
+              {[consegnaSelezionata?.data_servizio,
+                consegnaSelezionata?.ora_servizio]
+                .filter(Boolean)
+                .join(' · ') || 'Non indicata'}
+            </Text>
+
+            <Text
+              style={{
+                color: '#8FAEFF',
+                fontSize: 11,
+                fontWeight: '900',
+                marginBottom: 5,
+              }}
+            >
+              POSTAZIONE / LUOGO
+            </Text>
+            <Text
+              style={{
+                color: '#FFFFFF',
+                fontSize: 15,
+                fontWeight: '800',
+                marginBottom: 18,
+              }}
+            >
+              {consegnaSelezionata?.postazione || 'Non indicata'}
+            </Text>
+
+            {!!consegnaSelezionata?.accaduto && (
+              <>
+                <Text style={{ color: '#8FAEFF', fontSize: 11, fontWeight: '900', marginBottom: 5 }}>
+                  EVENTI DEL TURNO
+                </Text>
+                <Text style={{ color: '#FFFFFF', fontSize: 15, lineHeight: 23, fontWeight: '700', marginBottom: 18 }}>
+                  {consegnaSelezionata.accaduto}
+                </Text>
+              </>
+            )}
+
+            {!!consegnaSelezionata?.da_fare && (
+              <>
+                <Text style={{ color: '#8FAEFF', fontSize: 11, fontWeight: '900', marginBottom: 5 }}>
+                  ATTIVITÀ DA COMPLETARE
+                </Text>
+                <Text style={{ color: '#FFFFFF', fontSize: 15, lineHeight: 23, fontWeight: '700', marginBottom: 18 }}>
+                  {consegnaSelezionata.da_fare}
+                </Text>
+              </>
+            )}
+
+            {!!consegnaSelezionata?.anomalie && (
+              <>
+                <Text style={{ color: '#8FAEFF', fontSize: 11, fontWeight: '900', marginBottom: 5 }}>
+                  ANOMALIE / PROBLEMI
+                </Text>
+                <Text style={{ color: '#FFFFFF', fontSize: 15, lineHeight: 23, fontWeight: '700', marginBottom: 18 }}>
+                  {consegnaSelezionata.anomalie}
+                </Text>
+              </>
+            )}
+
+            {!!consegnaSelezionata?.chiavi && (
+              <>
+                <Text style={{ color: '#8FAEFF', fontSize: 11, fontWeight: '900', marginBottom: 5 }}>
+                  CHIAVI / MATERIALI
+                </Text>
+                <Text style={{ color: '#FFFFFF', fontSize: 15, lineHeight: 23, fontWeight: '700', marginBottom: 18 }}>
+                  {consegnaSelezionata.chiavi}
+                </Text>
+              </>
+            )}
+
+            {!!consegnaSelezionata?.apparati && (
+              <>
+                <Text style={{ color: '#8FAEFF', fontSize: 11, fontWeight: '900', marginBottom: 5 }}>
+                  MEZZI / APPARATI
+                </Text>
+                <Text style={{ color: '#FFFFFF', fontSize: 15, lineHeight: 23, fontWeight: '700', marginBottom: 18 }}>
+                  {consegnaSelezionata.apparati}
+                </Text>
+              </>
+            )}
+
+            {!!consegnaSelezionata?.note && (
+              <>
+                <Text style={{ color: '#8FAEFF', fontSize: 11, fontWeight: '900', marginBottom: 5 }}>
+                  NOTE PER IL COLLEGA SUCCESSIVO
+                </Text>
+                <Text style={{ color: '#FFFFFF', fontSize: 15, lineHeight: 23, fontWeight: '700' }}>
+                  {consegnaSelezionata.note}
+                </Text>
+              </>
+            )}
+          </View>
+
+          <View
+            style={{
+              marginTop: 16,
+              flexDirection: 'row',
+              alignItems: 'center',
+              padding: 14,
+              borderRadius: 16,
+              backgroundColor: 'rgba(67,194,122,0.10)',
+              borderWidth: 1,
+              borderColor: 'rgba(67,194,122,0.25)',
+            }}
+          >
+            <Ionicons
+              name="checkmark-circle-outline"
+              size={21}
+              color="#75D89B"
+            />
+
+            <Text
+              style={{
+                color: '#B9EACB',
+                fontSize: 12.5,
+                fontWeight: '800',
+                marginLeft: 9,
+                flex: 1,
+              }}
+            >
+              Consegna aperta e disponibile per la consultazione.
+            </Text>
+          </View>
+        </ScrollView>
+      </SafeAreaView>
+    );
+  }
+
   if (screen === 'centroNotifiche') {
     const mittentiNonLetti = Object.entries(riepilogoChat || {})
-      .filter(([_, dati]) => Number(dati?.nonLetti || 0) > 0)
       .map(([chiaveNotifica, dati]) => {
         const altroUserId =
           dati?.altroUserId ||
@@ -6602,10 +6983,85 @@ const coefficienteNettoFiduciario = 0.78;
         };
       });
 
+    const notificheChatVisibili = mittentiNonLetti.filter(
+      (n) => !notificheNascoste.includes(`chat:${n.id}`)
+    );
+
+    const consegneVisibili = (consegneRicevute || []).filter(
+      (c) => !notificheNascoste.includes(`consegna:${c.id}`)
+    );
+
+    const cancellaTuttoCentroNotifiche = () => {
+      Alert.alert(
+        'Cancella notifiche',
+        'Vuoi rimuovere tutte le notifiche dal Centro Notifiche?',
+        [
+          {
+            text: 'Annulla',
+            style: 'cancel',
+          },
+          {
+            text: 'Cancella tutto',
+            style: 'destructive',
+            onPress: async () => {
+              try {
+                await Promise.all(
+                  notificheChatVisibili.map((n) =>
+                    segnaMessaggiComeLetti(n.altroUserId)
+                  )
+                );
+
+                await Promise.all(
+                  consegneVisibili
+                    .filter((c) => !c.letta)
+                    .map((c) => segnaConsegnaComeLetta(c.id))
+                );
+
+                const nuoveNascoste = [
+                  ...notificheNascoste,
+                  ...notificheChatVisibili.map(
+                    (n) => `chat:${n.id}`
+                  ),
+                  ...consegneVisibili.map(
+                    (c) => `consegna:${c.id}`
+                  ),
+                ];
+
+                await salvaNotificheNascoste(
+                  [...new Set(nuoveNascoste)]
+                );
+
+                setRiepilogoChat({});
+                setConsegneRicevute([]);
+                setNumeroNotifiche(0);
+              } catch (error) {
+                console.log(
+                  'Errore cancellazione Centro Notifiche:',
+                  error
+                );
+
+                Alert.alert(
+                  'Errore',
+                  'Non è stato possibile cancellare le notifiche.'
+                );
+              }
+            },
+          },
+        ]
+      );
+    };
+
     return (
       <Screen>
         <ScrollView
+          ref={tornaSuRef}
           showsVerticalScrollIndicator={false}
+          scrollEventThrottle={16}
+          onScroll={(event) => {
+            setMostraTornaSu(
+              event.nativeEvent.contentOffset.y > 350
+            );
+          }}
           contentContainerStyle={{
             paddingHorizontal: 18,
             paddingTop: 18,
@@ -6659,27 +7115,40 @@ const coefficienteNettoFiduciario = 0.78;
               </Text>
             </View>
 
-            <View
-              style={{
-                width: 46,
-                height: 46,
-                borderRadius: 23,
-                alignItems: 'center',
-                justifyContent: 'center',
-                backgroundColor: 'rgba(255,255,255,0.08)',
-                borderWidth: 1,
-                borderColor: 'rgba(141,184,255,0.30)',
-              }}
-            >
-              <Ionicons
-                name="notifications-outline"
-                size={24}
-                color="#FFFFFF"
-              />
-            </View>
+              <TouchableOpacity
+                activeOpacity={0.8}
+                onPress={cancellaTuttoCentroNotifiche}
+                style={{
+                  paddingHorizontal: 13,
+                  height: 46,
+                  borderRadius: 23,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  backgroundColor: 'rgba(255,70,70,0.10)',
+                  borderWidth: 1,
+                  borderColor: 'rgba(255,90,90,0.35)',
+                }}
+              >
+                <Ionicons
+                  name="trash-outline"
+                  size={20}
+                  color="#FF7A7A"
+                />
+                <Text
+                  style={{
+                    color: '#FF9B9B',
+                    fontSize: 12,
+                    fontWeight: '900',
+                    marginLeft: 6,
+                  }}
+                >
+                  Cancella
+                </Text>
+              </TouchableOpacity>
           </View>
 
-          {mittentiNonLetti.length === 0 ? (
+            {notificheChatVisibili.length === 0 && consegneVisibili.length === 0 ? (
             <View
               style={{
                 paddingVertical: 42,
@@ -6724,20 +7193,26 @@ const coefficienteNettoFiduciario = 0.78;
               <TouchableOpacity
                 key={String(n.id)}
                 activeOpacity={0.82}
-                onPress={() => {
-                const collegaNotifica =
-                  n.collega || {
-                    altro_user_id: n.altroUserId,
-                    profilo: {
-                      nome: n.nomeMittente || 'Collega',
-                      cognome: ''
-                    }
-                  };
+          onPress={() => {
+            if (n.isConsegna) {
+              setConsegnaSelezionata(n);
+              setScreen('dettaglioConsegna');
+              return;
+            }
 
-                setCollegaSelezionato(collegaNotifica);
-                setChatMessaggio('');
-                setScreen('chatCollega');
-              }}
+            const collegaNotifica =
+              n.collega || {
+                altro_user_id: n.altroUserId,
+                profilo: {
+                  nome: n.nomeMittente || 'Collega',
+                  cognome: ''
+                }
+              };
+
+            setCollegaSelezionato(collegaNotifica);
+            setChatMessaggio('');
+            setScreen('chatCollega');
+          }}
               style={{
                   flexDirection: 'row',
                   alignItems: 'center',
@@ -6790,11 +7265,150 @@ const coefficienteNettoFiduciario = 0.78;
                   </Text>
                 </View>
 
+            {Number(n.nonLetti || 0) > 0 && (
+              <View
+              style={{
+              minWidth: 25,
+              height: 25,
+              paddingHorizontal: 7,
+              borderRadius: 13,
+              backgroundColor: '#FF3B30',
+              alignItems: 'center',
+              justifyContent: 'center',
+              marginLeft: 10,
+              }}
+              >
+              <Text
+              style={{
+              color: '#FFFFFF',
+              fontSize: 11,
+              fontWeight: '900',
+              }}
+              >
+              {n.nonLetti > 99 ? '99+' : n.nonLetti}
+              </Text>
+              </View>
+            )}
+
+                <Ionicons
+                  name="chevron-forward"
+                  size={20}
+                  color="#AEB9D6"
+                  style={{ marginLeft: 8 }}
+                />
+              </TouchableOpacity>
+            ))
+          )}
+          {consegneVisibili.map((c) => (
+            <TouchableOpacity
+              key={`consegna-${c.id}`}
+              activeOpacity={0.82}
+              onPress={async () => {
+                setConsegnaSelezionata(c);
+
+                if (!c.letta) {
+                  try {
+                    await segnaConsegnaComeLetta(c.id);
+
+                    setConsegneRicevute((prev) =>
+                      prev.map((item) =>
+                        item.id === c.id
+                          ? {
+                              ...item,
+                              letta: true,
+                              letta_at: new Date().toISOString(),
+                            }
+                          : item
+                      )
+                    );
+                  } catch (error) {
+                    console.log(
+                      'Errore lettura consegna:',
+                      error
+                    );
+                  }
+                }
+
+                setScreen('dettaglioConsegna');
+              }}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                padding: 15,
+                marginBottom: 12,
+                borderRadius: 20,
+                backgroundColor: c.letta
+                  ? 'rgba(255,255,255,0.05)'
+                  : 'rgba(255,179,48,0.10)',
+                borderWidth: 1,
+                borderColor: c.letta
+                  ? 'rgba(141,184,255,0.22)'
+                  : 'rgba(255,179,48,0.55)',
+              }}
+            >
+              <View
+                style={{
+                  width: 48,
+                  height: 48,
+                  borderRadius: 16,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  backgroundColor: 'rgba(255,179,48,0.14)',
+                }}
+              >
+                <Ionicons
+                  name="document-text-outline"
+                  size={24}
+                  color="#FFB330"
+                />
+              </View>
+
+              <View
+                style={{
+                  flex: 1,
+                  marginLeft: 13,
+                }}
+              >
+                <Text
+                  style={{
+                    color: '#FFFFFF',
+                    fontSize: 16,
+                    fontWeight: '900',
+                  }}
+                >
+                  Consegna di servizio
+                </Text>
+
+                <Text
+                  style={{
+                    color: '#AEB9D6',
+                    fontSize: 13,
+                    fontWeight: '700',
+                    marginTop: 4,
+                  }}
+                >
+                  {c.postazione || 'Postazione non indicata'}
+                </Text>
+
+                <Text
+                  style={{
+                    color: '#7F91B7',
+                    fontSize: 11,
+                    fontWeight: '700',
+                    marginTop: 3,
+                  }}
+                >
+                  {[c.data_servizio, c.ora_servizio]
+                    .filter(Boolean)
+                    .join(' · ')}
+                </Text>
+              </View>
+
+              {!c.letta && (
                 <View
                   style={{
-                    minWidth: 25,
+                    width: 25,
                     height: 25,
-                    paddingHorizontal: 7,
                     borderRadius: 13,
                     backgroundColor: '#FF3B30',
                     alignItems: 'center',
@@ -6809,20 +7423,53 @@ const coefficienteNettoFiduciario = 0.78;
                       fontWeight: '900',
                     }}
                   >
-                    {n.nonLetti > 99 ? '99+' : n.nonLetti}
+                    1
                   </Text>
                 </View>
+              )}
 
-                <Ionicons
-                  name="chevron-forward"
-                  size={20}
-                  color="#AEB9D6"
-                  style={{ marginLeft: 8 }}
-                />
-              </TouchableOpacity>
-            ))
-          )}
+              <Ionicons
+                name="chevron-forward"
+                size={20}
+                color="#AEB9D6"
+                style={{ marginLeft: 8 }}
+              />
+            </TouchableOpacity>
+          ))}
         </ScrollView>
+
+        {mostraTornaSu && (
+          <TouchableOpacity
+            activeOpacity={0.82}
+            onPress={() =>
+              tornaSuRef.current?.scrollTo({
+                y: 0,
+                animated: true,
+              })
+            }
+            style={{
+              position: 'absolute',
+              right: 18,
+              bottom: 24,
+              width: 46,
+              height: 46,
+              borderRadius: 23,
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: 'rgba(20,45,85,0.96)',
+              borderWidth: 1,
+              borderColor: 'rgba(110,190,255,0.55)',
+              zIndex: 50,
+              elevation: 8,
+            }}
+          >
+            <Ionicons
+              name="arrow-up"
+              size={22}
+              color="#FFFFFF"
+            />
+          </TouchableOpacity>
+        )}
       </Screen>
     );
   }
@@ -6830,7 +7477,20 @@ const coefficienteNettoFiduciario = 0.78;
 if (screen === 'colleghi') {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: '#07142f' }}>
-        <ScrollView contentContainerStyle={{ padding: 22, paddingBottom: 50 }}>
+        <ScrollView
+          ref={tornaSuRef}
+          showsVerticalScrollIndicator={false}
+          scrollEventThrottle={16}
+          onScroll={(event) => {
+            setMostraTornaSu(
+              event.nativeEvent.contentOffset.y > 350
+            );
+          }}
+          contentContainerStyle={{
+            padding: 22,
+            paddingBottom: 90,
+          }}
+        >
           
           <TouchableOpacity
             onPress={() => setScreen('home')}
@@ -7308,6 +7968,39 @@ if (screen === 'colleghi') {
           )}
 
         </ScrollView>
+
+        {mostraTornaSu && (
+          <TouchableOpacity
+            activeOpacity={0.82}
+            onPress={() =>
+              tornaSuRef.current?.scrollTo({
+                y: 0,
+                animated: true,
+              })
+            }
+            style={{
+              position: 'absolute',
+              right: 18,
+              bottom: 24,
+              width: 46,
+              height: 46,
+              borderRadius: 23,
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: 'rgba(20,45,85,0.96)',
+              borderWidth: 1,
+              borderColor: 'rgba(110,190,255,0.55)',
+              zIndex: 50,
+              elevation: 8,
+            }}
+          >
+            <Ionicons
+              name="arrow-up"
+              size={22}
+              color="#FFFFFF"
+            />
+          </TouchableOpacity>
+        )}
       </SafeAreaView>
     );
   }
@@ -10937,6 +11630,102 @@ if (screen === 'configuraStipendio') {
      PASSATEMPO - SALA GIOCHI
      ============================================================ */
   
+  if (screen === 'occhioGpgGame') {
+    return (
+      <OcchioGpgGameScreen
+        onBack={() => setScreen('passatempo')}
+      />
+    );
+  }
+
+  if (screen === 'cctvChallengeGame') {
+    return (
+      <CctvChallengeGameScreen
+        onBack={() => setScreen('passatempo')}
+      />
+    );
+  }
+
+  if (screen === 'falsoAllarmeGame') {
+    return (
+      <FalsoAllarmeGameScreen
+        onBack={() => setScreen('passatempo')}
+      />
+    );
+  }
+
+  if (screen === 'pattugliaNotturnaGame') {
+    return (
+      <PattugliaNotturnaGameScreen
+        onBack={() => setScreen('passatempo')}
+      />
+    );
+  }
+
+  if (screen === 'codiceRadioGame') {
+    return (
+      <CodiceRadioGameScreen
+        onBack={() => setScreen('passatempo')}
+      />
+    );
+  }
+
+  if (screen === 'controlloTargaGame') {
+    return (
+      <ControlloTargaGameScreen
+        onBack={() => setScreen('passatempo')}
+      />
+    );
+  }
+
+  if (screen === 'mazzoChiaviGame') {
+    return (
+      <MazzoChiaviGameScreen
+        onBack={() => setScreen('passatempo')}
+      />
+    );
+  }
+
+  if (screen === 'fineTurnoGame') {
+    return (
+      <FineTurnoGameScreen
+        onBack={() => setScreen('passatempo')}
+      />
+    );
+  }
+
+  if (screen === 'nonAddormentartiGame') {
+    return (
+      <NonAddormentartiGameScreen
+        onBack={() => setScreen('passatempo')}
+      />
+    );
+  }
+
+  if (screen === 'sfidaColleghiGame') {
+    return (
+      <SfidaColleghiGameScreen
+        onBack={() => setScreen('passatempo')}
+      />
+    );
+  }
+
+  if (screen === 'trovaAnomaliaGame') {
+    return (
+      <TrovaAnomaliaGameScreen
+        onBack={() => setScreen('passatempo')}
+      />
+    );
+  }
+
+  if (screen === 'briscolaGame') {
+    return (
+      <BriscolaGame
+        onBack={() => setScreen('passatempo')}
+      />
+    );
+  }
+
   if (screen === 'snakeGame') {
     const nuovaPartitaSnake = () => {
       const corpo = [
@@ -13236,7 +14025,93 @@ if (screen === 'configuraStipendio') {
         icona: 'warning-outline',
         colore: '#FF8C8C',
       },
-    ];
+    
+    {
+      id: 'occhioGpg',
+      titolo: 'OCCHIO DELLA GPG',
+      sottotitolo: 'Osserva. Memorizza. Individua.',
+      icona: 'eye-outline',
+      colore: '#67E8F9',
+    },
+    {
+      id: 'cctvChallenge',
+      titolo: 'CCTV CHALLENGE',
+      sottotitolo: 'Tieni d’occhio le telecamere',
+      icona: 'videocam-outline',
+      colore: '#60A5FA',
+    },
+    {
+      id: 'falsoAllarme',
+      titolo: 'FALSO ALLARME',
+      sottotitolo: 'Decidi in pochi secondi',
+      icona: 'warning-outline',
+      colore: '#F59E0B',
+    },
+    {
+      id: 'pattugliaNotturna',
+      titolo: 'PATTUGLIA NOTTURNA',
+      sottotitolo: 'Completa il giro senza errori',
+      icona: 'moon-outline',
+      colore: '#A78BFA',
+    },
+    {
+      id: 'codiceRadio',
+      titolo: 'CODICE RADIO',
+      sottotitolo: 'Interpreta il messaggio corretto',
+      icona: 'radio-outline',
+      colore: '#34D399',
+    },
+    {
+      id: 'controlloTarga',
+      titolo: 'CONTROLLO TARGA',
+      sottotitolo: 'Occhio a lettere e numeri',
+      icona: 'car-outline',
+      colore: '#38BDF8',
+    },
+    {
+      id: 'mazzoChiavi',
+      titolo: 'IL MAZZO DI CHIAVI',
+      sottotitolo: 'Trova quella giusta al volo',
+      icona: 'key-outline',
+      colore: '#FBBF24',
+    },
+    {
+      id: 'fineTurno',
+      titolo: 'FINE TURNO',
+      sottotitolo: 'Ricorda cosa non devi dimenticare',
+      icona: 'time-outline',
+      colore: '#FB7185',
+    },
+    {
+      id: 'nonAddormentarti',
+      titolo: 'NON ADDORMENTARTI!',
+      sottotitolo: 'Resta sveglio fino alla fine',
+      icona: 'flash-outline',
+      colore: '#F97316',
+    },
+    {
+      id: 'sfidaColleghi',
+      titolo: 'SFIDA TRA COLLEGHI',
+      sottotitolo: 'Chi fa il punteggio migliore?',
+      icona: 'trophy-outline',
+      colore: '#EAB308',
+    },
+    {
+      id: 'trovaAnomalia',
+      titolo: 'TROVA L’ANOMALIA',
+      sottotitolo: 'Qualcosa non torna...',
+      icona: 'search-outline',
+      colore: '#2DD4BF',
+    },
+
+    {
+      id: 'briscola',
+      titolo: 'BRISCOLA',
+      sottotitolo: 'Sfida il computer a carte',
+      icona: 'albums-outline',
+      colore: '#65E49A',
+    },
+];
 
     return (
       <Screen>
@@ -13334,7 +14209,79 @@ if (screen === 'configuraStipendio') {
                   return;
                 }
 
-                Alert.alert(
+
+              if (gioco.id === 'occhioGpg') {
+                setScreen('occhioGpgGame');
+                return;
+              }
+
+
+              if (gioco.id === 'cctvChallenge') {
+                setScreen('cctvChallengeGame');
+                return;
+              }
+
+                
+              if (gioco.id === 'falsoAllarme') {
+                setScreen('falsoAllarmeGame');
+                return;
+              }
+
+
+              if (gioco.id === 'pattugliaNotturna') {
+                setScreen('pattugliaNotturnaGame');
+                return;
+              }
+
+
+              if (gioco.id === 'codiceRadio') {
+                setScreen('codiceRadioGame');
+                return;
+              }
+
+
+              if (gioco.id === 'controlloTarga') {
+                setScreen('controlloTargaGame');
+                return;
+              }
+
+
+              if (gioco.id === 'mazzoChiavi') {
+                setScreen('mazzoChiaviGame');
+                return;
+              }
+
+
+              if (gioco.id === 'fineTurno') {
+                setScreen('fineTurnoGame');
+                return;
+              }
+
+
+              if (gioco.id === 'nonAddormentarti') {
+                setScreen('nonAddormentartiGame');
+                return;
+              }
+
+
+              if (gioco.id === 'sfidaColleghi') {
+                setScreen('sfidaColleghiGame');
+                return;
+              }
+
+
+              if (gioco.id === 'trovaAnomalia') {
+                setScreen('trovaAnomaliaGame');
+                return;
+              }
+
+
+              if (gioco.id === 'briscola') {
+                setScreen('briscolaGame');
+                return;
+              }
+
+Alert.alert(
                   gioco.titolo,
                   'Questo gioco verrà aggiunto alla Sala Giochi.'
                 );
@@ -18372,20 +19319,19 @@ if (screen === 'strumenti') {
         ? prossimiServiziMeteo[0]
         : null;
 
-    /*
-      Il turno possiede già il campo "luogo".
-      Se è valorizzato lo usiamo direttamente per il Meteo.
-    */
-    const luogoRealeProssimoTurno =
-      prossimoServizioMeteo?.turno?.luogo &&
-      String(prossimoServizioMeteo.turno.luogo).trim() &&
-      String(prossimoServizioMeteo.turno.luogo).trim().toLowerCase() !==
-        'servizio'
-        ? String(prossimoServizioMeteo.turno.luogo).trim()
-        : '';
+
+    const operativitaProssimoTurno =
+      String(
+        prossimoServizioMeteo?.turno?.luogo || ''
+      ).trim();
+
+    const localitaMeteoProssimoTurno =
+      String(
+        prossimoServizioMeteo?.turno?.localita_meteo || ''
+      ).trim();
 
     const zonaMeteoEffettiva =
-      luogoRealeProssimoTurno ||
+      localitaMeteoProssimoTurno ||
       localitaMeteo.trim() ||
       zonaMeteo;
 
@@ -18922,7 +19868,7 @@ if (screen === 'strumenti') {
                       letterSpacing: 0.8,
                     }}
                   >
-                    LUOGO DEL SERVIZIO
+                    OPERATIVITÀ
                   </Text>
 
                   <Text
@@ -18933,7 +19879,7 @@ if (screen === 'strumenti') {
                       marginTop: 3,
                     }}
                   >
-                    {luogoRealeProssimoTurno ||
+                    {operativitaProssimoTurno ||
                       luogoAssociatoProssimoTurno ||
                       'Non indicato nel turno'}
                   </Text>
@@ -23822,7 +24768,7 @@ if (screen === 'profiloCollega') {
                 letterSpacing: 0.45,
               }}
             >
-              LUOGO DEL SERVIZIO
+              OPERATIVITÀ
             </Text>
 
             <Text
@@ -23833,13 +24779,13 @@ if (screen === 'profiloCollega') {
                 marginTop: 2,
               }}
             >
-              FACOLTATIVO · utile anche per il meteo
+              Es. Ronda · Piantonamento · Controllo accessi
             </Text>
           </View>
         </View>
 
         <Field
-          label="ES. FIUMICINO, ROMA, CIAMPINO..."
+          label="ES. RONDA, PIANTONAMENTO..."
           value={luogo}
           onChange={setLuogo}
         />
@@ -23862,7 +24808,7 @@ if (screen === 'profiloCollega') {
       </Text>
 
       <Field
-            label="INDIRIZZO DEL SERVIZIO"
+            label="SEDE / INDIRIZZO DEL SERVIZIO"
             value={indirizzoServizio}
             onChange={setIndirizzoServizio}
           />
@@ -24742,16 +25688,27 @@ if (screen === 'profiloCollega') {
                 </View>
               </TouchableOpacity>
 
-              <TouchableOpacity
-              onPress={async () => {
-              try {
-                const dati = await caricaRiepilogoConversazioni();
-                setRiepilogoChat(dati || {});
-              } catch (error) {
-                console.log('Errore aggiornamento Centro Notifiche:', error);
-              }
-              setScreen('centroNotifiche');
-            }}
+      <TouchableOpacity
+        onPress={async () => {
+          try {
+            const [datiChat, datiConsegne] = await Promise.all([
+              caricaRiepilogoConversazioni(),
+              caricaConsegneRicevute(),
+            ]);
+
+            console.log("CONSEGNE RICEVUTE >>>", datiConsegne);
+
+            setRiepilogoChat(datiChat || {});
+            setConsegneRicevute(datiConsegne || []);
+          } catch (error) {
+            console.log(
+              'Errore aggiornamento Centro Notifiche:',
+              error
+            );
+          }
+
+          setScreen('centroNotifiche');
+        }}
               activeOpacity={0.8}
               style={{
                 width: 46,
@@ -24953,16 +25910,65 @@ if (screen === 'profiloCollega') {
             </View>
 
             {/* PERCORSO + TRAFFICO */}
-            <View
-              style={{
-                height: 1,
-                backgroundColor: 'rgba(85,244,124,0.18)',
-                marginTop: 13,
-                marginBottom: 11,
-              }}
-            />
+              <View
+                style={{
+                  height: 1,
+                  backgroundColor: 'rgba(85,244,124,0.18)',
+                  marginTop: 13,
+                  marginBottom: 11,
+                }}
+              />
 
-            <View
+              <TouchableOpacity
+                activeOpacity={0.85}
+                onPress={async () => {
+                  const partenza = String(
+                    profilo?.punto_partenza || ''
+                  ).trim();
+
+                  const turnoPercorso =
+                    turnoInCorso ||
+                    turnoOggi ||
+                    prossimoServizioMeteo?.turno ||
+                    null;
+
+                  const destinazione = String(
+                    turnoPercorso?.indirizzo_servizio || ''
+                  ).trim();
+
+                  if (!partenza) {
+                    Alert.alert(
+                      'Punto di partenza mancante',
+                      'Inserisci il tuo punto di partenza abituale nel profilo.'
+                    );
+                    return;
+                  }
+
+                  if (!destinazione) {
+                    Alert.alert(
+                      'Indirizzo del servizio mancante',
+                      'Apri il prossimo turno e inserisci l’indirizzo del servizio.'
+                    );
+                    return;
+                  }
+
+                  try {
+                    const url =
+                      'https://www.google.com/maps/dir/?api=1' +
+                      '&origin=' +
+                      encodeURIComponent(partenza) +
+                      '&destination=' +
+                      encodeURIComponent(destinazione) +
+                      '&travelmode=driving';
+
+                    await Linking.openURL(url);
+                  } catch (error) {
+                    Alert.alert(
+                      'Percorso non disponibile',
+                      'Non riesco ad aprire le indicazioni stradali in questo momento.'
+                    );
+                  }
+                }}
               style={{
                 minHeight: 38,
                 flexDirection: 'row',
@@ -25028,7 +26034,7 @@ if (screen === 'profiloCollega') {
                 size={19}
                 color="#8FEAFF"
               />
-            </View>
+              </TouchableOpacity>
           </View>
 
           {/* ================= MESE ================= */}
@@ -25547,15 +26553,25 @@ if (screen === 'profiloCollega') {
 
     <TouchableOpacity
       activeOpacity={0.8}
-      onPress={async () => {
-              try {
-                const dati = await caricaRiepilogoConversazioni();
-                setRiepilogoChat(dati || {});
-              } catch (error) {
-                console.log('Errore aggiornamento Centro Notifiche:', error);
-              }
-              setScreen('centroNotifiche');
-            }}
+        onPress={async () => {
+          try {
+            const [datiChat, datiConsegne] = await Promise.all([
+              caricaRiepilogoConversazioni(),
+              caricaConsegneRicevute(),
+            ]);
+          console.log("CONSEGNE RICEVUTE >>>", datiConsegne);
+
+            setRiepilogoChat(datiChat || {});
+            setConsegneRicevute(datiConsegne || []);
+          } catch (error) {
+            console.log(
+              'Errore aggiornamento Centro Notifiche:',
+              error
+            );
+          }
+
+          setScreen('centroNotifiche');
+        }}
       style={{
         width:46,
         height:46,
@@ -27495,6 +28511,7 @@ function RapportoServizioScreen({
         'Eventuali ulteriori elementi rilevanti...',
       multiline: true,
     },
+
   ];
 
   return (
@@ -28621,13 +29638,17 @@ function ConsegneServizioScreen({
     try {
       setInvioConsegnaInCorso(true);
 
-      const messaggio =
-        `📋 CONSEGNA DI SERVIZIO\n\n${testoConsegna}`;
-
-      await inviaMessaggio(
-        destinatarioId,
-        messaggio
-      );
+      await inviaConsegna(destinatarioId, {
+        data: consegnaData,
+        ora: consegnaOra,
+        postazione: consegnaPostazione,
+        accaduto: consegnaAccaduto,
+        daFare: consegnaDaFare,
+        anomalie: consegnaAnomalie,
+        chiavi: consegnaChiavi,
+        apparati: consegnaApparati,
+        note: consegnaNote,
+      });
 
       setMostraColleghiConsegna(false);
 
@@ -28727,7 +29748,7 @@ function ConsegneServizioScreen({
   ];
 
   return (
-    <Screen>
+    <Screen showScrollTop>
       <Back onPress={onBack} />
 
       <View
@@ -29554,6 +30575,8986 @@ function ConsegneServizioScreen({
           o altre credenziali sensibili nelle consegne.
         </Text>
       </View>
+    </Screen>
+  );
+}
+
+
+
+function OcchioGpgGameScreen({ onBack }) {
+  const elementiOcchioGpg = [
+    { nome: 'Radio', icona: 'radio-outline' },
+    { nome: 'Chiavi', icona: 'key-outline' },
+    { nome: 'Torcia', icona: 'flashlight-outline' },
+    { nome: 'Auto', icona: 'car-outline' },
+    { nome: 'Telecamera', icona: 'videocam-outline' },
+    { nome: 'Porta', icona: 'log-in-outline' },
+    { nome: 'Documento', icona: 'document-text-outline' },
+    { nome: 'Telefono', icona: 'phone-portrait-outline' },
+    { nome: 'Allarme', icona: 'warning-outline' },
+    { nome: 'Persona', icona: 'person-outline' },
+    { nome: 'Badge', icona: 'card-outline' },
+    { nome: 'Valigetta', icona: 'briefcase-outline' },
+  ];
+
+  const [fase, setFase] = React.useState('intro');
+  const [round, setRound] = React.useState(1);
+  const [punteggio, setPunteggio] = React.useState(0);
+  const [vite, setVite] = React.useState(3);
+
+  const [scenaOriginale, setScenaOriginale] =
+    React.useState([]);
+
+  const [scenaModificata, setScenaModificata] =
+    React.useState([]);
+
+  const [indiceCambiato, setIndiceCambiato] =
+    React.useState(null);
+
+  const [feedback, setFeedback] =
+    React.useState('');
+
+  const timeoutRef = React.useRef(null);
+
+  const mescola = (array) =>
+    [...array].sort(() => Math.random() - 0.5);
+
+  const preparaRound = () => {
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+    }
+
+    setFeedback('');
+
+    const quanti =
+      round >= 7
+        ? 8
+        : round >= 4
+        ? 7
+        : 6;
+
+    const scelti =
+      mescola(elementiOcchioGpg).slice(0, quanti);
+
+    const indice =
+      Math.floor(Math.random() * scelti.length);
+
+    const nomiPresenti =
+      new Set(scelti.map((e) => e.nome));
+
+    const sostituti =
+      elementiOcchioGpg.filter(
+        (e) => !nomiPresenti.has(e.nome)
+      );
+
+    const sostituto =
+      mescola(sostituti)[0];
+
+    const modificata =
+      scelti.map((elemento, i) =>
+        i === indice
+          ? sostituto
+          : elemento
+      );
+
+    setScenaOriginale(scelti);
+    setScenaModificata(modificata);
+    setIndiceCambiato(indice);
+    setFase('osserva');
+
+    const tempoOsservazione =
+      Math.max(
+        1800,
+        4300 - (round - 1) * 280
+      );
+
+    timeoutRef.current = setTimeout(() => {
+      setFase('trova');
+    }, tempoOsservazione);
+  };
+
+  React.useEffect(() => {
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+    };
+  }, []);
+
+  const nuovaPartita = () => {
+    setRound(1);
+    setPunteggio(0);
+    setVite(3);
+    setFeedback('');
+    setFase('intro');
+  };
+
+  const risposta = (indice) => {
+    if (fase !== 'trova') return;
+
+    if (indice === indiceCambiato) {
+      const bonus =
+        100 + Math.max(0, round - 1) * 20;
+
+      setPunteggio(
+        (prev) => prev + bonus
+      );
+
+      setFeedback('corretto');
+      setFase('feedback');
+
+      timeoutRef.current = setTimeout(() => {
+        setRound((prev) => prev + 1);
+        setFeedback('');
+        setFase('attesa');
+      }, 850);
+
+      return;
+    }
+
+    const nuoveVite = vite - 1;
+
+    setVite(nuoveVite);
+    setFeedback('errore');
+    setFase('feedback');
+
+    if (nuoveVite <= 0) {
+      timeoutRef.current = setTimeout(() => {
+        setFase('gameover');
+      }, 900);
+
+      return;
+    }
+
+    timeoutRef.current = setTimeout(() => {
+      setRound((prev) => prev + 1);
+      setFeedback('');
+      setFase('attesa');
+    }, 900);
+  };
+
+  React.useEffect(() => {
+    if (fase === 'attesa') {
+      preparaRound();
+    }
+  }, [fase]);
+
+  const renderElemento = (
+    elemento,
+    indice,
+    cliccabile
+  ) => {
+    const corretto =
+      feedback === 'corretto' &&
+      indice === indiceCambiato;
+
+    const errore =
+      feedback === 'errore' &&
+      indice !== indiceCambiato;
+
+    return (
+      <TouchableOpacity
+        key={`${elemento.nome}-${indice}`}
+        activeOpacity={
+          cliccabile ? 0.72 : 1
+        }
+        disabled={!cliccabile}
+        onPress={() => risposta(indice)}
+        style={{
+          width: '31%',
+          minHeight: 108,
+          marginBottom: 12,
+          borderRadius: 20,
+          alignItems: 'center',
+          justifyContent: 'center',
+
+          backgroundColor: corretto
+            ? 'rgba(53,220,140,0.18)'
+            : errore
+            ? 'rgba(255,80,90,0.10)'
+            : 'rgba(255,255,255,0.06)',
+
+          borderWidth: 1.2,
+
+          borderColor: corretto
+            ? '#43E6A1'
+            : 'rgba(103,232,249,0.28)',
+
+          paddingHorizontal: 6,
+        }}
+      >
+        <Ionicons
+          name={elemento.icona}
+          size={30}
+          color={
+            corretto
+              ? '#43E6A1'
+              : '#67E8F9'
+          }
+        />
+
+        <Text
+          style={{
+            color: '#FFFFFF',
+            fontSize: 11,
+            fontWeight: '900',
+            textAlign: 'center',
+            marginTop: 9,
+          }}
+        >
+          {elemento.nome}
+        </Text>
+      </TouchableOpacity>
+    );
+  };
+
+  return (
+    <Screen>
+      <Back onPress={onBack} />
+
+      <View
+        style={{
+          marginTop: 8,
+          marginBottom: 18,
+          padding: 20,
+          borderRadius: 27,
+          backgroundColor:
+            'rgba(7,32,52,0.96)',
+          borderWidth: 1,
+          borderColor:
+            'rgba(103,232,249,0.38)',
+        }}
+      >
+        <View
+          style={{
+            width: 52,
+            height: 52,
+            borderRadius: 17,
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor:
+              'rgba(103,232,249,0.12)',
+          }}
+        >
+          <Ionicons
+            name="eye-outline"
+            size={28}
+            color="#67E8F9"
+          />
+        </View>
+
+        <Text
+          style={{
+            color: '#67E8F9',
+            fontSize: 10,
+            fontWeight: '900',
+            letterSpacing: 1.3,
+            marginTop: 15,
+          }}
+        >
+          SALA GIOCHI · OSSERVAZIONE
+        </Text>
+
+        <Text
+          style={{
+            color: '#FFFFFF',
+            fontSize: 28,
+            fontWeight: '900',
+            marginTop: 4,
+          }}
+        >
+          Occhio della GPG
+        </Text>
+
+        <Text
+          style={{
+            color: '#9EB6CB',
+            fontSize: 12,
+            lineHeight: 18,
+            fontWeight: '700',
+            marginTop: 7,
+          }}
+        >
+          Osserva la scena. Quando cambia,
+          individua il dettaglio diverso.
+        </Text>
+      </View>
+
+      {fase !== 'intro' &&
+        fase !== 'gameover' && (
+          <View
+            style={{
+              flexDirection: 'row',
+              justifyContent:
+                'space-between',
+              marginBottom: 16,
+            }}
+          >
+            <View
+              style={{
+                flex: 1,
+                marginRight: 7,
+                padding: 12,
+                borderRadius: 17,
+                backgroundColor:
+                  'rgba(255,255,255,0.05)',
+                alignItems: 'center',
+              }}
+            >
+              <Text
+                style={{
+                  color: '#7F94B4',
+                  fontSize: 9,
+                  fontWeight: '900',
+                }}
+              >
+                ROUND
+              </Text>
+
+              <Text
+                style={{
+                  color: '#FFFFFF',
+                  fontSize: 19,
+                  fontWeight: '900',
+                  marginTop: 2,
+                }}
+              >
+                {round}
+              </Text>
+            </View>
+
+            <View
+              style={{
+                flex: 1,
+                marginHorizontal: 7,
+                padding: 12,
+                borderRadius: 17,
+                backgroundColor:
+                  'rgba(255,255,255,0.05)',
+                alignItems: 'center',
+              }}
+            >
+              <Text
+                style={{
+                  color: '#7F94B4',
+                  fontSize: 9,
+                  fontWeight: '900',
+                }}
+              >
+                PUNTI
+              </Text>
+
+              <Text
+                style={{
+                  color: '#67E8F9',
+                  fontSize: 19,
+                  fontWeight: '900',
+                  marginTop: 2,
+                }}
+              >
+                {punteggio}
+              </Text>
+            </View>
+
+            <View
+              style={{
+                flex: 1,
+                marginLeft: 7,
+                padding: 12,
+                borderRadius: 17,
+                backgroundColor:
+                  'rgba(255,255,255,0.05)',
+                alignItems: 'center',
+              }}
+            >
+              <Text
+                style={{
+                  color: '#7F94B4',
+                  fontSize: 9,
+                  fontWeight: '900',
+                }}
+              >
+                VITE
+              </Text>
+
+              <Text
+                style={{
+                  color: '#FF7B85',
+                  fontSize: 17,
+                  fontWeight: '900',
+                  marginTop: 3,
+                }}
+              >
+                {'♥'.repeat(vite)}
+              </Text>
+            </View>
+          </View>
+        )}
+
+      {fase === 'intro' && (
+        <View
+          style={{
+            padding: 22,
+            borderRadius: 24,
+            backgroundColor:
+              'rgba(255,255,255,0.055)',
+            borderWidth: 1,
+            borderColor:
+              'rgba(103,232,249,0.20)',
+          }}
+        >
+          <Ionicons
+            name="scan-outline"
+            size={42}
+            color="#67E8F9"
+          />
+
+          <Text
+            style={{
+              color: '#FFFFFF',
+              fontSize: 20,
+              fontWeight: '900',
+              marginTop: 15,
+            }}
+          >
+            Hai occhio?
+          </Text>
+
+          <Text
+            style={{
+              color: '#A6B6CF',
+              fontSize: 13,
+              lineHeight: 20,
+              marginTop: 8,
+            }}
+          >
+            Memorizza gli elementi presenti.
+            Dopo pochi secondi uno verrà
+            sostituito. Tocca quello che è
+            cambiato prima di perdere tutte
+            le vite.
+          </Text>
+
+          <TouchableOpacity
+            activeOpacity={0.85}
+            onPress={preparaRound}
+            style={{
+              marginTop: 22,
+              minHeight: 52,
+              borderRadius: 18,
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: '#168AB4',
+            }}
+          >
+            <Text
+              style={{
+                color: '#FFFFFF',
+                fontSize: 14,
+                fontWeight: '900',
+              }}
+            >
+              INIZIA LA SFIDA
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {fase === 'osserva' && (
+        <>
+          <Text
+            style={{
+              color: '#67E8F9',
+              fontSize: 13,
+              fontWeight: '900',
+              textAlign: 'center',
+              marginBottom: 15,
+            }}
+          >
+            👁️ MEMORIZZA LA SCENA
+          </Text>
+
+          <View
+            style={{
+              flexDirection: 'row',
+              flexWrap: 'wrap',
+              justifyContent:
+                'space-between',
+            }}
+          >
+            {scenaOriginale.map(
+              (e, i) =>
+                renderElemento(
+                  e,
+                  i,
+                  false
+                )
+            )}
+          </View>
+        </>
+      )}
+
+      {(fase === 'trova' ||
+        fase === 'feedback') && (
+        <>
+          <Text
+            style={{
+              color:
+                feedback === 'corretto'
+                  ? '#43E6A1'
+                  : feedback === 'errore'
+                  ? '#FF7B85'
+                  : '#FFFFFF',
+              fontSize: 15,
+              fontWeight: '900',
+              textAlign: 'center',
+              marginBottom: 15,
+            }}
+          >
+            {feedback === 'corretto'
+              ? '✓ OTTIMO OCCHIO!'
+              : feedback === 'errore'
+              ? '✕ NON ERA QUELLO'
+              : '⚠️ COSA È CAMBIATO?'}
+          </Text>
+
+          <View
+            style={{
+              flexDirection: 'row',
+              flexWrap: 'wrap',
+              justifyContent:
+                'space-between',
+            }}
+          >
+            {scenaModificata.map(
+              (e, i) =>
+                renderElemento(
+                  e,
+                  i,
+                  fase === 'trova'
+                )
+            )}
+          </View>
+        </>
+      )}
+
+      {fase === 'gameover' && (
+        <View
+          style={{
+            padding: 24,
+            borderRadius: 25,
+            alignItems: 'center',
+            backgroundColor:
+              'rgba(255,255,255,0.055)',
+            borderWidth: 1,
+            borderColor:
+              'rgba(255,100,110,0.30)',
+          }}
+        >
+          <Ionicons
+            name="eye-off-outline"
+            size={46}
+            color="#FF7B85"
+          />
+
+          <Text
+            style={{
+              color: '#FFFFFF',
+              fontSize: 23,
+              fontWeight: '900',
+              marginTop: 14,
+            }}
+          >
+            Fine turno!
+          </Text>
+
+          <Text
+            style={{
+              color: '#91A8C5',
+              fontSize: 12,
+              fontWeight: '800',
+              marginTop: 7,
+            }}
+          >
+            Punteggio finale
+          </Text>
+
+          <Text
+            style={{
+              color: '#67E8F9',
+              fontSize: 38,
+              fontWeight: '900',
+              marginTop: 4,
+            }}
+          >
+            {punteggio}
+          </Text>
+
+          <Text
+            style={{
+              color: '#A4B4CA',
+              fontSize: 12,
+              marginTop: 4,
+            }}
+          >
+            Round raggiunto: {round}
+          </Text>
+
+          <TouchableOpacity
+            activeOpacity={0.85}
+            onPress={nuovaPartita}
+            style={{
+              width: '100%',
+              minHeight: 52,
+              marginTop: 22,
+              borderRadius: 18,
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: '#168AB4',
+            }}
+          >
+            <Text
+              style={{
+                color: '#FFFFFF',
+                fontSize: 14,
+                fontWeight: '900',
+              }}
+            >
+              RIGIOCA
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            activeOpacity={0.8}
+            onPress={onBack}
+            style={{
+              marginTop: 10,
+              paddingVertical: 12,
+            }}
+          >
+            <Text
+              style={{
+                color: '#94A9C5',
+                fontSize: 12,
+                fontWeight: '800',
+              }}
+            >
+              Torna alla Sala Giochi
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
+    </Screen>
+  );
+}
+
+
+
+function CctvChallengeGameScreen({ onBack }) {
+
+  const anomalieCctv = [
+    {
+      nome: 'Porta aperta',
+      icona: 'log-in-outline',
+    },
+    {
+      nome: 'Persona sospetta',
+      icona: 'person-outline',
+    },
+    {
+      nome: 'Veicolo fermo',
+      icona: 'car-outline',
+    },
+    {
+      nome: 'Allarme',
+      icona: 'warning-outline',
+    },
+    {
+      nome: 'Zona buia',
+      icona: 'moon-outline',
+    },
+    {
+      nome: 'Oggetto abbandonato',
+      icona: 'briefcase-outline',
+    },
+  ];
+
+  const [fase, setFase] = React.useState('intro');
+  const [round, setRound] = React.useState(1);
+  const [vite, setVite] = React.useState(3);
+  const [punteggio, setPunteggio] = React.useState(0);
+
+  const [cameraCorretta, setCameraCorretta] =
+    React.useState(null);
+
+  const [anomalia, setAnomalia] =
+    React.useState(null);
+
+  const [tempo, setTempo] =
+    React.useState(5);
+
+  const [feedback, setFeedback] =
+    React.useState('');
+
+  const timerRef = React.useRef(null);
+
+  const preparaRound = () => {
+
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+    }
+
+    setFeedback('');
+
+    const camera =
+      Math.floor(Math.random() * 6);
+
+    const evento =
+      anomalieCctv[
+        Math.floor(
+          Math.random() *
+          anomalieCctv.length
+        )
+      ];
+
+    const secondi =
+      Math.max(
+        2,
+        6 - Math.floor((round - 1) / 2)
+      );
+
+    setCameraCorretta(camera);
+    setAnomalia(evento);
+    setTempo(secondi);
+    setFase('gioco');
+
+    let restante = secondi;
+
+    timerRef.current = setInterval(() => {
+      restante -= 1;
+      setTempo(restante);
+
+      if (restante <= 0) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+
+        setVite((prev) => {
+          const nuove = prev - 1;
+
+          if (nuove <= 0) {
+            setFeedback('tempo');
+            setFase('gameover');
+          } else {
+            setFeedback('tempo');
+            setFase('feedback');
+
+            setTimeout(() => {
+              setRound((r) => r + 1);
+              setFase('attesa');
+            }, 900);
+          }
+
+          return nuove;
+        });
+      }
+    }, 1000);
+  };
+
+  React.useEffect(() => {
+    if (fase === 'attesa') {
+      preparaRound();
+    }
+  }, [fase]);
+
+  React.useEffect(() => {
+    return () => {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+      }
+    };
+  }, []);
+
+  const scegliCamera = (indice) => {
+
+    if (fase !== 'gioco') return;
+
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+
+    if (indice === cameraCorretta) {
+
+      const bonus =
+        100 +
+        Math.max(0, tempo) * 25 +
+        (round - 1) * 10;
+
+      setPunteggio(
+        (prev) => prev + bonus
+      );
+
+      setFeedback('corretto');
+      setFase('feedback');
+
+      setTimeout(() => {
+        setRound((prev) => prev + 1);
+        setFase('attesa');
+      }, 850);
+
+      return;
+    }
+
+    const nuoveVite = vite - 1;
+
+    setVite(nuoveVite);
+    setFeedback('errore');
+    setFase('feedback');
+
+    if (nuoveVite <= 0) {
+
+      setTimeout(() => {
+        setFase('gameover');
+      }, 850);
+
+      return;
+    }
+
+    setTimeout(() => {
+      setRound((prev) => prev + 1);
+      setFase('attesa');
+    }, 850);
+  };
+
+  const nuovaPartita = () => {
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+    }
+
+    setRound(1);
+    setVite(3);
+    setPunteggio(0);
+    setFeedback('');
+    setFase('intro');
+  };
+
+  return (
+    <Screen showScrollTop>
+
+      <Back onPress={onBack} />
+
+      <View
+        style={{
+          marginTop: 8,
+          marginBottom: 18,
+          padding: 20,
+          borderRadius: 27,
+          backgroundColor:
+            'rgba(8,26,52,0.96)',
+          borderWidth: 1,
+          borderColor:
+            'rgba(96,165,250,0.40)',
+        }}
+      >
+
+        <View
+          style={{
+            width: 52,
+            height: 52,
+            borderRadius: 17,
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor:
+              'rgba(96,165,250,0.14)',
+          }}
+        >
+          <Ionicons
+            name="videocam-outline"
+            size={28}
+            color="#60A5FA"
+          />
+        </View>
+
+        <Text
+          style={{
+            color: '#60A5FA',
+            fontSize: 10,
+            fontWeight: '900',
+            letterSpacing: 1.3,
+            marginTop: 15,
+          }}
+        >
+          SALA CONTROLLO
+        </Text>
+
+        <Text
+          style={{
+            color: '#FFFFFF',
+            fontSize: 28,
+            fontWeight: '900',
+            marginTop: 4,
+          }}
+        >
+          CCTV Challenge
+        </Text>
+
+        <Text
+          style={{
+            color: '#A6B7D0',
+            fontSize: 12,
+            lineHeight: 18,
+            fontWeight: '700',
+            marginTop: 7,
+          }}
+        >
+          Controlla le telecamere e individua
+          subito quella con l’anomalia.
+        </Text>
+
+      </View>
+
+
+      {fase === 'intro' && (
+        <View
+          style={{
+            padding: 22,
+            borderRadius: 24,
+            backgroundColor:
+              'rgba(255,255,255,0.055)',
+            borderWidth: 1,
+            borderColor:
+              'rgba(96,165,250,0.22)',
+          }}
+        >
+
+          <Ionicons
+            name="scan-outline"
+            size={44}
+            color="#60A5FA"
+          />
+
+          <Text
+            style={{
+              color: '#FFFFFF',
+              fontSize: 20,
+              fontWeight: '900',
+              marginTop: 14,
+            }}
+          >
+            Centrale operativa pronta
+          </Text>
+
+          <Text
+            style={{
+              color: '#A7B7CE',
+              fontSize: 13,
+              lineHeight: 20,
+              marginTop: 8,
+            }}
+          >
+            Una delle sei telecamere mostrerà
+            un evento anomalo. Tocca quella
+            corretta prima che il timer arrivi
+            a zero.
+          </Text>
+
+          <TouchableOpacity
+            activeOpacity={0.85}
+            onPress={preparaRound}
+            style={{
+              marginTop: 22,
+              minHeight: 52,
+              borderRadius: 18,
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: '#246DD8',
+            }}
+          >
+            <Text
+              style={{
+                color: '#FFFFFF',
+                fontSize: 14,
+                fontWeight: '900',
+              }}
+            >
+              AVVIA VIDEOSORVEGLIANZA
+            </Text>
+          </TouchableOpacity>
+
+        </View>
+      )}
+
+
+      {fase !== 'intro' &&
+       fase !== 'gameover' && (
+        <>
+
+          <View
+            style={{
+              flexDirection: 'row',
+              justifyContent: 'space-between',
+              marginBottom: 14,
+            }}
+          >
+
+            <View
+              style={{
+                flex: 1,
+                padding: 11,
+                marginRight: 6,
+                borderRadius: 16,
+                alignItems: 'center',
+                backgroundColor:
+                  'rgba(255,255,255,0.05)',
+              }}
+            >
+              <Text
+                style={{
+                  color: '#8399B9',
+                  fontSize: 9,
+                  fontWeight: '900',
+                }}
+              >
+                ROUND
+              </Text>
+
+              <Text
+                style={{
+                  color: '#FFFFFF',
+                  fontSize: 19,
+                  fontWeight: '900',
+                }}
+              >
+                {round}
+              </Text>
+            </View>
+
+            <View
+              style={{
+                flex: 1,
+                padding: 11,
+                marginHorizontal: 6,
+                borderRadius: 16,
+                alignItems: 'center',
+                backgroundColor:
+                  'rgba(255,255,255,0.05)',
+              }}
+            >
+              <Text
+                style={{
+                  color: '#8399B9',
+                  fontSize: 9,
+                  fontWeight: '900',
+                }}
+              >
+                PUNTI
+              </Text>
+
+              <Text
+                style={{
+                  color: '#60A5FA',
+                  fontSize: 19,
+                  fontWeight: '900',
+                }}
+              >
+                {punteggio}
+              </Text>
+            </View>
+
+            <View
+              style={{
+                flex: 1,
+                padding: 11,
+                marginLeft: 6,
+                borderRadius: 16,
+                alignItems: 'center',
+                backgroundColor:
+                  'rgba(255,255,255,0.05)',
+              }}
+            >
+              <Text
+                style={{
+                  color: '#8399B9',
+                  fontSize: 9,
+                  fontWeight: '900',
+                }}
+              >
+                VITE
+              </Text>
+
+              <Text
+                style={{
+                  color: '#FF7B85',
+                  fontSize: 17,
+                  fontWeight: '900',
+                }}
+              >
+                {'♥'.repeat(vite)}
+              </Text>
+            </View>
+
+          </View>
+
+
+          <View
+            style={{
+              padding: 13,
+              borderRadius: 18,
+              marginBottom: 15,
+              backgroundColor:
+                'rgba(96,165,250,0.08)',
+              borderWidth: 1,
+              borderColor:
+                'rgba(96,165,250,0.22)',
+              flexDirection: 'row',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+            }}
+          >
+
+            <View>
+              <Text
+                style={{
+                  color: '#8399B9',
+                  fontSize: 9,
+                  fontWeight: '900',
+                }}
+              >
+                ANOMALIA SEGNALATA
+              </Text>
+
+              <Text
+                style={{
+                  color: '#FFFFFF',
+                  fontSize: 14,
+                  fontWeight: '900',
+                  marginTop: 3,
+                }}
+              >
+                {anomalia?.nome || 'Analisi...'}
+              </Text>
+            </View>
+
+            <Text
+              style={{
+                color:
+                  tempo <= 2
+                    ? '#FF6A70'
+                    : '#60A5FA',
+                fontSize: 28,
+                fontWeight: '900',
+              }}
+            >
+              {tempo}
+            </Text>
+
+          </View>
+
+
+          <View
+            style={{
+              flexDirection: 'row',
+              flexWrap: 'wrap',
+              justifyContent: 'space-between',
+            }}
+          >
+
+            {[0,1,2,3,4,5].map((indice) => {
+
+              const anomala =
+                indice === cameraCorretta;
+
+              const mostraEvento =
+                fase === 'gioco' && anomala;
+
+              return (
+                <TouchableOpacity
+                  key={indice}
+                  activeOpacity={0.75}
+                  disabled={fase !== 'gioco'}
+                  onPress={() =>
+                    scegliCamera(indice)
+                  }
+                  style={{
+                    width: '48.5%',
+                    height: 145,
+                    marginBottom: 12,
+                    borderRadius: 19,
+                    padding: 12,
+                    backgroundColor:
+                      'rgba(5,16,31,0.96)',
+                    borderWidth: 1.2,
+                    borderColor:
+                      mostraEvento
+                        ? 'rgba(245,158,11,0.72)'
+                        : 'rgba(96,165,250,0.28)',
+                  }}
+                >
+
+                  <View
+                    style={{
+                      flexDirection: 'row',
+                      justifyContent:
+                        'space-between',
+                      alignItems: 'center',
+                    }}
+                  >
+                    <Text
+                      style={{
+                        color: '#91A7C6',
+                        fontSize: 10,
+                        fontWeight: '900',
+                      }}
+                    >
+                      CAM {indice + 1}
+                    </Text>
+
+                    <View
+                      style={{
+                        width: 7,
+                        height: 7,
+                        borderRadius: 4,
+                        backgroundColor:
+                          mostraEvento
+                            ? '#F59E0B'
+                            : '#42E49B',
+                      }}
+                    />
+                  </View>
+
+                  <View
+                    style={{
+                      flex: 1,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+
+                    <Ionicons
+                      name={
+                        mostraEvento
+                          ? anomalia?.icona ||
+                            'warning-outline'
+                          : 'videocam-outline'
+                      }
+                      size={
+                        mostraEvento
+                          ? 34
+                          : 28
+                      }
+                      color={
+                        mostraEvento
+                          ? '#F59E0B'
+                          : '#536A87'
+                      }
+                    />
+
+                    <Text
+                      style={{
+                        color:
+                          mostraEvento
+                            ? '#FFFFFF'
+                            : '#60758F',
+                        fontSize: 10,
+                        fontWeight: '800',
+                        marginTop: 8,
+                        textAlign: 'center',
+                      }}
+                    >
+                      {mostraEvento
+                        ? anomalia?.nome
+                        : 'AREA REGOLARE'}
+                    </Text>
+
+                  </View>
+
+                </TouchableOpacity>
+              );
+            })}
+
+          </View>
+
+
+          {fase === 'feedback' && (
+            <Text
+              style={{
+                textAlign: 'center',
+                fontSize: 14,
+                fontWeight: '900',
+                marginTop: 5,
+                color:
+                  feedback === 'corretto'
+                    ? '#43E6A1'
+                    : '#FF7B85',
+              }}
+            >
+              {feedback === 'corretto'
+                ? '✓ ANOMALIA INDIVIDUATA'
+                : feedback === 'tempo'
+                ? '⏱ TEMPO SCADUTO'
+                : '✕ TELECAMERA SBAGLIATA'}
+            </Text>
+          )}
+
+        </>
+      )}
+
+
+      {fase === 'gameover' && (
+        <View
+          style={{
+            padding: 24,
+            borderRadius: 25,
+            alignItems: 'center',
+            backgroundColor:
+              'rgba(255,255,255,0.055)',
+            borderWidth: 1,
+            borderColor:
+              'rgba(255,100,110,0.30)',
+          }}
+        >
+
+          <Ionicons
+            name="videocam-off-outline"
+            size={46}
+            color="#FF7B85"
+          />
+
+          <Text
+            style={{
+              color: '#FFFFFF',
+              fontSize: 23,
+              fontWeight: '900',
+              marginTop: 14,
+            }}
+          >
+            Centrale compromessa
+          </Text>
+
+          <Text
+            style={{
+              color: '#91A8C5',
+              fontSize: 12,
+              fontWeight: '800',
+              marginTop: 8,
+            }}
+          >
+            Punteggio finale
+          </Text>
+
+          <Text
+            style={{
+              color: '#60A5FA',
+              fontSize: 38,
+              fontWeight: '900',
+              marginTop: 4,
+            }}
+          >
+            {punteggio}
+          </Text>
+
+          <Text
+            style={{
+              color: '#A4B4CA',
+              fontSize: 12,
+              marginTop: 3,
+            }}
+          >
+            Round raggiunto: {round}
+          </Text>
+
+          <TouchableOpacity
+            activeOpacity={0.85}
+            onPress={nuovaPartita}
+            style={{
+              width: '100%',
+              minHeight: 52,
+              marginTop: 22,
+              borderRadius: 18,
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: '#246DD8',
+            }}
+          >
+            <Text
+              style={{
+                color: '#FFFFFF',
+                fontSize: 14,
+                fontWeight: '900',
+              }}
+            >
+              RIGIOCA
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            onPress={onBack}
+            style={{
+              paddingVertical: 13,
+              marginTop: 5,
+            }}
+          >
+            <Text
+              style={{
+                color: '#94A9C5',
+                fontSize: 12,
+                fontWeight: '800',
+              }}
+            >
+              Torna alla Sala Giochi
+            </Text>
+          </TouchableOpacity>
+
+        </View>
+      )}
+
+    </Screen>
+  );
+}
+
+
+
+function FalsoAllarmeGameScreen({ onBack }) {
+
+  const scenari = [
+    {
+      titolo: 'Sensore porta magazzino',
+      dettagli:
+        'Allarme porta alle 02:14. Nessun movimento rilevato dalle telecamere. Forte vento esterno.',
+      reale: false,
+      spiegazione:
+        'Probabile attivazione accidentale legata al vento.',
+      icona: 'business-outline',
+    },
+    {
+      titolo: 'Movimento area riservata',
+      dettagli:
+        'Sensore attivo. Una persona è visibile in un’area chiusa al pubblico durante la notte.',
+      reale: true,
+      spiegazione:
+        'Presenza non prevista in area riservata: segnalazione da verificare.',
+      icona: 'person-outline',
+    },
+    {
+      titolo: 'Barriera perimetrale',
+      dettagli:
+        'Allarme sul perimetro. Telecamera mostra un animale che attraversa la zona.',
+      reale: false,
+      spiegazione:
+        'La causa osservabile è compatibile con un falso allarme.',
+      icona: 'paw-outline',
+    },
+    {
+      titolo: 'Porta antincendio',
+      dettagli:
+        'Contatto porta aperto da oltre 3 minuti. Nessun addetto autorizzato previsto in zona.',
+      reale: true,
+      spiegazione:
+        'Apertura prolungata e non prevista: situazione da controllare.',
+      icona: 'exit-outline',
+    },
+    {
+      titolo: 'Sensore parcheggio',
+      dettagli:
+        'Rilevato movimento. Le immagini mostrano foglie e rami mossi dal vento.',
+      reale: false,
+      spiegazione:
+        'Le immagini spiegano l’attivazione senza evidenziare una minaccia.',
+      icona: 'leaf-outline',
+    },
+    {
+      titolo: 'Veicolo al cancello',
+      dettagli:
+        'Auto ferma da diversi minuti davanti a un accesso chiuso. Il conducente osserva l’interno.',
+      reale: true,
+      spiegazione:
+        'Comportamento anomalo vicino a un accesso: richiede attenzione.',
+      icona: 'car-outline',
+    },
+    {
+      titolo: 'Allarme volumetrico ufficio',
+      dettagli:
+        'Sensore interno attivo. Il personale delle pulizie risulta regolarmente registrato in quell’area.',
+      reale: false,
+      spiegazione:
+        'La presenza è autorizzata e coerente con l’orario.',
+      icona: 'construct-outline',
+    },
+    {
+      titolo: 'Finestra forzata',
+      dettagli:
+        'Contatto finestra attivo. Telecamera mostra vetro danneggiato e nessun personale autorizzato.',
+      reale: true,
+      spiegazione:
+        'Segni di effrazione: allarme da considerare reale.',
+      icona: 'warning-outline',
+    },
+    {
+      titolo: 'Deposito tecnico',
+      dettagli:
+        'Allarme apertura. Il registro accessi indica un tecnico autorizzato entrato un minuto prima.',
+      reale: false,
+      spiegazione:
+        'L’evento coincide con un accesso autorizzato.',
+      icona: 'build-outline',
+    },
+    {
+      titolo: 'Area carico merci',
+      dettagli:
+        'Movimento rilevato fuori orario. Nessuna consegna prevista e nessun badge registrato.',
+      reale: true,
+      spiegazione:
+        'Movimento non giustificato fuori orario: va verificato.',
+      icona: 'cube-outline',
+    },
+  ];
+
+  const [fase, setFase] = React.useState('intro');
+  const [round, setRound] = React.useState(1);
+  const [vite, setVite] = React.useState(3);
+  const [punteggio, setPunteggio] = React.useState(0);
+  const [scenario, setScenario] = React.useState(null);
+  const [tempo, setTempo] = React.useState(6);
+  const [feedback, setFeedback] = React.useState('');
+  const [ultimoIndice, setUltimoIndice] = React.useState(-1);
+
+  const timerRef = React.useRef(null);
+  const timeoutRef = React.useRef(null);
+
+  const pulisciTimer = () => {
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+    }
+  };
+
+  React.useEffect(() => {
+    return () => {
+      pulisciTimer();
+    };
+  }, []);
+
+  const preparaRound = () => {
+    pulisciTimer();
+    setFeedback('');
+
+    let indice =
+      Math.floor(Math.random() * scenari.length);
+
+    if (
+      scenari.length > 1 &&
+      indice === ultimoIndice
+    ) {
+      indice = (indice + 1) % scenari.length;
+    }
+
+    setUltimoIndice(indice);
+    setScenario(scenari[indice]);
+
+    const secondi =
+      Math.max(
+        3,
+        7 - Math.floor((round - 1) / 3)
+      );
+
+    setTempo(secondi);
+    setFase('gioco');
+
+    let restante = secondi;
+
+    timerRef.current = setInterval(() => {
+      restante -= 1;
+      setTempo(restante);
+
+      if (restante <= 0) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+
+        setVite((prev) => {
+          const nuove = prev - 1;
+
+          setFeedback('tempo');
+
+          if (nuove <= 0) {
+            setFase('gameover');
+          } else {
+            setFase('feedback');
+
+            timeoutRef.current =
+              setTimeout(() => {
+                setRound((r) => r + 1);
+                setFase('attesa');
+              }, 1100);
+          }
+
+          return nuove;
+        });
+      }
+    }, 1000);
+  };
+
+  React.useEffect(() => {
+    if (fase === 'attesa') {
+      preparaRound();
+    }
+  }, [fase]);
+
+  const rispondi = (intervieni) => {
+    if (fase !== 'gioco' || !scenario) return;
+
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+
+    const corretto =
+      intervieni === scenario.reale;
+
+    if (corretto) {
+      const bonus =
+        100 +
+        Math.max(0, tempo) * 20 +
+        (round - 1) * 10;
+
+      setPunteggio(
+        (prev) => prev + bonus
+      );
+
+      setFeedback('corretto');
+      setFase('feedback');
+
+      timeoutRef.current =
+        setTimeout(() => {
+          setRound((prev) => prev + 1);
+          setFase('attesa');
+        }, 1200);
+
+      return;
+    }
+
+    const nuoveVite = vite - 1;
+
+    setVite(nuoveVite);
+    setFeedback('errore');
+    setFase('feedback');
+
+    if (nuoveVite <= 0) {
+      timeoutRef.current =
+        setTimeout(() => {
+          setFase('gameover');
+        }, 1200);
+      return;
+    }
+
+    timeoutRef.current =
+      setTimeout(() => {
+        setRound((prev) => prev + 1);
+        setFase('attesa');
+      }, 1200);
+  };
+
+  const nuovaPartita = () => {
+    pulisciTimer();
+    setRound(1);
+    setVite(3);
+    setPunteggio(0);
+    setFeedback('');
+    setScenario(null);
+    setFase('intro');
+  };
+
+  return (
+    <Screen showScrollTop>
+
+      <Back onPress={onBack} />
+
+      <View
+        style={{
+          marginTop: 8,
+          marginBottom: 18,
+          padding: 20,
+          borderRadius: 27,
+          backgroundColor:
+            'rgba(48,31,7,0.95)',
+          borderWidth: 1,
+          borderColor:
+            'rgba(245,158,11,0.42)',
+        }}
+      >
+        <View
+          style={{
+            width: 52,
+            height: 52,
+            borderRadius: 17,
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor:
+              'rgba(245,158,11,0.14)',
+          }}
+        >
+          <Ionicons
+            name="warning-outline"
+            size={29}
+            color="#F59E0B"
+          />
+        </View>
+
+        <Text
+          style={{
+            color: '#F59E0B',
+            fontSize: 10,
+            fontWeight: '900',
+            letterSpacing: 1.3,
+            marginTop: 15,
+          }}
+        >
+          CENTRALE ALLARMI
+        </Text>
+
+        <Text
+          style={{
+            color: '#FFFFFF',
+            fontSize: 28,
+            fontWeight: '900',
+            marginTop: 4,
+          }}
+        >
+          Falso Allarme
+        </Text>
+
+        <Text
+          style={{
+            color: '#C2B493',
+            fontSize: 12,
+            lineHeight: 18,
+            fontWeight: '700',
+            marginTop: 7,
+          }}
+        >
+          Valuta rapidamente la segnalazione e
+          scegli se intervenire o considerarla
+          un falso allarme.
+        </Text>
+      </View>
+
+
+      {fase === 'intro' && (
+        <View
+          style={{
+            padding: 22,
+            borderRadius: 24,
+            backgroundColor:
+              'rgba(255,255,255,0.055)',
+            borderWidth: 1,
+            borderColor:
+              'rgba(245,158,11,0.22)',
+          }}
+        >
+          <Ionicons
+            name="notifications-outline"
+            size={43}
+            color="#F59E0B"
+          />
+
+          <Text
+            style={{
+              color: '#FFFFFF',
+              fontSize: 20,
+              fontWeight: '900',
+              marginTop: 14,
+            }}
+          >
+            Decidi in pochi secondi
+          </Text>
+
+          <Text
+            style={{
+              color: '#ABB6C8',
+              fontSize: 13,
+              lineHeight: 20,
+              marginTop: 8,
+            }}
+          >
+            Leggi attentamente gli indizi.
+            Se la situazione sembra realmente
+            anomala scegli INTERVIENI.
+            Se gli elementi spiegano chiaramente
+            l’attivazione scegli FALSO ALLARME.
+          </Text>
+
+          <TouchableOpacity
+            activeOpacity={0.85}
+            onPress={preparaRound}
+            style={{
+              marginTop: 22,
+              minHeight: 52,
+              borderRadius: 18,
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: '#B66A0D',
+            }}
+          >
+            <Text
+              style={{
+                color: '#FFFFFF',
+                fontSize: 14,
+                fontWeight: '900',
+              }}
+            >
+              INIZIA IL TURNO
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+
+      {fase !== 'intro' &&
+       fase !== 'gameover' && (
+        <>
+
+          <View
+            style={{
+              flexDirection: 'row',
+              justifyContent: 'space-between',
+              marginBottom: 14,
+            }}
+          >
+            <View
+              style={{
+                flex: 1,
+                padding: 11,
+                marginRight: 6,
+                borderRadius: 16,
+                alignItems: 'center',
+                backgroundColor:
+                  'rgba(255,255,255,0.05)',
+              }}
+            >
+              <Text style={{
+                color: '#8399B9',
+                fontSize: 9,
+                fontWeight: '900',
+              }}>
+                ROUND
+              </Text>
+
+              <Text style={{
+                color: '#FFFFFF',
+                fontSize: 19,
+                fontWeight: '900',
+              }}>
+                {round}
+              </Text>
+            </View>
+
+            <View
+              style={{
+                flex: 1,
+                padding: 11,
+                marginHorizontal: 6,
+                borderRadius: 16,
+                alignItems: 'center',
+                backgroundColor:
+                  'rgba(255,255,255,0.05)',
+              }}
+            >
+              <Text style={{
+                color: '#8399B9',
+                fontSize: 9,
+                fontWeight: '900',
+              }}>
+                PUNTI
+              </Text>
+
+              <Text style={{
+                color: '#F59E0B',
+                fontSize: 19,
+                fontWeight: '900',
+              }}>
+                {punteggio}
+              </Text>
+            </View>
+
+            <View
+              style={{
+                flex: 1,
+                padding: 11,
+                marginLeft: 6,
+                borderRadius: 16,
+                alignItems: 'center',
+                backgroundColor:
+                  'rgba(255,255,255,0.05)',
+              }}
+            >
+              <Text style={{
+                color: '#8399B9',
+                fontSize: 9,
+                fontWeight: '900',
+              }}>
+                VITE
+              </Text>
+
+              <Text style={{
+                color: '#FF7B85',
+                fontSize: 17,
+                fontWeight: '900',
+              }}>
+                {'♥'.repeat(vite)}
+              </Text>
+            </View>
+          </View>
+
+
+          <View
+            style={{
+              padding: 20,
+              borderRadius: 23,
+              backgroundColor:
+                'rgba(24,29,39,0.96)',
+              borderWidth: 1,
+              borderColor:
+                'rgba(245,158,11,0.30)',
+            }}
+          >
+            <View
+              style={{
+                flexDirection: 'row',
+                justifyContent:
+                  'space-between',
+                alignItems: 'center',
+              }}
+            >
+              <View
+                style={{
+                  width: 46,
+                  height: 46,
+                  borderRadius: 15,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  backgroundColor:
+                    'rgba(245,158,11,0.12)',
+                }}
+              >
+                <Ionicons
+                  name={
+                    scenario?.icona ||
+                    'warning-outline'
+                  }
+                  size={25}
+                  color="#F59E0B"
+                />
+              </View>
+
+              <View
+                style={{
+                  alignItems: 'center',
+                }}
+              >
+                <Text
+                  style={{
+                    color: '#8D9AAF',
+                    fontSize: 9,
+                    fontWeight: '900',
+                  }}
+                >
+                  TEMPO
+                </Text>
+
+                <Text
+                  style={{
+                    color:
+                      tempo <= 2
+                        ? '#FF636D'
+                        : '#F59E0B',
+                    fontSize: 30,
+                    fontWeight: '900',
+                  }}
+                >
+                  {tempo}
+                </Text>
+              </View>
+            </View>
+
+            <Text
+              style={{
+                color: '#FFFFFF',
+                fontSize: 19,
+                fontWeight: '900',
+                marginTop: 17,
+              }}
+            >
+              {scenario?.titolo}
+            </Text>
+
+            <Text
+              style={{
+                color: '#B3BECD',
+                fontSize: 13,
+                lineHeight: 20,
+                marginTop: 9,
+              }}
+            >
+              {scenario?.dettagli}
+            </Text>
+          </View>
+
+
+          {fase === 'gioco' && (
+            <View
+              style={{
+                flexDirection: 'row',
+                marginTop: 15,
+              }}
+            >
+              <TouchableOpacity
+                activeOpacity={0.82}
+                onPress={() => rispondi(false)}
+                style={{
+                  flex: 1,
+                  minHeight: 60,
+                  marginRight: 7,
+                  borderRadius: 19,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  backgroundColor:
+                    'rgba(90,104,128,0.16)',
+                  borderWidth: 1,
+                  borderColor:
+                    'rgba(150,170,200,0.28)',
+                }}
+              >
+                <Ionicons
+                  name="close-circle-outline"
+                  size={24}
+                  color="#AAB8CB"
+                />
+
+                <Text
+                  style={{
+                    color: '#FFFFFF',
+                    fontSize: 12,
+                    fontWeight: '900',
+                    marginTop: 4,
+                  }}
+                >
+                  FALSO ALLARME
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                activeOpacity={0.82}
+                onPress={() => rispondi(true)}
+                style={{
+                  flex: 1,
+                  minHeight: 60,
+                  marginLeft: 7,
+                  borderRadius: 19,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  backgroundColor:
+                    'rgba(239,68,68,0.14)',
+                  borderWidth: 1,
+                  borderColor:
+                    'rgba(255,90,90,0.40)',
+                }}
+              >
+                <Ionicons
+                  name="alert-circle-outline"
+                  size={24}
+                  color="#FF747C"
+                />
+
+                <Text
+                  style={{
+                    color: '#FFFFFF',
+                    fontSize: 12,
+                    fontWeight: '900',
+                    marginTop: 4,
+                  }}
+                >
+                  INTERVIENI
+                </Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+
+          {fase === 'feedback' && (
+            <View
+              style={{
+                marginTop: 15,
+                padding: 16,
+                borderRadius: 18,
+                backgroundColor:
+                  feedback === 'corretto'
+                    ? 'rgba(67,230,161,0.10)'
+                    : 'rgba(255,100,110,0.10)',
+                borderWidth: 1,
+                borderColor:
+                  feedback === 'corretto'
+                    ? 'rgba(67,230,161,0.35)'
+                    : 'rgba(255,100,110,0.32)',
+              }}
+            >
+              <Text
+                style={{
+                  color:
+                    feedback === 'corretto'
+                      ? '#43E6A1'
+                      : '#FF7B85',
+                  fontSize: 14,
+                  fontWeight: '900',
+                }}
+              >
+                {feedback === 'corretto'
+                  ? '✓ DECISIONE CORRETTA'
+                  : feedback === 'tempo'
+                  ? '⏱ TEMPO SCADUTO'
+                  : '✕ DECISIONE SBAGLIATA'}
+              </Text>
+
+              <Text
+                style={{
+                  color: '#B1BDCC',
+                  fontSize: 12,
+                  lineHeight: 18,
+                  marginTop: 6,
+                }}
+              >
+                {scenario?.spiegazione}
+              </Text>
+            </View>
+          )}
+
+        </>
+      )}
+
+
+      {fase === 'gameover' && (
+        <View
+          style={{
+            padding: 24,
+            borderRadius: 25,
+            alignItems: 'center',
+            backgroundColor:
+              'rgba(255,255,255,0.055)',
+            borderWidth: 1,
+            borderColor:
+              'rgba(255,100,110,0.30)',
+          }}
+        >
+          <Ionicons
+            name="warning-outline"
+            size={47}
+            color="#FF7B85"
+          />
+
+          <Text
+            style={{
+              color: '#FFFFFF',
+              fontSize: 23,
+              fontWeight: '900',
+              marginTop: 14,
+            }}
+          >
+            Turno terminato
+          </Text>
+
+          <Text
+            style={{
+              color: '#91A8C5',
+              fontSize: 12,
+              fontWeight: '800',
+              marginTop: 8,
+            }}
+          >
+            Punteggio finale
+          </Text>
+
+          <Text
+            style={{
+              color: '#F59E0B',
+              fontSize: 38,
+              fontWeight: '900',
+              marginTop: 4,
+            }}
+          >
+            {punteggio}
+          </Text>
+
+          <Text
+            style={{
+              color: '#A4B4CA',
+              fontSize: 12,
+              marginTop: 3,
+            }}
+          >
+            Round raggiunto: {round}
+          </Text>
+
+          <TouchableOpacity
+            activeOpacity={0.85}
+            onPress={nuovaPartita}
+            style={{
+              width: '100%',
+              minHeight: 52,
+              marginTop: 22,
+              borderRadius: 18,
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: '#B66A0D',
+            }}
+          >
+            <Text
+              style={{
+                color: '#FFFFFF',
+                fontSize: 14,
+                fontWeight: '900',
+              }}
+            >
+              RIGIOCA
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            onPress={onBack}
+            style={{
+              paddingVertical: 13,
+              marginTop: 5,
+            }}
+          >
+            <Text
+              style={{
+                color: '#94A9C5',
+                fontSize: 12,
+                fontWeight: '800',
+              }}
+            >
+              Torna alla Sala Giochi
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+    </Screen>
+  );
+}
+
+
+
+function PattugliaNotturnaGameScreen({ onBack }) {
+
+  const checkpoint = [
+    {
+      nome: 'Cancello',
+      icona: 'lock-closed-outline',
+    },
+    {
+      nome: 'Parcheggio',
+      icona: 'car-outline',
+    },
+    {
+      nome: 'Magazzino',
+      icona: 'cube-outline',
+    },
+    {
+      nome: 'Uffici',
+      icona: 'business-outline',
+    },
+    {
+      nome: 'Perimetro',
+      icona: 'walk-outline',
+    },
+    {
+      nome: 'Centrale',
+      icona: 'radio-outline',
+    },
+    {
+      nome: 'Ingresso',
+      icona: 'enter-outline',
+    },
+    {
+      nome: 'Deposito',
+      icona: 'archive-outline',
+    },
+  ];
+
+  const [fase, setFase] = React.useState('intro');
+  const [round, setRound] = React.useState(1);
+  const [vite, setVite] = React.useState(3);
+  const [punteggio, setPunteggio] = React.useState(0);
+
+  const [sequenza, setSequenza] =
+    React.useState([]);
+
+  const [rispostaUtente, setRispostaUtente] =
+    React.useState([]);
+
+  const [feedback, setFeedback] =
+    React.useState('');
+
+  const [indiceEvidenziato, setIndiceEvidenziato] =
+    React.useState(-1);
+
+  const timeoutRef = React.useRef(null);
+
+  const mescola = (array) =>
+    [...array].sort(() => Math.random() - 0.5);
+
+  const pulisciTimer = () => {
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+    }
+  };
+
+  React.useEffect(() => {
+    return () => {
+      pulisciTimer();
+    };
+  }, []);
+
+  const mostraSequenza = async (nuovaSequenza) => {
+    setFase('osserva');
+    setIndiceEvidenziato(-1);
+
+    const velocita =
+      Math.max(
+        450,
+        850 - (round - 1) * 45
+      );
+
+    for (
+      let i = 0;
+      i < nuovaSequenza.length;
+      i++
+    ) {
+      setIndiceEvidenziato(i);
+
+      await new Promise((resolve) => {
+        timeoutRef.current =
+          setTimeout(resolve, velocita);
+      });
+
+      setIndiceEvidenziato(-1);
+
+      await new Promise((resolve) => {
+        timeoutRef.current =
+          setTimeout(resolve, 180);
+      });
+    }
+
+    setRispostaUtente([]);
+    setFase('gioco');
+  };
+
+  const preparaRound = () => {
+    pulisciTimer();
+    setFeedback('');
+    setRispostaUtente([]);
+
+    const lunghezza =
+      Math.min(
+        7,
+        3 + Math.floor((round - 1) / 2)
+      );
+
+    const base = mescola(checkpoint);
+
+    const nuovaSequenza =
+      base.slice(0, lunghezza);
+
+    setSequenza(nuovaSequenza);
+
+    mostraSequenza(nuovaSequenza);
+  };
+
+  const scegliCheckpoint = (elemento) => {
+
+    if (fase !== 'gioco') return;
+
+    const nuovoIndice =
+      rispostaUtente.length;
+
+    const corretto =
+      sequenza[nuovoIndice]?.nome ===
+      elemento.nome;
+
+    if (!corretto) {
+
+      const nuoveVite = vite - 1;
+
+      setVite(nuoveVite);
+      setFeedback('errore');
+      setFase('feedback');
+
+      if (nuoveVite <= 0) {
+        timeoutRef.current =
+          setTimeout(() => {
+            setFase('gameover');
+          }, 1000);
+
+        return;
+      }
+
+      timeoutRef.current =
+        setTimeout(() => {
+          setRound((prev) => prev + 1);
+          setFase('attesa');
+        }, 1000);
+
+      return;
+    }
+
+    const nuovaRisposta = [
+      ...rispostaUtente,
+      elemento,
+    ];
+
+    setRispostaUtente(nuovaRisposta);
+
+    if (
+      nuovaRisposta.length ===
+      sequenza.length
+    ) {
+
+      const bonus =
+        100 +
+        sequenza.length * 30 +
+        (round - 1) * 15;
+
+      setPunteggio(
+        (prev) => prev + bonus
+      );
+
+      setFeedback('corretto');
+      setFase('feedback');
+
+      timeoutRef.current =
+        setTimeout(() => {
+          setRound((prev) => prev + 1);
+          setFase('attesa');
+        }, 1000);
+    }
+  };
+
+  React.useEffect(() => {
+    if (fase === 'attesa') {
+      preparaRound();
+    }
+  }, [fase]);
+
+  const nuovaPartita = () => {
+    pulisciTimer();
+    setRound(1);
+    setVite(3);
+    setPunteggio(0);
+    setSequenza([]);
+    setRispostaUtente([]);
+    setFeedback('');
+    setFase('intro');
+  };
+
+  return (
+    <Screen showScrollTop>
+
+      <Back onPress={onBack} />
+
+      <View
+        style={{
+          marginTop: 8,
+          marginBottom: 18,
+          padding: 20,
+          borderRadius: 27,
+          backgroundColor:
+            'rgba(20,20,51,0.96)',
+          borderWidth: 1,
+          borderColor:
+            'rgba(167,139,250,0.40)',
+        }}
+      >
+
+        <View
+          style={{
+            width: 52,
+            height: 52,
+            borderRadius: 17,
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor:
+              'rgba(167,139,250,0.14)',
+          }}
+        >
+          <Ionicons
+            name="moon-outline"
+            size={28}
+            color="#A78BFA"
+          />
+        </View>
+
+        <Text
+          style={{
+            color: '#A78BFA',
+            fontSize: 10,
+            fontWeight: '900',
+            letterSpacing: 1.3,
+            marginTop: 15,
+          }}
+        >
+          TURNO NOTTURNO
+        </Text>
+
+        <Text
+          style={{
+            color: '#FFFFFF',
+            fontSize: 28,
+            fontWeight: '900',
+            marginTop: 4,
+          }}
+        >
+          Pattuglia Notturna
+        </Text>
+
+        <Text
+          style={{
+            color: '#AAA6C9',
+            fontSize: 12,
+            lineHeight: 18,
+            fontWeight: '700',
+            marginTop: 7,
+          }}
+        >
+          Memorizza il percorso della ronda
+          e ripeti i checkpoint nello stesso
+          ordine.
+        </Text>
+
+      </View>
+
+
+      {fase === 'intro' && (
+        <View
+          style={{
+            padding: 22,
+            borderRadius: 24,
+            backgroundColor:
+              'rgba(255,255,255,0.055)',
+            borderWidth: 1,
+            borderColor:
+              'rgba(167,139,250,0.22)',
+          }}
+        >
+
+          <Ionicons
+            name="footsteps-outline"
+            size={43}
+            color="#A78BFA"
+          />
+
+          <Text
+            style={{
+              color: '#FFFFFF',
+              fontSize: 20,
+              fontWeight: '900',
+              marginTop: 14,
+            }}
+          >
+            Inizia la ronda
+          </Text>
+
+          <Text
+            style={{
+              color: '#A9B1C8',
+              fontSize: 13,
+              lineHeight: 20,
+              marginTop: 8,
+            }}
+          >
+            Guarda attentamente l’ordine dei
+            checkpoint. Quando la sequenza
+            scompare dovrai ripeterla senza
+            commettere errori.
+          </Text>
+
+          <TouchableOpacity
+            activeOpacity={0.85}
+            onPress={preparaRound}
+            style={{
+              marginTop: 22,
+              minHeight: 52,
+              borderRadius: 18,
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: '#6753C5',
+            }}
+          >
+            <Text
+              style={{
+                color: '#FFFFFF',
+                fontSize: 14,
+                fontWeight: '900',
+              }}
+            >
+              INIZIA LA PATTUGLIA
+            </Text>
+          </TouchableOpacity>
+
+        </View>
+      )}
+
+
+      {fase !== 'intro' &&
+       fase !== 'gameover' && (
+        <>
+
+          <View
+            style={{
+              flexDirection: 'row',
+              justifyContent:
+                'space-between',
+              marginBottom: 15,
+            }}
+          >
+
+            <View
+              style={{
+                flex: 1,
+                marginRight: 6,
+                padding: 11,
+                borderRadius: 16,
+                backgroundColor:
+                  'rgba(255,255,255,0.05)',
+                alignItems: 'center',
+              }}
+            >
+              <Text style={{
+                color: '#8390AD',
+                fontSize: 9,
+                fontWeight: '900',
+              }}>
+                ROUND
+              </Text>
+
+              <Text style={{
+                color: '#FFFFFF',
+                fontSize: 19,
+                fontWeight: '900',
+              }}>
+                {round}
+              </Text>
+            </View>
+
+            <View
+              style={{
+                flex: 1,
+                marginHorizontal: 6,
+                padding: 11,
+                borderRadius: 16,
+                backgroundColor:
+                  'rgba(255,255,255,0.05)',
+                alignItems: 'center',
+              }}
+            >
+              <Text style={{
+                color: '#8390AD',
+                fontSize: 9,
+                fontWeight: '900',
+              }}>
+                PUNTI
+              </Text>
+
+              <Text style={{
+                color: '#A78BFA',
+                fontSize: 19,
+                fontWeight: '900',
+              }}>
+                {punteggio}
+              </Text>
+            </View>
+
+            <View
+              style={{
+                flex: 1,
+                marginLeft: 6,
+                padding: 11,
+                borderRadius: 16,
+                backgroundColor:
+                  'rgba(255,255,255,0.05)',
+                alignItems: 'center',
+              }}
+            >
+              <Text style={{
+                color: '#8390AD',
+                fontSize: 9,
+                fontWeight: '900',
+              }}>
+                VITE
+              </Text>
+
+              <Text style={{
+                color: '#FF7B85',
+                fontSize: 17,
+                fontWeight: '900',
+              }}>
+                {'♥'.repeat(vite)}
+              </Text>
+            </View>
+
+          </View>
+
+
+          {fase === 'osserva' && (
+            <View
+              style={{
+                padding: 20,
+                borderRadius: 22,
+                backgroundColor:
+                  'rgba(18,20,42,0.96)',
+                borderWidth: 1,
+                borderColor:
+                  'rgba(167,139,250,0.28)',
+              }}
+            >
+
+              <Text
+                style={{
+                  color: '#A78BFA',
+                  fontSize: 13,
+                  fontWeight: '900',
+                  textAlign: 'center',
+                  marginBottom: 18,
+                }}
+              >
+                🌙 MEMORIZZA IL PERCORSO
+              </Text>
+
+              {sequenza.map((item, index) => {
+
+                const attivo =
+                  indiceEvidenziato === index;
+
+                return (
+                  <View
+                    key={`${item.nome}-${index}`}
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      padding: 13,
+                      marginBottom: 9,
+                      borderRadius: 17,
+                      backgroundColor:
+                        attivo
+                          ? 'rgba(167,139,250,0.22)'
+                          : 'rgba(255,255,255,0.04)',
+                      borderWidth: 1,
+                      borderColor:
+                        attivo
+                          ? '#A78BFA'
+                          : 'rgba(167,139,250,0.16)',
+                    }}
+                  >
+
+                    <View
+                      style={{
+                        width: 32,
+                        height: 32,
+                        borderRadius: 11,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        backgroundColor:
+                          'rgba(167,139,250,0.12)',
+                      }}
+                    >
+                      <Text
+                        style={{
+                          color: '#FFFFFF',
+                          fontSize: 12,
+                          fontWeight: '900',
+                        }}
+                      >
+                        {index + 1}
+                      </Text>
+                    </View>
+
+                    <Ionicons
+                      name={item.icona}
+                      size={22}
+                      color="#A78BFA"
+                      style={{
+                        marginLeft: 13,
+                      }}
+                    />
+
+                    <Text
+                      style={{
+                        color: '#FFFFFF',
+                        fontSize: 14,
+                        fontWeight: '900',
+                        marginLeft: 12,
+                      }}
+                    >
+                      {item.nome}
+                    </Text>
+
+                  </View>
+                );
+              })}
+
+            </View>
+          )}
+
+
+          {fase === 'gioco' && (
+            <>
+
+              <Text
+                style={{
+                  color: '#FFFFFF',
+                  fontSize: 15,
+                  fontWeight: '900',
+                  textAlign: 'center',
+                  marginBottom: 5,
+                }}
+              >
+                Ripeti la ronda
+              </Text>
+
+              <Text
+                style={{
+                  color: '#8D99B3',
+                  fontSize: 11,
+                  fontWeight: '700',
+                  textAlign: 'center',
+                  marginBottom: 16,
+                }}
+              >
+                {rispostaUtente.length}
+                {' / '}
+                {sequenza.length}
+                {' checkpoint completati'}
+              </Text>
+
+              <View
+                style={{
+                  flexDirection: 'row',
+                  flexWrap: 'wrap',
+                  justifyContent:
+                    'space-between',
+                }}
+              >
+
+                {checkpoint.map((item) => (
+
+                  <TouchableOpacity
+                    key={item.nome}
+                    activeOpacity={0.78}
+                    onPress={() =>
+                      scegliCheckpoint(item)
+                    }
+                    style={{
+                      width: '48.5%',
+                      minHeight: 105,
+                      marginBottom: 12,
+                      borderRadius: 19,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      backgroundColor:
+                        'rgba(255,255,255,0.055)',
+                      borderWidth: 1,
+                      borderColor:
+                        'rgba(167,139,250,0.25)',
+                    }}
+                  >
+
+                    <Ionicons
+                      name={item.icona}
+                      size={29}
+                      color="#A78BFA"
+                    />
+
+                    <Text
+                      style={{
+                        color: '#FFFFFF',
+                        fontSize: 12,
+                        fontWeight: '900',
+                        marginTop: 8,
+                      }}
+                    >
+                      {item.nome}
+                    </Text>
+
+                  </TouchableOpacity>
+
+                ))}
+
+              </View>
+
+            </>
+          )}
+
+
+          {fase === 'feedback' && (
+            <View
+              style={{
+                padding: 20,
+                borderRadius: 21,
+                alignItems: 'center',
+                backgroundColor:
+                  feedback === 'corretto'
+                    ? 'rgba(67,230,161,0.10)'
+                    : 'rgba(255,100,110,0.10)',
+                borderWidth: 1,
+                borderColor:
+                  feedback === 'corretto'
+                    ? 'rgba(67,230,161,0.35)'
+                    : 'rgba(255,100,110,0.30)',
+              }}
+            >
+
+              <Ionicons
+                name={
+                  feedback === 'corretto'
+                    ? 'checkmark-circle-outline'
+                    : 'close-circle-outline'
+                }
+                size={39}
+                color={
+                  feedback === 'corretto'
+                    ? '#43E6A1'
+                    : '#FF7B85'
+                }
+              />
+
+              <Text
+                style={{
+                  color:
+                    feedback === 'corretto'
+                      ? '#43E6A1'
+                      : '#FF7B85',
+                  fontSize: 15,
+                  fontWeight: '900',
+                  marginTop: 10,
+                }}
+              >
+                {feedback === 'corretto'
+                  ? 'RONDA COMPLETATA'
+                  : 'CHECKPOINT SBAGLIATO'}
+              </Text>
+
+            </View>
+          )}
+
+        </>
+      )}
+
+
+      {fase === 'gameover' && (
+        <View
+          style={{
+            padding: 24,
+            borderRadius: 25,
+            alignItems: 'center',
+            backgroundColor:
+              'rgba(255,255,255,0.055)',
+            borderWidth: 1,
+            borderColor:
+              'rgba(255,100,110,0.30)',
+          }}
+        >
+
+          <Ionicons
+            name="moon-outline"
+            size={47}
+            color="#FF7B85"
+          />
+
+          <Text
+            style={{
+              color: '#FFFFFF',
+              fontSize: 23,
+              fontWeight: '900',
+              marginTop: 14,
+            }}
+          >
+            Pattuglia terminata
+          </Text>
+
+          <Text
+            style={{
+              color: '#91A8C5',
+              fontSize: 12,
+              fontWeight: '800',
+              marginTop: 8,
+            }}
+          >
+            Punteggio finale
+          </Text>
+
+          <Text
+            style={{
+              color: '#A78BFA',
+              fontSize: 38,
+              fontWeight: '900',
+              marginTop: 4,
+            }}
+          >
+            {punteggio}
+          </Text>
+
+          <Text
+            style={{
+              color: '#A4B4CA',
+              fontSize: 12,
+              marginTop: 3,
+            }}
+          >
+            Round raggiunto: {round}
+          </Text>
+
+          <TouchableOpacity
+            activeOpacity={0.85}
+            onPress={nuovaPartita}
+            style={{
+              width: '100%',
+              minHeight: 52,
+              marginTop: 22,
+              borderRadius: 18,
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: '#6753C5',
+            }}
+          >
+            <Text
+              style={{
+                color: '#FFFFFF',
+                fontSize: 14,
+                fontWeight: '900',
+              }}
+            >
+              NUOVA PATTUGLIA
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            onPress={onBack}
+            style={{
+              paddingVertical: 13,
+              marginTop: 5,
+            }}
+          >
+            <Text
+              style={{
+                color: '#94A9C5',
+                fontSize: 12,
+                fontWeight: '800',
+              }}
+            >
+              Torna alla Sala Giochi
+            </Text>
+          </TouchableOpacity>
+
+        </View>
+      )}
+
+    </Screen>
+  );
+}
+
+
+
+function CodiceRadioGameScreen({ onBack }) {
+
+  const domandeRadio = [
+    {
+      codice: 'COPIATO',
+      messaggio: '“Delta 2 da Centrale, ricevuto?”',
+      corretto: 'Messaggio ricevuto e compreso',
+      opzioni: [
+        'Messaggio ricevuto e compreso',
+        'Ripetere il messaggio',
+        'Comunicazione terminata',
+      ],
+    },
+    {
+      codice: 'NEGATIVO',
+      messaggio: '“Confermi accesso autorizzato?”',
+      corretto: 'No / risposta negativa',
+      opzioni: [
+        'No / risposta negativa',
+        'Attendere istruzioni',
+        'Richiesta di supporto',
+      ],
+    },
+    {
+      codice: 'AFFERMATIVO',
+      messaggio: '“Postazione 3, situazione regolare?”',
+      corretto: 'Sì / risposta positiva',
+      opzioni: [
+        'Sì / risposta positiva',
+        'Emergenza in corso',
+        'Cambio canale radio',
+      ],
+    },
+    {
+      codice: 'RIPETI',
+      messaggio: '“Centrale, messaggio disturbato.”',
+      corretto: 'Trasmettere nuovamente il messaggio',
+      opzioni: [
+        'Trasmettere nuovamente il messaggio',
+        'Interrompere la comunicazione',
+        'Inviare una pattuglia',
+      ],
+    },
+    {
+      codice: 'ATTENDI',
+      messaggio: '“Unità 4, resta in ascolto.”',
+      corretto: 'Rimanere in attesa di ulteriori comunicazioni',
+      opzioni: [
+        'Rimanere in attesa di ulteriori comunicazioni',
+        'Terminare il turno',
+        'Raggiungere immediatamente la centrale',
+      ],
+    },
+    {
+      codice: 'PASSO',
+      messaggio: '“Area controllata, nessuna anomalia. Passo.”',
+      corretto: 'Ho finito di parlare e attendo risposta',
+      opzioni: [
+        'Ho finito di parlare e attendo risposta',
+        'Comunicazione definitivamente chiusa',
+        'Segnale radio insufficiente',
+      ],
+    },
+    {
+      codice: 'CHIUDO',
+      messaggio: '“Ricevuto, nessun altro aggiornamento. Chiudo.”',
+      corretto: 'Fine della comunicazione',
+      opzioni: [
+        'Fine della comunicazione',
+        'Attendere una risposta',
+        'Ripetere il messaggio',
+      ],
+    },
+    {
+      codice: 'PRIORITÀ',
+      messaggio: '“Centrale da Bravo 1, comunicazione prioritaria.”',
+      corretto: 'Messaggio importante da gestire rapidamente',
+      opzioni: [
+        'Messaggio importante da gestire rapidamente',
+        'Comunicazione di routine',
+        'Richiesta cambio turno',
+      ],
+    },
+    {
+      codice: 'POSIZIONE',
+      messaggio: '“Bravo 2, comunica posizione.”',
+      corretto: 'Indicare dove ci si trova',
+      opzioni: [
+        'Indicare dove ci si trova',
+        'Indicare il proprio nome',
+        'Indicare il numero di radio',
+      ],
+    },
+    {
+      codice: 'SITUAZIONE',
+      messaggio: '“Unità 1, aggiorna situazione.”',
+      corretto: 'Comunicare cosa sta accadendo',
+      opzioni: [
+        'Comunicare cosa sta accadendo',
+        'Comunicare l’orario di fine turno',
+        'Cambiare frequenza radio',
+      ],
+    },
+  ];
+
+  const [fase, setFase] = React.useState('intro');
+  const [round, setRound] = React.useState(1);
+  const [vite, setVite] = React.useState(3);
+  const [punteggio, setPunteggio] = React.useState(0);
+  const [domanda, setDomanda] = React.useState(null);
+  const [opzioni, setOpzioni] = React.useState([]);
+  const [tempo, setTempo] = React.useState(7);
+  const [feedback, setFeedback] = React.useState('');
+  const [ultimoIndice, setUltimoIndice] = React.useState(-1);
+
+  const timerRef = React.useRef(null);
+  const timeoutRef = React.useRef(null);
+
+  const mescola = (array) =>
+    [...array].sort(() => Math.random() - 0.5);
+
+  const pulisciTimer = () => {
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+    }
+  };
+
+  React.useEffect(() => {
+    return () => {
+      pulisciTimer();
+    };
+  }, []);
+
+  const preparaRound = () => {
+    pulisciTimer();
+    setFeedback('');
+
+    let indice =
+      Math.floor(Math.random() * domandeRadio.length);
+
+    if (
+      domandeRadio.length > 1 &&
+      indice === ultimoIndice
+    ) {
+      indice =
+        (indice + 1) % domandeRadio.length;
+    }
+
+    const nuovaDomanda =
+      domandeRadio[indice];
+
+    setUltimoIndice(indice);
+    setDomanda(nuovaDomanda);
+    setOpzioni(
+      mescola(nuovaDomanda.opzioni)
+    );
+
+    const secondi =
+      Math.max(
+        3,
+        8 - Math.floor((round - 1) / 3)
+      );
+
+    setTempo(secondi);
+    setFase('gioco');
+
+    let restante = secondi;
+
+    timerRef.current = setInterval(() => {
+      restante -= 1;
+      setTempo(restante);
+
+      if (restante <= 0) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+
+        setVite((prev) => {
+          const nuove = prev - 1;
+
+          setFeedback('tempo');
+
+          if (nuove <= 0) {
+            setFase('gameover');
+          } else {
+            setFase('feedback');
+
+            timeoutRef.current =
+              setTimeout(() => {
+                setRound((r) => r + 1);
+                setFase('attesa');
+              }, 1100);
+          }
+
+          return nuove;
+        });
+      }
+    }, 1000);
+  };
+
+  React.useEffect(() => {
+    if (fase === 'attesa') {
+      preparaRound();
+    }
+  }, [fase]);
+
+  const rispondi = (scelta) => {
+    if (fase !== 'gioco' || !domanda) return;
+
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+
+    const corretto =
+      scelta === domanda.corretto;
+
+    if (corretto) {
+      const bonus =
+        100 +
+        Math.max(0, tempo) * 20 +
+        (round - 1) * 10;
+
+      setPunteggio(
+        (prev) => prev + bonus
+      );
+
+      setFeedback('corretto');
+      setFase('feedback');
+
+      timeoutRef.current =
+        setTimeout(() => {
+          setRound((prev) => prev + 1);
+          setFase('attesa');
+        }, 1000);
+
+      return;
+    }
+
+    const nuoveVite = vite - 1;
+
+    setVite(nuoveVite);
+    setFeedback('errore');
+    setFase('feedback');
+
+    if (nuoveVite <= 0) {
+      timeoutRef.current =
+        setTimeout(() => {
+          setFase('gameover');
+        }, 1000);
+      return;
+    }
+
+    timeoutRef.current =
+      setTimeout(() => {
+        setRound((prev) => prev + 1);
+        setFase('attesa');
+      }, 1000);
+  };
+
+  const nuovaPartita = () => {
+    pulisciTimer();
+    setRound(1);
+    setVite(3);
+    setPunteggio(0);
+    setDomanda(null);
+    setFeedback('');
+    setFase('intro');
+  };
+
+  return (
+    <Screen showScrollTop>
+
+      <Back onPress={onBack} />
+
+      <View
+        style={{
+          marginTop: 8,
+          marginBottom: 18,
+          padding: 20,
+          borderRadius: 27,
+          backgroundColor:
+            'rgba(8,43,39,0.96)',
+          borderWidth: 1,
+          borderColor:
+            'rgba(52,211,153,0.40)',
+        }}
+      >
+
+        <View
+          style={{
+            width: 52,
+            height: 52,
+            borderRadius: 17,
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor:
+              'rgba(52,211,153,0.14)',
+          }}
+        >
+          <Ionicons
+            name="radio-outline"
+            size={29}
+            color="#34D399"
+          />
+        </View>
+
+        <Text
+          style={{
+            color: '#34D399',
+            fontSize: 10,
+            fontWeight: '900',
+            letterSpacing: 1.3,
+            marginTop: 15,
+          }}
+        >
+          COMUNICAZIONI OPERATIVE
+        </Text>
+
+        <Text
+          style={{
+            color: '#FFFFFF',
+            fontSize: 28,
+            fontWeight: '900',
+            marginTop: 4,
+          }}
+        >
+          Codice Radio
+        </Text>
+
+        <Text
+          style={{
+            color: '#9DBDB3',
+            fontSize: 12,
+            lineHeight: 18,
+            fontWeight: '700',
+            marginTop: 7,
+          }}
+        >
+          Interpreta correttamente la
+          comunicazione prima che scada
+          il tempo.
+        </Text>
+
+      </View>
+
+
+      {fase === 'intro' && (
+        <View
+          style={{
+            padding: 22,
+            borderRadius: 24,
+            backgroundColor:
+              'rgba(255,255,255,0.055)',
+            borderWidth: 1,
+            borderColor:
+              'rgba(52,211,153,0.22)',
+          }}
+        >
+
+          <Ionicons
+            name="headset-outline"
+            size={43}
+            color="#34D399"
+          />
+
+          <Text
+            style={{
+              color: '#FFFFFF',
+              fontSize: 20,
+              fontWeight: '900',
+              marginTop: 14,
+            }}
+          >
+            Radio check
+          </Text>
+
+          <Text
+            style={{
+              color: '#A9B7C7',
+              fontSize: 13,
+              lineHeight: 20,
+              marginTop: 8,
+            }}
+          >
+            Leggi la comunicazione e scegli
+            il significato corretto tra le
+            tre possibilità. Più avanzi,
+            meno tempo avrai.
+          </Text>
+
+          <TouchableOpacity
+            activeOpacity={0.85}
+            onPress={preparaRound}
+            style={{
+              marginTop: 22,
+              minHeight: 52,
+              borderRadius: 18,
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: '#168D68',
+            }}
+          >
+            <Text
+              style={{
+                color: '#FFFFFF',
+                fontSize: 14,
+                fontWeight: '900',
+              }}
+            >
+              APRI IL CANALE
+            </Text>
+          </TouchableOpacity>
+
+        </View>
+      )}
+
+
+      {fase !== 'intro' &&
+       fase !== 'gameover' && (
+        <>
+
+          <View
+            style={{
+              flexDirection: 'row',
+              justifyContent: 'space-between',
+              marginBottom: 14,
+            }}
+          >
+
+            <View
+              style={{
+                flex: 1,
+                marginRight: 6,
+                padding: 11,
+                borderRadius: 16,
+                alignItems: 'center',
+                backgroundColor:
+                  'rgba(255,255,255,0.05)',
+              }}
+            >
+              <Text style={{
+                color: '#8399B9',
+                fontSize: 9,
+                fontWeight: '900',
+              }}>
+                ROUND
+              </Text>
+
+              <Text style={{
+                color: '#FFFFFF',
+                fontSize: 19,
+                fontWeight: '900',
+              }}>
+                {round}
+              </Text>
+            </View>
+
+            <View
+              style={{
+                flex: 1,
+                marginHorizontal: 6,
+                padding: 11,
+                borderRadius: 16,
+                alignItems: 'center',
+                backgroundColor:
+                  'rgba(255,255,255,0.05)',
+              }}
+            >
+              <Text style={{
+                color: '#8399B9',
+                fontSize: 9,
+                fontWeight: '900',
+              }}>
+                PUNTI
+              </Text>
+
+              <Text style={{
+                color: '#34D399',
+                fontSize: 19,
+                fontWeight: '900',
+              }}>
+                {punteggio}
+              </Text>
+            </View>
+
+            <View
+              style={{
+                flex: 1,
+                marginLeft: 6,
+                padding: 11,
+                borderRadius: 16,
+                alignItems: 'center',
+                backgroundColor:
+                  'rgba(255,255,255,0.05)',
+              }}
+            >
+              <Text style={{
+                color: '#8399B9',
+                fontSize: 9,
+                fontWeight: '900',
+              }}>
+                VITE
+              </Text>
+
+              <Text style={{
+                color: '#FF7B85',
+                fontSize: 17,
+                fontWeight: '900',
+              }}>
+                {'♥'.repeat(vite)}
+              </Text>
+            </View>
+
+          </View>
+
+
+          <View
+            style={{
+              padding: 20,
+              borderRadius: 23,
+              backgroundColor:
+                'rgba(7,24,28,0.97)',
+              borderWidth: 1,
+              borderColor:
+                'rgba(52,211,153,0.30)',
+            }}
+          >
+
+            <View
+              style={{
+                flexDirection: 'row',
+                justifyContent:
+                  'space-between',
+                alignItems: 'center',
+              }}
+            >
+
+              <View
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                }}
+              >
+                <Ionicons
+                  name="radio-outline"
+                  size={25}
+                  color="#34D399"
+                />
+
+                <Text
+                  style={{
+                    color: '#34D399',
+                    fontSize: 11,
+                    fontWeight: '900',
+                    marginLeft: 9,
+                    letterSpacing: 1,
+                  }}
+                >
+                  CANALE 01
+                </Text>
+              </View>
+
+              <Text
+                style={{
+                  color:
+                    tempo <= 2
+                      ? '#FF636D'
+                      : '#34D399',
+                  fontSize: 29,
+                  fontWeight: '900',
+                }}
+              >
+                {tempo}
+              </Text>
+
+            </View>
+
+            <View
+              style={{
+                marginTop: 18,
+                padding: 15,
+                borderRadius: 17,
+                backgroundColor:
+                  'rgba(52,211,153,0.08)',
+              }}
+            >
+
+              <Text
+                style={{
+                  color: '#81A89C',
+                  fontSize: 9,
+                  fontWeight: '900',
+                  letterSpacing: 1,
+                }}
+              >
+                CODICE
+              </Text>
+
+              <Text
+                style={{
+                  color: '#FFFFFF',
+                  fontSize: 23,
+                  fontWeight: '900',
+                  marginTop: 4,
+                }}
+              >
+                {domanda?.codice}
+              </Text>
+
+            </View>
+
+            <Text
+              style={{
+                color: '#C4D1CE',
+                fontSize: 14,
+                lineHeight: 21,
+                fontWeight: '700',
+                marginTop: 16,
+              }}
+            >
+              {domanda?.messaggio}
+            </Text>
+
+          </View>
+
+
+          {fase === 'gioco' && (
+            <View style={{ marginTop: 15 }}>
+
+              {opzioni.map((opzione, index) => (
+
+                <TouchableOpacity
+                  key={`${opzione}-${index}`}
+                  activeOpacity={0.82}
+                  onPress={() =>
+                    rispondi(opzione)
+                  }
+                  style={{
+                    minHeight: 58,
+                    marginBottom: 10,
+                    paddingHorizontal: 16,
+                    borderRadius: 18,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    backgroundColor:
+                      'rgba(255,255,255,0.055)',
+                    borderWidth: 1,
+                    borderColor:
+                      'rgba(52,211,153,0.22)',
+                  }}
+                >
+
+                  <View
+                    style={{
+                      width: 30,
+                      height: 30,
+                      borderRadius: 10,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      backgroundColor:
+                        'rgba(52,211,153,0.10)',
+                    }}
+                  >
+                    <Text
+                      style={{
+                        color: '#34D399',
+                        fontSize: 11,
+                        fontWeight: '900',
+                      }}
+                    >
+                      {index + 1}
+                    </Text>
+                  </View>
+
+                  <Text
+                    style={{
+                      flex: 1,
+                      color: '#FFFFFF',
+                      fontSize: 12,
+                      fontWeight: '800',
+                      lineHeight: 18,
+                      marginLeft: 12,
+                    }}
+                  >
+                    {opzione}
+                  </Text>
+
+                </TouchableOpacity>
+
+              ))}
+
+            </View>
+          )}
+
+
+          {fase === 'feedback' && (
+            <View
+              style={{
+                marginTop: 15,
+                padding: 18,
+                borderRadius: 19,
+                alignItems: 'center',
+                backgroundColor:
+                  feedback === 'corretto'
+                    ? 'rgba(67,230,161,0.10)'
+                    : 'rgba(255,100,110,0.10)',
+                borderWidth: 1,
+                borderColor:
+                  feedback === 'corretto'
+                    ? 'rgba(67,230,161,0.35)'
+                    : 'rgba(255,100,110,0.30)',
+              }}
+            >
+
+              <Ionicons
+                name={
+                  feedback === 'corretto'
+                    ? 'checkmark-circle-outline'
+                    : feedback === 'tempo'
+                    ? 'timer-outline'
+                    : 'close-circle-outline'
+                }
+                size={38}
+                color={
+                  feedback === 'corretto'
+                    ? '#43E6A1'
+                    : '#FF7B85'
+                }
+              />
+
+              <Text
+                style={{
+                  color:
+                    feedback === 'corretto'
+                      ? '#43E6A1'
+                      : '#FF7B85',
+                  fontSize: 14,
+                  fontWeight: '900',
+                  marginTop: 8,
+                }}
+              >
+                {feedback === 'corretto'
+                  ? 'COPIATO!'
+                  : feedback === 'tempo'
+                  ? 'TEMPO SCADUTO'
+                  : 'CODICE ERRATO'}
+              </Text>
+
+              {feedback !== 'corretto' && (
+                <Text
+                  style={{
+                    color: '#AEBBC8',
+                    fontSize: 11,
+                    lineHeight: 17,
+                    textAlign: 'center',
+                    marginTop: 6,
+                  }}
+                >
+                  Risposta corretta:
+                  {' '}
+                  {domanda?.corretto}
+                </Text>
+              )}
+
+            </View>
+          )}
+
+        </>
+      )}
+
+
+      {fase === 'gameover' && (
+        <View
+          style={{
+            padding: 24,
+            borderRadius: 25,
+            alignItems: 'center',
+            backgroundColor:
+              'rgba(255,255,255,0.055)',
+            borderWidth: 1,
+            borderColor:
+              'rgba(255,100,110,0.30)',
+          }}
+        >
+
+          <Ionicons
+            name="radio-outline"
+            size={47}
+            color="#FF7B85"
+          />
+
+          <Text
+            style={{
+              color: '#FFFFFF',
+              fontSize: 23,
+              fontWeight: '900',
+              marginTop: 14,
+            }}
+          >
+            Comunicazione chiusa
+          </Text>
+
+          <Text
+            style={{
+              color: '#91A8C5',
+              fontSize: 12,
+              fontWeight: '800',
+              marginTop: 8,
+            }}
+          >
+            Punteggio finale
+          </Text>
+
+          <Text
+            style={{
+              color: '#34D399',
+              fontSize: 38,
+              fontWeight: '900',
+              marginTop: 4,
+            }}
+          >
+            {punteggio}
+          </Text>
+
+          <Text
+            style={{
+              color: '#A4B4CA',
+              fontSize: 12,
+              marginTop: 3,
+            }}
+          >
+            Round raggiunto: {round}
+          </Text>
+
+          <TouchableOpacity
+            activeOpacity={0.85}
+            onPress={nuovaPartita}
+            style={{
+              width: '100%',
+              minHeight: 52,
+              marginTop: 22,
+              borderRadius: 18,
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: '#168D68',
+            }}
+          >
+            <Text
+              style={{
+                color: '#FFFFFF',
+                fontSize: 14,
+                fontWeight: '900',
+              }}
+            >
+              NUOVA COMUNICAZIONE
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            onPress={onBack}
+            style={{
+              paddingVertical: 13,
+              marginTop: 5,
+            }}
+          >
+            <Text
+              style={{
+                color: '#94A9C5',
+                fontSize: 12,
+                fontWeight: '800',
+              }}
+            >
+              Torna alla Sala Giochi
+            </Text>
+          </TouchableOpacity>
+
+        </View>
+      )}
+
+    </Screen>
+  );
+}
+
+
+
+function ControlloTargaGameScreen({ onBack }) {
+
+  const lettere =
+    'ABCDEFGHJKLMNPRSTUVWXYZ';
+
+  const numeri =
+    '0123456789';
+
+  const randomChar = (set) =>
+    set[
+      Math.floor(Math.random() * set.length)
+    ];
+
+  const generaTarga = () =>
+    `${randomChar(lettere)}${randomChar(lettere)} ` +
+    `${randomChar(numeri)}${randomChar(numeri)}${randomChar(numeri)} ` +
+    `${randomChar(lettere)}${randomChar(lettere)}`;
+
+  const modificaTarga = (targa) => {
+
+    const chars = targa.split('');
+    const posizioniValide = [
+      0, 1,
+      3, 4, 5,
+      7, 8,
+    ];
+
+    const posizione =
+      posizioniValide[
+        Math.floor(
+          Math.random() *
+          posizioniValide.length
+        )
+      ];
+
+    const originale =
+      chars[posizione];
+
+    const set =
+      /[0-9]/.test(originale)
+        ? numeri
+        : lettere;
+
+    let nuovo = originale;
+
+    while (nuovo === originale) {
+      nuovo = randomChar(set);
+    }
+
+    chars[posizione] = nuovo;
+
+    return chars.join('');
+  };
+
+  const mescola = (array) =>
+    [...array].sort(() => Math.random() - 0.5);
+
+  const [fase, setFase] =
+    React.useState('intro');
+
+  const [round, setRound] =
+    React.useState(1);
+
+  const [vite, setVite] =
+    React.useState(3);
+
+  const [punteggio, setPunteggio] =
+    React.useState(0);
+
+  const [targaCorretta, setTargaCorretta] =
+    React.useState('');
+
+  const [opzioni, setOpzioni] =
+    React.useState([]);
+
+  const [tempoMemoria, setTempoMemoria] =
+    React.useState(3);
+
+  const [feedback, setFeedback] =
+    React.useState('');
+
+  const timeoutRef = React.useRef(null);
+
+  const pulisciTimer = () => {
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+    }
+  };
+
+  React.useEffect(() => {
+    return () => {
+      pulisciTimer();
+    };
+  }, []);
+
+  const preparaRound = () => {
+
+    pulisciTimer();
+    setFeedback('');
+
+    const targa = generaTarga();
+
+    let errata1 = modificaTarga(targa);
+    let errata2 = modificaTarga(targa);
+    let errata3 = modificaTarga(targa);
+
+    while (
+      errata2 === errata1 ||
+      errata2 === targa
+    ) {
+      errata2 = modificaTarga(targa);
+    }
+
+    while (
+      errata3 === errata1 ||
+      errata3 === errata2 ||
+      errata3 === targa
+    ) {
+      errata3 = modificaTarga(targa);
+    }
+
+    setTargaCorretta(targa);
+
+    setOpzioni(
+      mescola([
+        targa,
+        errata1,
+        errata2,
+        errata3,
+      ])
+    );
+
+    const secondi =
+      Math.max(
+        1.4,
+        3.5 - (round - 1) * 0.18
+      );
+
+    setTempoMemoria(
+      Math.ceil(secondi)
+    );
+
+    setFase('memorizza');
+
+    timeoutRef.current =
+      setTimeout(() => {
+        setFase('scegli');
+      }, secondi * 1000);
+  };
+
+  React.useEffect(() => {
+    if (fase === 'attesa') {
+      preparaRound();
+    }
+  }, [fase]);
+
+  const scegliTarga = (scelta) => {
+
+    if (fase !== 'scegli') return;
+
+    if (scelta === targaCorretta) {
+
+      const bonus =
+        120 +
+        (round - 1) * 20;
+
+      setPunteggio(
+        (prev) => prev + bonus
+      );
+
+      setFeedback('corretto');
+      setFase('feedback');
+
+      timeoutRef.current =
+        setTimeout(() => {
+          setRound((prev) => prev + 1);
+          setFase('attesa');
+        }, 950);
+
+      return;
+    }
+
+    const nuoveVite = vite - 1;
+
+    setVite(nuoveVite);
+    setFeedback('errore');
+    setFase('feedback');
+
+    if (nuoveVite <= 0) {
+
+      timeoutRef.current =
+        setTimeout(() => {
+          setFase('gameover');
+        }, 1000);
+
+      return;
+    }
+
+    timeoutRef.current =
+      setTimeout(() => {
+        setRound((prev) => prev + 1);
+        setFase('attesa');
+      }, 1000);
+  };
+
+  const nuovaPartita = () => {
+    pulisciTimer();
+    setRound(1);
+    setVite(3);
+    setPunteggio(0);
+    setFeedback('');
+    setTargaCorretta('');
+    setOpzioni([]);
+    setFase('intro');
+  };
+
+  const Targa = ({
+    valore,
+    cliccabile = false,
+    onPress,
+  }) => {
+
+    const contenuto = (
+      <View
+        style={{
+          minHeight: 70,
+          borderRadius: 13,
+          backgroundColor: '#F4F5F7',
+          borderWidth: 3,
+          borderColor: '#172033',
+          flexDirection: 'row',
+          alignItems: 'center',
+          overflow: 'hidden',
+        }}
+      >
+
+        <View
+          style={{
+            width: 25,
+            alignSelf: 'stretch',
+            backgroundColor: '#1656A6',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <Text
+            style={{
+              color: '#FFFFFF',
+              fontSize: 8,
+              fontWeight: '900',
+            }}
+          >
+            I
+          </Text>
+        </View>
+
+        <Text
+          style={{
+            flex: 1,
+            color: '#111827',
+            fontSize: 25,
+            fontWeight: '900',
+            letterSpacing: 2.2,
+            textAlign: 'center',
+          }}
+        >
+          {valore}
+        </Text>
+
+        <View
+          style={{
+            width: 25,
+            alignSelf: 'stretch',
+            backgroundColor: '#1656A6',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <View
+            style={{
+              width: 7,
+              height: 7,
+              borderRadius: 4,
+              backgroundColor: '#F7D34B',
+            }}
+          />
+        </View>
+
+      </View>
+    );
+
+    if (!cliccabile) {
+      return contenuto;
+    }
+
+    return (
+      <TouchableOpacity
+        activeOpacity={0.76}
+        onPress={onPress}
+        style={{
+          marginBottom: 12,
+        }}
+      >
+        {contenuto}
+      </TouchableOpacity>
+    );
+  };
+
+  return (
+    <Screen showScrollTop>
+
+      <Back onPress={onBack} />
+
+      <View
+        style={{
+          marginTop: 8,
+          marginBottom: 18,
+          padding: 20,
+          borderRadius: 27,
+          backgroundColor:
+            'rgba(7,35,55,0.96)',
+          borderWidth: 1,
+          borderColor:
+            'rgba(56,189,248,0.40)',
+        }}
+      >
+
+        <View
+          style={{
+            width: 52,
+            height: 52,
+            borderRadius: 17,
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor:
+              'rgba(56,189,248,0.14)',
+          }}
+        >
+          <Ionicons
+            name="car-outline"
+            size={29}
+            color="#38BDF8"
+          />
+        </View>
+
+        <Text
+          style={{
+            color: '#38BDF8',
+            fontSize: 10,
+            fontWeight: '900',
+            letterSpacing: 1.3,
+            marginTop: 15,
+          }}
+        >
+          CONTROLLO VEICOLI
+        </Text>
+
+        <Text
+          style={{
+            color: '#FFFFFF',
+            fontSize: 28,
+            fontWeight: '900',
+            marginTop: 4,
+          }}
+        >
+          Controllo Targa
+        </Text>
+
+        <Text
+          style={{
+            color: '#9CB7CA',
+            fontSize: 12,
+            lineHeight: 18,
+            fontWeight: '700',
+            marginTop: 7,
+          }}
+        >
+          Memorizza lettere e numeri.
+          Poi individua la targa corretta
+          tra quelle quasi identiche.
+        </Text>
+
+      </View>
+
+
+      {fase === 'intro' && (
+        <View
+          style={{
+            padding: 22,
+            borderRadius: 24,
+            backgroundColor:
+              'rgba(255,255,255,0.055)',
+            borderWidth: 1,
+            borderColor:
+              'rgba(56,189,248,0.22)',
+          }}
+        >
+
+          <Ionicons
+            name="scan-outline"
+            size={44}
+            color="#38BDF8"
+          />
+
+          <Text
+            style={{
+              color: '#FFFFFF',
+              fontSize: 20,
+              fontWeight: '900',
+              marginTop: 14,
+            }}
+          >
+            Occhio alla targa
+          </Text>
+
+          <Text
+            style={{
+              color: '#A7B7CA',
+              fontSize: 13,
+              lineHeight: 20,
+              marginTop: 8,
+            }}
+          >
+            La targa rimarrà visibile solo
+            per pochi secondi. Memorizzala
+            e riconoscila tra quattro
+            alternative molto simili.
+          </Text>
+
+          <TouchableOpacity
+            activeOpacity={0.85}
+            onPress={preparaRound}
+            style={{
+              marginTop: 22,
+              minHeight: 52,
+              borderRadius: 18,
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: '#147FAF',
+            }}
+          >
+            <Text
+              style={{
+                color: '#FFFFFF',
+                fontSize: 14,
+                fontWeight: '900',
+              }}
+            >
+              INIZIA CONTROLLO
+            </Text>
+          </TouchableOpacity>
+
+        </View>
+      )}
+
+
+      {fase !== 'intro' &&
+       fase !== 'gameover' && (
+        <>
+
+          <View
+            style={{
+              flexDirection: 'row',
+              justifyContent:
+                'space-between',
+              marginBottom: 15,
+            }}
+          >
+
+            <View
+              style={{
+                flex: 1,
+                marginRight: 6,
+                padding: 11,
+                borderRadius: 16,
+                alignItems: 'center',
+                backgroundColor:
+                  'rgba(255,255,255,0.05)',
+              }}
+            >
+              <Text style={{
+                color: '#8399B9',
+                fontSize: 9,
+                fontWeight: '900',
+              }}>
+                ROUND
+              </Text>
+
+              <Text style={{
+                color: '#FFFFFF',
+                fontSize: 19,
+                fontWeight: '900',
+              }}>
+                {round}
+              </Text>
+            </View>
+
+            <View
+              style={{
+                flex: 1,
+                marginHorizontal: 6,
+                padding: 11,
+                borderRadius: 16,
+                alignItems: 'center',
+                backgroundColor:
+                  'rgba(255,255,255,0.05)',
+              }}
+            >
+              <Text style={{
+                color: '#8399B9',
+                fontSize: 9,
+                fontWeight: '900',
+              }}>
+                PUNTI
+              </Text>
+
+              <Text style={{
+                color: '#38BDF8',
+                fontSize: 19,
+                fontWeight: '900',
+              }}>
+                {punteggio}
+              </Text>
+            </View>
+
+            <View
+              style={{
+                flex: 1,
+                marginLeft: 6,
+                padding: 11,
+                borderRadius: 16,
+                alignItems: 'center',
+                backgroundColor:
+                  'rgba(255,255,255,0.05)',
+              }}
+            >
+              <Text style={{
+                color: '#8399B9',
+                fontSize: 9,
+                fontWeight: '900',
+              }}>
+                VITE
+              </Text>
+
+              <Text style={{
+                color: '#FF7B85',
+                fontSize: 17,
+                fontWeight: '900',
+              }}>
+                {'♥'.repeat(vite)}
+              </Text>
+            </View>
+
+          </View>
+
+
+          {fase === 'memorizza' && (
+            <View
+              style={{
+                padding: 22,
+                borderRadius: 23,
+                backgroundColor:
+                  'rgba(7,24,39,0.96)',
+                borderWidth: 1,
+                borderColor:
+                  'rgba(56,189,248,0.30)',
+              }}
+            >
+
+              <Text
+                style={{
+                  color: '#38BDF8',
+                  fontSize: 13,
+                  fontWeight: '900',
+                  textAlign: 'center',
+                  marginBottom: 8,
+                }}
+              >
+                👁️ MEMORIZZA
+              </Text>
+
+              <Text
+                style={{
+                  color: '#8EA5BA',
+                  fontSize: 10,
+                  fontWeight: '800',
+                  textAlign: 'center',
+                  marginBottom: 18,
+                }}
+              >
+                Hai circa {tempoMemoria} secondi
+              </Text>
+
+              <Targa
+                valore={targaCorretta}
+              />
+
+            </View>
+          )}
+
+
+          {fase === 'scegli' && (
+            <>
+
+              <Text
+                style={{
+                  color: '#FFFFFF',
+                  fontSize: 16,
+                  fontWeight: '900',
+                  textAlign: 'center',
+                  marginBottom: 5,
+                }}
+              >
+                Qual era la targa?
+              </Text>
+
+              <Text
+                style={{
+                  color: '#899DB7',
+                  fontSize: 11,
+                  fontWeight: '700',
+                  textAlign: 'center',
+                  marginBottom: 16,
+                }}
+              >
+                Attenzione: cambia un solo
+                carattere.
+              </Text>
+
+              {opzioni.map(
+                (targa, index) => (
+                  <Targa
+                    key={`${targa}-${index}`}
+                    valore={targa}
+                    cliccabile
+                    onPress={() =>
+                      scegliTarga(targa)
+                    }
+                  />
+                )
+              )}
+
+            </>
+          )}
+
+
+          {fase === 'feedback' && (
+            <View
+              style={{
+                padding: 21,
+                borderRadius: 22,
+                alignItems: 'center',
+                backgroundColor:
+                  feedback === 'corretto'
+                    ? 'rgba(67,230,161,0.10)'
+                    : 'rgba(255,100,110,0.10)',
+                borderWidth: 1,
+                borderColor:
+                  feedback === 'corretto'
+                    ? 'rgba(67,230,161,0.35)'
+                    : 'rgba(255,100,110,0.30)',
+              }}
+            >
+
+              <Ionicons
+                name={
+                  feedback === 'corretto'
+                    ? 'checkmark-circle-outline'
+                    : 'close-circle-outline'
+                }
+                size={40}
+                color={
+                  feedback === 'corretto'
+                    ? '#43E6A1'
+                    : '#FF7B85'
+                }
+              />
+
+              <Text
+                style={{
+                  color:
+                    feedback === 'corretto'
+                      ? '#43E6A1'
+                      : '#FF7B85',
+                  fontSize: 15,
+                  fontWeight: '900',
+                  marginTop: 10,
+                }}
+              >
+                {feedback === 'corretto'
+                  ? 'TARGA CORRETTA'
+                  : 'TARGA ERRATA'}
+              </Text>
+
+              {feedback === 'errore' && (
+                <View
+                  style={{
+                    width: '100%',
+                    marginTop: 16,
+                  }}
+                >
+                  <Text
+                    style={{
+                      color: '#92A7BD',
+                      fontSize: 10,
+                      fontWeight: '800',
+                      textAlign: 'center',
+                      marginBottom: 7,
+                    }}
+                  >
+                    Era questa:
+                  </Text>
+
+                  <Targa
+                    valore={targaCorretta}
+                  />
+                </View>
+              )}
+
+            </View>
+          )}
+
+        </>
+      )}
+
+
+      {fase === 'gameover' && (
+        <View
+          style={{
+            padding: 24,
+            borderRadius: 25,
+            alignItems: 'center',
+            backgroundColor:
+              'rgba(255,255,255,0.055)',
+            borderWidth: 1,
+            borderColor:
+              'rgba(255,100,110,0.30)',
+          }}
+        >
+
+          <Ionicons
+            name="car-outline"
+            size={48}
+            color="#FF7B85"
+          />
+
+          <Text
+            style={{
+              color: '#FFFFFF',
+              fontSize: 23,
+              fontWeight: '900',
+              marginTop: 14,
+            }}
+          >
+            Controllo terminato
+          </Text>
+
+          <Text
+            style={{
+              color: '#91A8C5',
+              fontSize: 12,
+              fontWeight: '800',
+              marginTop: 8,
+            }}
+          >
+            Punteggio finale
+          </Text>
+
+          <Text
+            style={{
+              color: '#38BDF8',
+              fontSize: 38,
+              fontWeight: '900',
+              marginTop: 4,
+            }}
+          >
+            {punteggio}
+          </Text>
+
+          <Text
+            style={{
+              color: '#A4B4CA',
+              fontSize: 12,
+              marginTop: 3,
+            }}
+          >
+            Round raggiunto: {round}
+          </Text>
+
+          <TouchableOpacity
+            activeOpacity={0.85}
+            onPress={nuovaPartita}
+            style={{
+              width: '100%',
+              minHeight: 52,
+              marginTop: 22,
+              borderRadius: 18,
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: '#147FAF',
+            }}
+          >
+            <Text
+              style={{
+                color: '#FFFFFF',
+                fontSize: 14,
+                fontWeight: '900',
+              }}
+            >
+              NUOVO CONTROLLO
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            onPress={onBack}
+            style={{
+              paddingVertical: 13,
+              marginTop: 5,
+            }}
+          >
+            <Text
+              style={{
+                color: '#94A9C5',
+                fontSize: 12,
+                fontWeight: '800',
+              }}
+            >
+              Torna alla Sala Giochi
+            </Text>
+          </TouchableOpacity>
+
+        </View>
+      )}
+
+    </Screen>
+  );
+}
+
+
+
+function MazzoChiaviGameScreen({ onBack }) {
+
+  const destinazioniChiavi = [
+    'Cancello principale',
+    'Magazzino',
+    'Ufficio direttore',
+    'Deposito',
+    'Sala tecnica',
+    'Centrale operativa',
+    'Archivio',
+    'Ingresso dipendenti',
+    'Locale allarmi',
+    'Parcheggio',
+  ];
+
+  const mescola = (array) =>
+    [...array].sort(() => Math.random() - 0.5);
+
+  const [fase, setFase] =
+    React.useState('intro');
+
+  const [round, setRound] =
+    React.useState(1);
+
+  const [vite, setVite] =
+    React.useState(3);
+
+  const [punteggio, setPunteggio] =
+    React.useState(0);
+
+  const [chiavi, setChiavi] =
+    React.useState([]);
+
+  const [destinazioneRichiesta, setDestinazioneRichiesta] =
+    React.useState('');
+
+  const [numeroCorretto, setNumeroCorretto] =
+    React.useState(null);
+
+  const [feedback, setFeedback] =
+    React.useState('');
+
+  const [tempoMemoria, setTempoMemoria] =
+    React.useState(4);
+
+  const timeoutRef = React.useRef(null);
+
+  const pulisciTimer = () => {
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+    }
+  };
+
+  React.useEffect(() => {
+    return () => {
+      pulisciTimer();
+    };
+  }, []);
+
+  const preparaRound = () => {
+
+    pulisciTimer();
+    setFeedback('');
+
+    const quantita =
+      Math.min(
+        8,
+        4 + Math.floor((round - 1) / 2)
+      );
+
+    const destinazioni =
+      mescola(destinazioniChiavi).slice(
+        0,
+        quantita
+      );
+
+    const numeriDisponibili =
+      mescola(
+        Array.from(
+          { length: 20 },
+          (_, i) => i + 1
+        )
+      ).slice(0, quantita);
+
+    const nuovoMazzo =
+      destinazioni.map((destinazione, index) => ({
+        destinazione,
+        numero: numeriDisponibili[index],
+      }));
+
+    const scelta =
+      nuovoMazzo[
+        Math.floor(
+          Math.random() *
+          nuovoMazzo.length
+        )
+      ];
+
+    setChiavi(nuovoMazzo);
+    setDestinazioneRichiesta(
+      scelta.destinazione
+    );
+    setNumeroCorretto(
+      scelta.numero
+    );
+
+    const secondi =
+      Math.max(
+        1.8,
+        4.5 - (round - 1) * 0.22
+      );
+
+    setTempoMemoria(
+      Math.ceil(secondi)
+    );
+
+    setFase('memorizza');
+
+    timeoutRef.current =
+      setTimeout(() => {
+        setFase('scegli');
+      }, secondi * 1000);
+  };
+
+  React.useEffect(() => {
+    if (fase === 'attesa') {
+      preparaRound();
+    }
+  }, [fase]);
+
+  const scegliChiave = (numero) => {
+
+    if (fase !== 'scegli') return;
+
+    if (numero === numeroCorretto) {
+
+      const bonus =
+        120 +
+        chiavi.length * 20 +
+        (round - 1) * 15;
+
+      setPunteggio(
+        (prev) => prev + bonus
+      );
+
+      setFeedback('corretto');
+      setFase('feedback');
+
+      timeoutRef.current =
+        setTimeout(() => {
+          setRound((prev) => prev + 1);
+          setFase('attesa');
+        }, 1000);
+
+      return;
+    }
+
+    const nuoveVite = vite - 1;
+
+    setVite(nuoveVite);
+    setFeedback('errore');
+    setFase('feedback');
+
+    if (nuoveVite <= 0) {
+
+      timeoutRef.current =
+        setTimeout(() => {
+          setFase('gameover');
+        }, 1000);
+
+      return;
+    }
+
+    timeoutRef.current =
+      setTimeout(() => {
+        setRound((prev) => prev + 1);
+        setFase('attesa');
+      }, 1000);
+  };
+
+  const nuovaPartita = () => {
+    pulisciTimer();
+    setRound(1);
+    setVite(3);
+    setPunteggio(0);
+    setChiavi([]);
+    setFeedback('');
+    setDestinazioneRichiesta('');
+    setNumeroCorretto(null);
+    setFase('intro');
+  };
+
+  const ChiaveCard = ({
+    item,
+    mostraDestinazione,
+    cliccabile = false,
+  }) => {
+
+    const contenuto = (
+      <View
+        style={{
+          minHeight: 108,
+          borderRadius: 20,
+          padding: 13,
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor:
+            'rgba(255,255,255,0.055)',
+          borderWidth: 1,
+          borderColor:
+            'rgba(251,191,36,0.28)',
+        }}
+      >
+
+        <View
+          style={{
+            width: 43,
+            height: 43,
+            borderRadius: 14,
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor:
+              'rgba(251,191,36,0.13)',
+          }}
+        >
+          <Ionicons
+            name="key-outline"
+            size={25}
+            color="#FBBF24"
+          />
+        </View>
+
+        <Text
+          style={{
+            color: '#FBBF24',
+            fontSize: 20,
+            fontWeight: '900',
+            marginTop: 8,
+          }}
+        >
+          #{item.numero}
+        </Text>
+
+        {mostraDestinazione && (
+          <Text
+            style={{
+              color: '#FFFFFF',
+              fontSize: 10,
+              lineHeight: 14,
+              fontWeight: '800',
+              textAlign: 'center',
+              marginTop: 5,
+            }}
+          >
+            {item.destinazione}
+          </Text>
+        )}
+
+      </View>
+    );
+
+    if (!cliccabile) {
+      return (
+        <View
+          style={{
+            width: '48.5%',
+            marginBottom: 11,
+          }}
+        >
+          {contenuto}
+        </View>
+      );
+    }
+
+    return (
+      <TouchableOpacity
+        activeOpacity={0.76}
+        onPress={() =>
+          scegliChiave(item.numero)
+        }
+        style={{
+          width: '48.5%',
+          marginBottom: 11,
+        }}
+      >
+        {contenuto}
+      </TouchableOpacity>
+    );
+  };
+
+  return (
+    <Screen showScrollTop>
+
+      <Back onPress={onBack} />
+
+      <View
+        style={{
+          marginTop: 8,
+          marginBottom: 18,
+          padding: 20,
+          borderRadius: 27,
+          backgroundColor:
+            'rgba(48,37,6,0.95)',
+          borderWidth: 1,
+          borderColor:
+            'rgba(251,191,36,0.40)',
+        }}
+      >
+
+        <View
+          style={{
+            width: 52,
+            height: 52,
+            borderRadius: 17,
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor:
+              'rgba(251,191,36,0.14)',
+          }}
+        >
+          <Ionicons
+            name="key-outline"
+            size={29}
+            color="#FBBF24"
+          />
+        </View>
+
+        <Text
+          style={{
+            color: '#FBBF24',
+            fontSize: 10,
+            fontWeight: '900',
+            letterSpacing: 1.3,
+            marginTop: 15,
+          }}
+        >
+          CONTROLLO CHIAVI
+        </Text>
+
+        <Text
+          style={{
+            color: '#FFFFFF',
+            fontSize: 28,
+            fontWeight: '900',
+            marginTop: 4,
+          }}
+        >
+          Il Mazzo di Chiavi
+        </Text>
+
+        <Text
+          style={{
+            color: '#C3B78E',
+            fontSize: 12,
+            lineHeight: 18,
+            fontWeight: '700',
+            marginTop: 7,
+          }}
+        >
+          Memorizza a quale ambiente
+          appartiene ogni chiave e trova
+          quella giusta al momento richiesto.
+        </Text>
+
+      </View>
+
+
+      {fase === 'intro' && (
+        <View
+          style={{
+            padding: 22,
+            borderRadius: 24,
+            backgroundColor:
+              'rgba(255,255,255,0.055)',
+            borderWidth: 1,
+            borderColor:
+              'rgba(251,191,36,0.22)',
+          }}
+        >
+
+          <Ionicons
+            name="key-outline"
+            size={45}
+            color="#FBBF24"
+          />
+
+          <Text
+            style={{
+              color: '#FFFFFF',
+              fontSize: 20,
+              fontWeight: '900',
+              marginTop: 14,
+            }}
+          >
+            Qual era la chiave?
+          </Text>
+
+          <Text
+            style={{
+              color: '#AEB7C5',
+              fontSize: 13,
+              lineHeight: 20,
+              marginTop: 8,
+            }}
+          >
+            Ogni chiave ha un numero e una
+            destinazione. Memorizza gli
+            abbinamenti prima che le
+            etichette scompaiano.
+          </Text>
+
+          <TouchableOpacity
+            activeOpacity={0.85}
+            onPress={preparaRound}
+            style={{
+              marginTop: 22,
+              minHeight: 52,
+              borderRadius: 18,
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: '#A87908',
+            }}
+          >
+            <Text
+              style={{
+                color: '#FFFFFF',
+                fontSize: 14,
+                fontWeight: '900',
+              }}
+            >
+              PRENDI IL MAZZO
+            </Text>
+          </TouchableOpacity>
+
+        </View>
+      )}
+
+
+      {fase !== 'intro' &&
+       fase !== 'gameover' && (
+        <>
+
+          <View
+            style={{
+              flexDirection: 'row',
+              justifyContent:
+                'space-between',
+              marginBottom: 15,
+            }}
+          >
+
+            <View
+              style={{
+                flex: 1,
+                marginRight: 6,
+                padding: 11,
+                borderRadius: 16,
+                alignItems: 'center',
+                backgroundColor:
+                  'rgba(255,255,255,0.05)',
+              }}
+            >
+              <Text style={{
+                color: '#8399B9',
+                fontSize: 9,
+                fontWeight: '900',
+              }}>
+                ROUND
+              </Text>
+
+              <Text style={{
+                color: '#FFFFFF',
+                fontSize: 19,
+                fontWeight: '900',
+              }}>
+                {round}
+              </Text>
+            </View>
+
+            <View
+              style={{
+                flex: 1,
+                marginHorizontal: 6,
+                padding: 11,
+                borderRadius: 16,
+                alignItems: 'center',
+                backgroundColor:
+                  'rgba(255,255,255,0.05)',
+              }}
+            >
+              <Text style={{
+                color: '#8399B9',
+                fontSize: 9,
+                fontWeight: '900',
+              }}>
+                PUNTI
+              </Text>
+
+              <Text style={{
+                color: '#FBBF24',
+                fontSize: 19,
+                fontWeight: '900',
+              }}>
+                {punteggio}
+              </Text>
+            </View>
+
+            <View
+              style={{
+                flex: 1,
+                marginLeft: 6,
+                padding: 11,
+                borderRadius: 16,
+                alignItems: 'center',
+                backgroundColor:
+                  'rgba(255,255,255,0.05)',
+              }}
+            >
+              <Text style={{
+                color: '#8399B9',
+                fontSize: 9,
+                fontWeight: '900',
+              }}>
+                VITE
+              </Text>
+
+              <Text style={{
+                color: '#FF7B85',
+                fontSize: 17,
+                fontWeight: '900',
+              }}>
+                {'♥'.repeat(vite)}
+              </Text>
+            </View>
+
+          </View>
+
+
+          {fase === 'memorizza' && (
+            <>
+
+              <Text
+                style={{
+                  color: '#FBBF24',
+                  fontSize: 13,
+                  fontWeight: '900',
+                  textAlign: 'center',
+                  marginBottom: 5,
+                }}
+              >
+                🔑 MEMORIZZA IL MAZZO
+              </Text>
+
+              <Text
+                style={{
+                  color: '#8FA0B5',
+                  fontSize: 10,
+                  fontWeight: '700',
+                  textAlign: 'center',
+                  marginBottom: 16,
+                }}
+              >
+                Hai circa {tempoMemoria} secondi
+              </Text>
+
+              <View
+                style={{
+                  flexDirection: 'row',
+                  flexWrap: 'wrap',
+                  justifyContent:
+                    'space-between',
+                }}
+              >
+                {chiavi.map((item) => (
+                  <ChiaveCard
+                    key={item.numero}
+                    item={item}
+                    mostraDestinazione
+                  />
+                ))}
+              </View>
+
+            </>
+          )}
+
+
+          {fase === 'scegli' && (
+            <>
+
+              <View
+                style={{
+                  marginBottom: 16,
+                  padding: 16,
+                  borderRadius: 19,
+                  backgroundColor:
+                    'rgba(251,191,36,0.09)',
+                  borderWidth: 1,
+                  borderColor:
+                    'rgba(251,191,36,0.24)',
+                }}
+              >
+                <Text
+                  style={{
+                    color: '#9F9473',
+                    fontSize: 9,
+                    fontWeight: '900',
+                    letterSpacing: 1,
+                  }}
+                >
+                  TROVA LA CHIAVE DI
+                </Text>
+
+                <Text
+                  style={{
+                    color: '#FFFFFF',
+                    fontSize: 19,
+                    fontWeight: '900',
+                    marginTop: 4,
+                  }}
+                >
+                  {destinazioneRichiesta}
+                </Text>
+              </View>
+
+              <View
+                style={{
+                  flexDirection: 'row',
+                  flexWrap: 'wrap',
+                  justifyContent:
+                    'space-between',
+                }}
+              >
+                {chiavi.map((item) => (
+                  <ChiaveCard
+                    key={item.numero}
+                    item={item}
+                    cliccabile
+                    mostraDestinazione={false}
+                  />
+                ))}
+              </View>
+
+            </>
+          )}
+
+
+          {fase === 'feedback' && (
+            <View
+              style={{
+                padding: 21,
+                borderRadius: 22,
+                alignItems: 'center',
+                backgroundColor:
+                  feedback === 'corretto'
+                    ? 'rgba(67,230,161,0.10)'
+                    : 'rgba(255,100,110,0.10)',
+                borderWidth: 1,
+                borderColor:
+                  feedback === 'corretto'
+                    ? 'rgba(67,230,161,0.35)'
+                    : 'rgba(255,100,110,0.30)',
+              }}
+            >
+
+              <Ionicons
+                name={
+                  feedback === 'corretto'
+                    ? 'checkmark-circle-outline'
+                    : 'close-circle-outline'
+                }
+                size={40}
+                color={
+                  feedback === 'corretto'
+                    ? '#43E6A1'
+                    : '#FF7B85'
+                }
+              />
+
+              <Text
+                style={{
+                  color:
+                    feedback === 'corretto'
+                      ? '#43E6A1'
+                      : '#FF7B85',
+                  fontSize: 15,
+                  fontWeight: '900',
+                  marginTop: 9,
+                }}
+              >
+                {feedback === 'corretto'
+                  ? 'CHIAVE CORRETTA'
+                  : 'CHIAVE SBAGLIATA'}
+              </Text>
+
+              {feedback === 'errore' && (
+                <Text
+                  style={{
+                    color: '#ABB7C6',
+                    fontSize: 12,
+                    textAlign: 'center',
+                    marginTop: 7,
+                  }}
+                >
+                  La chiave corretta era la
+                  {' '}
+                  #{numeroCorretto}
+                </Text>
+              )}
+
+            </View>
+          )}
+
+        </>
+      )}
+
+
+      {fase === 'gameover' && (
+        <View
+          style={{
+            padding: 24,
+            borderRadius: 25,
+            alignItems: 'center',
+            backgroundColor:
+              'rgba(255,255,255,0.055)',
+            borderWidth: 1,
+            borderColor:
+              'rgba(255,100,110,0.30)',
+          }}
+        >
+
+          <Ionicons
+            name="key-outline"
+            size={48}
+            color="#FF7B85"
+          />
+
+          <Text
+            style={{
+              color: '#FFFFFF',
+              fontSize: 23,
+              fontWeight: '900',
+              marginTop: 14,
+            }}
+          >
+            Mazzo riconsegnato
+          </Text>
+
+          <Text
+            style={{
+              color: '#91A8C5',
+              fontSize: 12,
+              fontWeight: '800',
+              marginTop: 8,
+            }}
+          >
+            Punteggio finale
+          </Text>
+
+          <Text
+            style={{
+              color: '#FBBF24',
+              fontSize: 38,
+              fontWeight: '900',
+              marginTop: 4,
+            }}
+          >
+            {punteggio}
+          </Text>
+
+          <Text
+            style={{
+              color: '#A4B4CA',
+              fontSize: 12,
+              marginTop: 3,
+            }}
+          >
+            Round raggiunto: {round}
+          </Text>
+
+          <TouchableOpacity
+            activeOpacity={0.85}
+            onPress={nuovaPartita}
+            style={{
+              width: '100%',
+              minHeight: 52,
+              marginTop: 22,
+              borderRadius: 18,
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: '#A87908',
+            }}
+          >
+            <Text
+              style={{
+                color: '#FFFFFF',
+                fontSize: 14,
+                fontWeight: '900',
+              }}
+            >
+              NUOVO MAZZO
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            onPress={onBack}
+            style={{
+              paddingVertical: 13,
+              marginTop: 5,
+            }}
+          >
+            <Text
+              style={{
+                color: '#94A9C5',
+                fontSize: 12,
+                fontWeight: '800',
+              }}
+            >
+              Torna alla Sala Giochi
+            </Text>
+          </TouchableOpacity>
+
+        </View>
+      )}
+
+    </Screen>
+  );
+}
+
+
+
+function FineTurnoGameScreen({ onBack }) {
+
+  const attivitaDisponibili = [
+    { nome: 'Riconsegna chiavi', icona: 'key-outline' },
+    { nome: 'Firma registro', icona: 'create-outline' },
+    { nome: 'Controlla radio', icona: 'radio-outline' },
+    { nome: 'Chiudi accessi', icona: 'lock-closed-outline' },
+    { nome: 'Segnala anomalie', icona: 'warning-outline' },
+    { nome: 'Consegna badge', icona: 'card-outline' },
+    { nome: 'Spegni torcia', icona: 'flashlight-outline' },
+    { nome: 'Verifica locali', icona: 'business-outline' },
+    { nome: 'Passaggio consegne', icona: 'clipboard-outline' },
+    { nome: 'Controlla allarmi', icona: 'notifications-outline' },
+  ];
+
+  const mescola = (array) =>
+    [...array].sort(() => Math.random() - 0.5);
+
+  const [fase, setFase] = React.useState('intro');
+  const [round, setRound] = React.useState(1);
+  const [vite, setVite] = React.useState(3);
+  const [punteggio, setPunteggio] = React.useState(0);
+
+  const [listaRound, setListaRound] =
+    React.useState([]);
+
+  const [daFare, setDaFare] =
+    React.useState([]);
+
+  const [selezionate, setSelezionate] =
+    React.useState([]);
+
+  const [feedback, setFeedback] =
+    React.useState('');
+
+  const [tempoMemoria, setTempoMemoria] =
+    React.useState(4);
+
+  const timeoutRef = React.useRef(null);
+
+  const pulisciTimer = () => {
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+    }
+  };
+
+  React.useEffect(() => {
+    return () => {
+      pulisciTimer();
+    };
+  }, []);
+
+  const preparaRound = () => {
+
+    pulisciTimer();
+
+    setFeedback('');
+    setSelezionate([]);
+
+    const quantita =
+      Math.min(
+        8,
+        5 + Math.floor((round - 1) / 2)
+      );
+
+    const elementi =
+      mescola(attivitaDisponibili).slice(
+        0,
+        quantita
+      );
+
+    const quantiDaFare =
+      Math.min(
+        4,
+        2 + Math.floor((round - 1) / 3)
+      );
+
+    const indiciDaFare =
+      new Set(
+        mescola(
+          elementi.map((_, i) => i)
+        ).slice(0, quantiDaFare)
+      );
+
+    const lista =
+      elementi.map((item, index) => ({
+        ...item,
+        completata:
+          !indiciDaFare.has(index),
+      }));
+
+    const aperte =
+      lista
+        .filter((item) => !item.completata)
+        .map((item) => item.nome);
+
+    setListaRound(lista);
+    setDaFare(aperte);
+
+    const secondi =
+      Math.max(
+        2,
+        5 - (round - 1) * 0.22
+      );
+
+    setTempoMemoria(
+      Math.ceil(secondi)
+    );
+
+    setFase('memorizza');
+
+    timeoutRef.current =
+      setTimeout(() => {
+        setFase('scegli');
+      }, secondi * 1000);
+  };
+
+  React.useEffect(() => {
+    if (fase === 'attesa') {
+      preparaRound();
+    }
+  }, [fase]);
+
+  const toggleAttivita = (nome) => {
+
+    if (fase !== 'scegli') return;
+
+    setSelezionate((prev) =>
+      prev.includes(nome)
+        ? prev.filter((x) => x !== nome)
+        : [...prev, nome]
+    );
+  };
+
+  const conferma = () => {
+
+    if (fase !== 'scegli') return;
+
+    const corrette =
+      [...daFare].sort();
+
+    const risposta =
+      [...selezionate].sort();
+
+    const ok =
+      corrette.length === risposta.length &&
+      corrette.every(
+        (x, i) => x === risposta[i]
+      );
+
+    if (ok) {
+
+      const bonus =
+        120 +
+        daFare.length * 35 +
+        (round - 1) * 15;
+
+      setPunteggio(
+        (prev) => prev + bonus
+      );
+
+      setFeedback('corretto');
+      setFase('feedback');
+
+      timeoutRef.current =
+        setTimeout(() => {
+          setRound((prev) => prev + 1);
+          setFase('attesa');
+        }, 1100);
+
+      return;
+    }
+
+    const nuoveVite = vite - 1;
+
+    setVite(nuoveVite);
+    setFeedback('errore');
+    setFase('feedback');
+
+    if (nuoveVite <= 0) {
+      timeoutRef.current =
+        setTimeout(() => {
+          setFase('gameover');
+        }, 1200);
+
+      return;
+    }
+
+    timeoutRef.current =
+      setTimeout(() => {
+        setRound((prev) => prev + 1);
+        setFase('attesa');
+      }, 1200);
+  };
+
+  const nuovaPartita = () => {
+    pulisciTimer();
+    setRound(1);
+    setVite(3);
+    setPunteggio(0);
+    setListaRound([]);
+    setDaFare([]);
+    setSelezionate([]);
+    setFeedback('');
+    setFase('intro');
+  };
+
+  return (
+    <Screen showScrollTop>
+
+      <Back onPress={onBack} />
+
+      <View
+        style={{
+          marginTop: 8,
+          marginBottom: 18,
+          padding: 20,
+          borderRadius: 27,
+          backgroundColor:
+            'rgba(48,18,31,0.95)',
+          borderWidth: 1,
+          borderColor:
+            'rgba(251,113,133,0.40)',
+        }}
+      >
+
+        <View
+          style={{
+            width: 52,
+            height: 52,
+            borderRadius: 17,
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor:
+              'rgba(251,113,133,0.14)',
+          }}
+        >
+          <Ionicons
+            name="time-outline"
+            size={29}
+            color="#FB7185"
+          />
+        </View>
+
+        <Text
+          style={{
+            color: '#FB7185',
+            fontSize: 10,
+            fontWeight: '900',
+            letterSpacing: 1.3,
+            marginTop: 15,
+          }}
+        >
+          CHIUSURA SERVIZIO
+        </Text>
+
+        <Text
+          style={{
+            color: '#FFFFFF',
+            fontSize: 28,
+            fontWeight: '900',
+            marginTop: 4,
+          }}
+        >
+          Fine Turno
+        </Text>
+
+        <Text
+          style={{
+            color: '#C1A1AC',
+            fontSize: 12,
+            lineHeight: 18,
+            fontWeight: '700',
+            marginTop: 7,
+          }}
+        >
+          Prima di andare via ricordati
+          cosa manca ancora da fare.
+        </Text>
+
+      </View>
+
+
+      {fase === 'intro' && (
+        <View
+          style={{
+            padding: 22,
+            borderRadius: 24,
+            backgroundColor:
+              'rgba(255,255,255,0.055)',
+            borderWidth: 1,
+            borderColor:
+              'rgba(251,113,133,0.22)',
+          }}
+        >
+
+          <Ionicons
+            name="checkbox-outline"
+            size={45}
+            color="#FB7185"
+          />
+
+          <Text
+            style={{
+              color: '#FFFFFF',
+              fontSize: 20,
+              fontWeight: '900',
+              marginTop: 14,
+            }}
+          >
+            Puoi andare a casa?
+          </Text>
+
+          <Text
+            style={{
+              color: '#AEB7C6',
+              fontSize: 13,
+              lineHeight: 20,
+              marginTop: 8,
+            }}
+          >
+            Osserva la checklist.
+            Alcune attività sono già completate,
+            altre no. Quando scompare dovrai
+            ricordare quali erano ancora da fare.
+          </Text>
+
+          <TouchableOpacity
+            activeOpacity={0.85}
+            onPress={preparaRound}
+            style={{
+              marginTop: 22,
+              minHeight: 52,
+              borderRadius: 18,
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: '#AD4258',
+            }}
+          >
+            <Text
+              style={{
+                color: '#FFFFFF',
+                fontSize: 14,
+                fontWeight: '900',
+              }}
+            >
+              INIZIA FINE TURNO
+            </Text>
+          </TouchableOpacity>
+
+        </View>
+      )}
+
+
+      {fase !== 'intro' &&
+       fase !== 'gameover' && (
+        <>
+
+          <View
+            style={{
+              flexDirection: 'row',
+              justifyContent: 'space-between',
+              marginBottom: 15,
+            }}
+          >
+
+            <View style={{
+              flex: 1,
+              marginRight: 6,
+              padding: 11,
+              borderRadius: 16,
+              alignItems: 'center',
+              backgroundColor:
+                'rgba(255,255,255,0.05)',
+            }}>
+              <Text style={{
+                color: '#8399B9',
+                fontSize: 9,
+                fontWeight: '900',
+              }}>
+                ROUND
+              </Text>
+
+              <Text style={{
+                color: '#FFFFFF',
+                fontSize: 19,
+                fontWeight: '900',
+              }}>
+                {round}
+              </Text>
+            </View>
+
+            <View style={{
+              flex: 1,
+              marginHorizontal: 6,
+              padding: 11,
+              borderRadius: 16,
+              alignItems: 'center',
+              backgroundColor:
+                'rgba(255,255,255,0.05)',
+            }}>
+              <Text style={{
+                color: '#8399B9',
+                fontSize: 9,
+                fontWeight: '900',
+              }}>
+                PUNTI
+              </Text>
+
+              <Text style={{
+                color: '#FB7185',
+                fontSize: 19,
+                fontWeight: '900',
+              }}>
+                {punteggio}
+              </Text>
+            </View>
+
+            <View style={{
+              flex: 1,
+              marginLeft: 6,
+              padding: 11,
+              borderRadius: 16,
+              alignItems: 'center',
+              backgroundColor:
+                'rgba(255,255,255,0.05)',
+            }}>
+              <Text style={{
+                color: '#8399B9',
+                fontSize: 9,
+                fontWeight: '900',
+              }}>
+                VITE
+              </Text>
+
+              <Text style={{
+                color: '#FF7B85',
+                fontSize: 17,
+                fontWeight: '900',
+              }}>
+                {'♥'.repeat(vite)}
+              </Text>
+            </View>
+
+          </View>
+
+
+          {fase === 'memorizza' && (
+            <>
+
+              <Text
+                style={{
+                  color: '#FB7185',
+                  fontSize: 13,
+                  fontWeight: '900',
+                  textAlign: 'center',
+                  marginBottom: 5,
+                }}
+              >
+                🕐 MEMORIZZA LA CHECKLIST
+              </Text>
+
+              <Text
+                style={{
+                  color: '#8FA0B5',
+                  fontSize: 10,
+                  fontWeight: '700',
+                  textAlign: 'center',
+                  marginBottom: 16,
+                }}
+              >
+                Hai circa {tempoMemoria} secondi
+              </Text>
+
+              {listaRound.map(
+                (item, index) => (
+                  <View
+                    key={`${item.nome}-${index}`}
+                    style={{
+                      minHeight: 57,
+                      marginBottom: 9,
+                      paddingHorizontal: 14,
+                      borderRadius: 17,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      backgroundColor:
+                        item.completata
+                          ? 'rgba(67,230,161,0.07)'
+                          : 'rgba(251,113,133,0.09)',
+                      borderWidth: 1,
+                      borderColor:
+                        item.completata
+                          ? 'rgba(67,230,161,0.22)'
+                          : 'rgba(251,113,133,0.28)',
+                    }}
+                  >
+
+                    <Ionicons
+                      name={
+                        item.completata
+                          ? 'checkmark-circle-outline'
+                          : 'ellipse-outline'
+                      }
+                      size={24}
+                      color={
+                        item.completata
+                          ? '#43E6A1'
+                          : '#FB7185'
+                      }
+                    />
+
+                    <Ionicons
+                      name={item.icona}
+                      size={20}
+                      color="#AAB6C7"
+                      style={{
+                        marginLeft: 11,
+                      }}
+                    />
+
+                    <Text
+                      style={{
+                        flex: 1,
+                        color: '#FFFFFF',
+                        fontSize: 12,
+                        fontWeight: '800',
+                        marginLeft: 10,
+                      }}
+                    >
+                      {item.nome}
+                    </Text>
+
+                    <Text
+                      style={{
+                        color:
+                          item.completata
+                            ? '#43E6A1'
+                            : '#FB7185',
+                        fontSize: 9,
+                        fontWeight: '900',
+                      }}
+                    >
+                      {item.completata
+                        ? 'FATTO'
+                        : 'DA FARE'}
+                    </Text>
+
+                  </View>
+                )
+              )}
+
+            </>
+          )}
+
+
+          {fase === 'scegli' && (
+            <>
+
+              <Text
+                style={{
+                  color: '#FFFFFF',
+                  fontSize: 16,
+                  fontWeight: '900',
+                  textAlign: 'center',
+                  marginBottom: 5,
+                }}
+              >
+                Cosa mancava?
+              </Text>
+
+              <Text
+                style={{
+                  color: '#8FA0B5',
+                  fontSize: 11,
+                  textAlign: 'center',
+                  marginBottom: 15,
+                }}
+              >
+                Seleziona tutte le attività
+                ancora da completare.
+              </Text>
+
+              {listaRound.map(
+                (item, index) => {
+
+                  const attiva =
+                    selezionate.includes(
+                      item.nome
+                    );
+
+                  return (
+                    <TouchableOpacity
+                      key={`${item.nome}-${index}`}
+                      activeOpacity={0.78}
+                      onPress={() =>
+                        toggleAttivita(
+                          item.nome
+                        )
+                      }
+                      style={{
+                        minHeight: 57,
+                        marginBottom: 9,
+                        paddingHorizontal: 14,
+                        borderRadius: 17,
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        backgroundColor:
+                          attiva
+                            ? 'rgba(251,113,133,0.14)'
+                            : 'rgba(255,255,255,0.055)',
+                        borderWidth: 1,
+                        borderColor:
+                          attiva
+                            ? '#FB7185'
+                            : 'rgba(255,255,255,0.10)',
+                      }}
+                    >
+
+                      <Ionicons
+                        name={
+                          attiva
+                            ? 'checkbox-outline'
+                            : 'square-outline'
+                        }
+                        size={24}
+                        color={
+                          attiva
+                            ? '#FB7185'
+                            : '#7D8EA8'
+                        }
+                      />
+
+                      <Ionicons
+                        name={item.icona}
+                        size={20}
+                        color="#AAB6C7"
+                        style={{
+                          marginLeft: 11,
+                        }}
+                      />
+
+                      <Text
+                        style={{
+                          flex: 1,
+                          color: '#FFFFFF',
+                          fontSize: 12,
+                          fontWeight: '800',
+                          marginLeft: 10,
+                        }}
+                      >
+                        {item.nome}
+                      </Text>
+
+                    </TouchableOpacity>
+                  );
+                }
+              )}
+
+              <TouchableOpacity
+                activeOpacity={0.84}
+                onPress={conferma}
+                style={{
+                  minHeight: 52,
+                  marginTop: 7,
+                  borderRadius: 18,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  backgroundColor: '#AD4258',
+                }}
+              >
+                <Text
+                  style={{
+                    color: '#FFFFFF',
+                    fontSize: 13,
+                    fontWeight: '900',
+                  }}
+                >
+                  CONFERMA CHECKLIST
+                </Text>
+              </TouchableOpacity>
+
+            </>
+          )}
+
+
+          {fase === 'feedback' && (
+            <View
+              style={{
+                padding: 21,
+                borderRadius: 22,
+                alignItems: 'center',
+                backgroundColor:
+                  feedback === 'corretto'
+                    ? 'rgba(67,230,161,0.10)'
+                    : 'rgba(255,100,110,0.10)',
+                borderWidth: 1,
+                borderColor:
+                  feedback === 'corretto'
+                    ? 'rgba(67,230,161,0.35)'
+                    : 'rgba(255,100,110,0.30)',
+              }}
+            >
+
+              <Ionicons
+                name={
+                  feedback === 'corretto'
+                    ? 'checkmark-done-outline'
+                    : 'close-circle-outline'
+                }
+                size={41}
+                color={
+                  feedback === 'corretto'
+                    ? '#43E6A1'
+                    : '#FF7B85'
+                }
+              />
+
+              <Text
+                style={{
+                  color:
+                    feedback === 'corretto'
+                      ? '#43E6A1'
+                      : '#FF7B85',
+                  fontSize: 15,
+                  fontWeight: '900',
+                  marginTop: 10,
+                }}
+              >
+                {feedback === 'corretto'
+                  ? 'TURNO CHIUSO CORRETTAMENTE'
+                  : 'HAI DIMENTICATO QUALCOSA'}
+              </Text>
+
+              {feedback === 'errore' && (
+                <Text
+                  style={{
+                    color: '#ABB7C6',
+                    fontSize: 11,
+                    lineHeight: 17,
+                    textAlign: 'center',
+                    marginTop: 7,
+                  }}
+                >
+                  Restavano da fare:
+                  {' '}
+                  {daFare.join(' · ')}
+                </Text>
+              )}
+
+            </View>
+          )}
+
+        </>
+      )}
+
+
+      {fase === 'gameover' && (
+        <View
+          style={{
+            padding: 24,
+            borderRadius: 25,
+            alignItems: 'center',
+            backgroundColor:
+              'rgba(255,255,255,0.055)',
+            borderWidth: 1,
+            borderColor:
+              'rgba(255,100,110,0.30)',
+          }}
+        >
+
+          <Ionicons
+            name="time-outline"
+            size={48}
+            color="#FF7B85"
+          />
+
+          <Text
+            style={{
+              color: '#FFFFFF',
+              fontSize: 23,
+              fontWeight: '900',
+              marginTop: 14,
+            }}
+          >
+            Turno non chiuso
+          </Text>
+
+          <Text
+            style={{
+              color: '#91A8C5',
+              fontSize: 12,
+              fontWeight: '800',
+              marginTop: 8,
+            }}
+          >
+            Punteggio finale
+          </Text>
+
+          <Text
+            style={{
+              color: '#FB7185',
+              fontSize: 38,
+              fontWeight: '900',
+              marginTop: 4,
+            }}
+          >
+            {punteggio}
+          </Text>
+
+          <Text
+            style={{
+              color: '#A4B4CA',
+              fontSize: 12,
+              marginTop: 3,
+            }}
+          >
+            Round raggiunto: {round}
+          </Text>
+
+          <TouchableOpacity
+            activeOpacity={0.85}
+            onPress={nuovaPartita}
+            style={{
+              width: '100%',
+              minHeight: 52,
+              marginTop: 22,
+              borderRadius: 18,
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: '#AD4258',
+            }}
+          >
+            <Text
+              style={{
+                color: '#FFFFFF',
+                fontSize: 14,
+                fontWeight: '900',
+              }}
+            >
+              RIPROVA IL TURNO
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            onPress={onBack}
+            style={{
+              paddingVertical: 13,
+              marginTop: 5,
+            }}
+          >
+            <Text
+              style={{
+                color: '#94A9C5',
+                fontSize: 12,
+                fontWeight: '800',
+              }}
+            >
+              Torna alla Sala Giochi
+            </Text>
+          </TouchableOpacity>
+
+        </View>
+      )}
+
+    </Screen>
+  );
+}
+
+
+
+function NonAddormentartiGameScreen({ onBack }) {
+
+  const [fase, setFase] =
+    React.useState('intro');
+
+  const [round, setRound] =
+    React.useState(1);
+
+  const [vite, setVite] =
+    React.useState(3);
+
+  const [punteggio, setPunteggio] =
+    React.useState(0);
+
+  const [segnale, setSegnale] =
+    React.useState('attesa');
+
+  const [feedback, setFeedback] =
+    React.useState('');
+
+  const timeoutRef = React.useRef(null);
+  const comparsaRef = React.useRef(null);
+
+  const pulisciTimer = () => {
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+    }
+
+    if (comparsaRef.current) {
+      clearTimeout(comparsaRef.current);
+      comparsaRef.current = null;
+    }
+  };
+
+  React.useEffect(() => {
+    return () => {
+      pulisciTimer();
+    };
+  }, []);
+
+  const perdiVita = (tipo) => {
+
+    const nuoveVite = vite - 1;
+
+    setVite(nuoveVite);
+    setFeedback(tipo);
+    setFase('feedback');
+
+    if (nuoveVite <= 0) {
+      timeoutRef.current =
+        setTimeout(() => {
+          setFase('gameover');
+        }, 900);
+
+      return;
+    }
+
+    timeoutRef.current =
+      setTimeout(() => {
+        setRound((prev) => prev + 1);
+        setFase('attesaRound');
+      }, 900);
+  };
+
+  const preparaRound = () => {
+
+    pulisciTimer();
+
+    setFeedback('');
+    setSegnale('attesa');
+    setFase('gioco');
+
+    const attesaMin =
+      Math.max(
+        500,
+        1200 - (round - 1) * 45
+      );
+
+    const attesaMax =
+      Math.max(
+        1000,
+        2400 - (round - 1) * 70
+      );
+
+    const ritardo =
+      attesaMin +
+      Math.random() *
+        (attesaMax - attesaMin);
+
+    comparsaRef.current =
+      setTimeout(() => {
+
+        const veroSegnale =
+          Math.random() < 0.68;
+
+        if (veroSegnale) {
+
+          setSegnale('sveglia');
+
+          const tempoRisposta =
+            Math.max(
+              650,
+              1500 - (round - 1) * 55
+            );
+
+          timeoutRef.current =
+            setTimeout(() => {
+              setSegnale('scaduto');
+              perdiVita('troppoLento');
+            }, tempoRisposta);
+
+        } else {
+
+          setSegnale('falso');
+
+          const durataFalso =
+            Math.max(
+              700,
+              1300 - (round - 1) * 35
+            );
+
+          timeoutRef.current =
+            setTimeout(() => {
+
+              setPunteggio(
+                (prev) =>
+                  prev +
+                  80 +
+                  (round - 1) * 10
+              );
+
+              setFeedback('bravoFalso');
+              setFase('feedback');
+
+              timeoutRef.current =
+                setTimeout(() => {
+                  setRound(
+                    (prev) => prev + 1
+                  );
+                  setFase('attesaRound');
+                }, 750);
+
+            }, durataFalso);
+        }
+
+      }, ritardo);
+  };
+
+  React.useEffect(() => {
+    if (fase === 'attesaRound') {
+      preparaRound();
+    }
+  }, [fase]);
+
+  const tocca = () => {
+
+    if (fase !== 'gioco') return;
+
+    if (segnale === 'attesa') {
+      pulisciTimer();
+      perdiVita('troppoPresto');
+      return;
+    }
+
+    if (segnale === 'falso') {
+      pulisciTimer();
+      perdiVita('falsoSegnale');
+      return;
+    }
+
+    if (segnale === 'sveglia') {
+
+      pulisciTimer();
+
+      const bonus =
+        120 +
+        (round - 1) * 18;
+
+      setPunteggio(
+        (prev) => prev + bonus
+      );
+
+      setFeedback('corretto');
+      setFase('feedback');
+
+      timeoutRef.current =
+        setTimeout(() => {
+          setRound((prev) => prev + 1);
+          setFase('attesaRound');
+        }, 750);
+    }
+  };
+
+  const nuovaPartita = () => {
+    pulisciTimer();
+
+    setRound(1);
+    setVite(3);
+    setPunteggio(0);
+    setSegnale('attesa');
+    setFeedback('');
+    setFase('intro');
+  };
+
+  return (
+    <Screen>
+
+      <Back onPress={onBack} />
+
+      <View
+        style={{
+          marginTop: 8,
+          marginBottom: 18,
+          padding: 20,
+          borderRadius: 27,
+          backgroundColor:
+            'rgba(54,27,7,0.95)',
+          borderWidth: 1,
+          borderColor:
+            'rgba(249,115,22,0.40)',
+        }}
+      >
+
+        <View
+          style={{
+            width: 52,
+            height: 52,
+            borderRadius: 17,
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor:
+              'rgba(249,115,22,0.14)',
+          }}
+        >
+          <Ionicons
+            name="flash-outline"
+            size={29}
+            color="#F97316"
+          />
+        </View>
+
+        <Text
+          style={{
+            color: '#F97316',
+            fontSize: 10,
+            fontWeight: '900',
+            letterSpacing: 1.3,
+            marginTop: 15,
+          }}
+        >
+          TURNO NOTTURNO · RIFLESSI
+        </Text>
+
+        <Text
+          style={{
+            color: '#FFFFFF',
+            fontSize: 28,
+            fontWeight: '900',
+            marginTop: 4,
+          }}
+        >
+          Non Addormentarti!
+        </Text>
+
+        <Text
+          style={{
+            color: '#C1A58F',
+            fontSize: 12,
+            lineHeight: 18,
+            fontWeight: '700',
+            marginTop: 7,
+          }}
+        >
+          Rimani concentrato. Tocca soltanto
+          quando compare il vero segnale.
+        </Text>
+
+      </View>
+
+
+      {fase === 'intro' && (
+        <View
+          style={{
+            padding: 22,
+            borderRadius: 24,
+            backgroundColor:
+              'rgba(255,255,255,0.055)',
+            borderWidth: 1,
+            borderColor:
+              'rgba(249,115,22,0.22)',
+          }}
+        >
+
+          <Ionicons
+            name="eye-outline"
+            size={45}
+            color="#F97316"
+          />
+
+          <Text
+            style={{
+              color: '#FFFFFF',
+              fontSize: 20,
+              fontWeight: '900',
+              marginTop: 14,
+            }}
+          >
+            Occhi aperti
+          </Text>
+
+          <Text
+            style={{
+              color: '#AEB7C5',
+              fontSize: 13,
+              lineHeight: 20,
+              marginTop: 8,
+            }}
+          >
+            Quando compare SVEGLIA! tocca
+            subito il pulsante. Se compare
+            FALSO SEGNALE non fare nulla.
+            Attenzione anche a non anticipare.
+          </Text>
+
+          <TouchableOpacity
+            activeOpacity={0.85}
+            onPress={preparaRound}
+            style={{
+              marginTop: 22,
+              minHeight: 52,
+              borderRadius: 18,
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: '#C7580D',
+            }}
+          >
+            <Text
+              style={{
+                color: '#FFFFFF',
+                fontSize: 14,
+                fontWeight: '900',
+              }}
+            >
+              INIZIA IL TURNO
+            </Text>
+          </TouchableOpacity>
+
+        </View>
+      )}
+
+
+      {fase !== 'intro' &&
+       fase !== 'gameover' && (
+        <>
+
+          <View
+            style={{
+              flexDirection: 'row',
+              justifyContent:
+                'space-between',
+              marginBottom: 15,
+            }}
+          >
+
+            <View style={{
+              flex: 1,
+              marginRight: 6,
+              padding: 11,
+              borderRadius: 16,
+              alignItems: 'center',
+              backgroundColor:
+                'rgba(255,255,255,0.05)',
+            }}>
+              <Text style={{
+                color: '#8399B9',
+                fontSize: 9,
+                fontWeight: '900',
+              }}>
+                ROUND
+              </Text>
+
+              <Text style={{
+                color: '#FFFFFF',
+                fontSize: 19,
+                fontWeight: '900',
+              }}>
+                {round}
+              </Text>
+            </View>
+
+            <View style={{
+              flex: 1,
+              marginHorizontal: 6,
+              padding: 11,
+              borderRadius: 16,
+              alignItems: 'center',
+              backgroundColor:
+                'rgba(255,255,255,0.05)',
+            }}>
+              <Text style={{
+                color: '#8399B9',
+                fontSize: 9,
+                fontWeight: '900',
+              }}>
+                PUNTI
+              </Text>
+
+              <Text style={{
+                color: '#F97316',
+                fontSize: 19,
+                fontWeight: '900',
+              }}>
+                {punteggio}
+              </Text>
+            </View>
+
+            <View style={{
+              flex: 1,
+              marginLeft: 6,
+              padding: 11,
+              borderRadius: 16,
+              alignItems: 'center',
+              backgroundColor:
+                'rgba(255,255,255,0.05)',
+            }}>
+              <Text style={{
+                color: '#8399B9',
+                fontSize: 9,
+                fontWeight: '900',
+              }}>
+                VITE
+              </Text>
+
+              <Text style={{
+                color: '#FF7B85',
+                fontSize: 17,
+                fontWeight: '900',
+              }}>
+                {'♥'.repeat(vite)}
+              </Text>
+            </View>
+
+          </View>
+
+
+          {fase === 'gioco' && (
+            <TouchableOpacity
+              activeOpacity={0.88}
+              onPress={tocca}
+              style={{
+                minHeight: 300,
+                borderRadius: 28,
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: 24,
+
+                backgroundColor:
+                  segnale === 'sveglia'
+                    ? 'rgba(249,115,22,0.18)'
+                    : segnale === 'falso'
+                    ? 'rgba(82,100,125,0.12)'
+                    : 'rgba(7,18,34,0.96)',
+
+                borderWidth: 1.5,
+
+                borderColor:
+                  segnale === 'sveglia'
+                    ? '#F97316'
+                    : segnale === 'falso'
+                    ? '#708197'
+                    : 'rgba(249,115,22,0.18)',
+              }}
+            >
+
+              <Ionicons
+                name={
+                  segnale === 'sveglia'
+                    ? 'flash-outline'
+                    : segnale === 'falso'
+                    ? 'cloud-outline'
+                    : 'moon-outline'
+                }
+                size={62}
+                color={
+                  segnale === 'sveglia'
+                    ? '#F97316'
+                    : segnale === 'falso'
+                    ? '#71849C'
+                    : '#53647D'
+                }
+              />
+
+              <Text
+                style={{
+                  color:
+                    segnale === 'sveglia'
+                      ? '#FFFFFF'
+                      : segnale === 'falso'
+                      ? '#9DAABC'
+                      : '#78899F',
+
+                  fontSize:
+                    segnale === 'sveglia'
+                      ? 31
+                      : 21,
+
+                  fontWeight: '900',
+                  textAlign: 'center',
+                  marginTop: 18,
+                }}
+              >
+                {segnale === 'sveglia'
+                  ? 'SVEGLIA!'
+                  : segnale === 'falso'
+                  ? 'FALSO SEGNALE'
+                  : 'Resta concentrato...'}
+              </Text>
+
+              <Text
+                style={{
+                  color: '#8797AC',
+                  fontSize: 11,
+                  fontWeight: '700',
+                  textAlign: 'center',
+                  marginTop: 10,
+                }}
+              >
+                {segnale === 'sveglia'
+                  ? 'TOCCA SUBITO'
+                  : segnale === 'falso'
+                  ? 'NON TOCCARE'
+                  : 'Aspetta il segnale'}
+              </Text>
+
+            </TouchableOpacity>
+          )}
+
+
+          {fase === 'feedback' && (
+            <View
+              style={{
+                minHeight: 190,
+                padding: 24,
+                borderRadius: 24,
+                alignItems: 'center',
+                justifyContent: 'center',
+
+                backgroundColor:
+                  feedback === 'corretto' ||
+                  feedback === 'bravoFalso'
+                    ? 'rgba(67,230,161,0.10)'
+                    : 'rgba(255,100,110,0.10)',
+
+                borderWidth: 1,
+
+                borderColor:
+                  feedback === 'corretto' ||
+                  feedback === 'bravoFalso'
+                    ? 'rgba(67,230,161,0.35)'
+                    : 'rgba(255,100,110,0.30)',
+              }}
+            >
+
+              <Ionicons
+                name={
+                  feedback === 'corretto' ||
+                  feedback === 'bravoFalso'
+                    ? 'checkmark-circle-outline'
+                    : 'alert-circle-outline'
+                }
+                size={45}
+                color={
+                  feedback === 'corretto' ||
+                  feedback === 'bravoFalso'
+                    ? '#43E6A1'
+                    : '#FF7B85'
+                }
+              />
+
+              <Text
+                style={{
+                  color:
+                    feedback === 'corretto' ||
+                    feedback === 'bravoFalso'
+                      ? '#43E6A1'
+                      : '#FF7B85',
+
+                  fontSize: 16,
+                  fontWeight: '900',
+                  textAlign: 'center',
+                  marginTop: 12,
+                }}
+              >
+                {feedback === 'corretto'
+                  ? 'RIFLESSI PERFETTI!'
+                  : feedback === 'bravoFalso'
+                  ? 'OTTIMO, NON SEI CASCATO NEL TRANELLO'
+                  : feedback === 'falsoSegnale'
+                  ? 'ERA UN FALSO SEGNALE!'
+                  : feedback === 'troppoPresto'
+                  ? 'HAI TOCCATO TROPPO PRESTO!'
+                  : 'TI SEI ADDORMENTATO!'}
+              </Text>
+
+            </View>
+          )}
+
+        </>
+      )}
+
+
+      {fase === 'gameover' && (
+        <View
+          style={{
+            padding: 24,
+            borderRadius: 25,
+            alignItems: 'center',
+            backgroundColor:
+              'rgba(255,255,255,0.055)',
+            borderWidth: 1,
+            borderColor:
+              'rgba(255,100,110,0.30)',
+          }}
+        >
+
+          <Ionicons
+            name="bed-outline"
+            size={49}
+            color="#FF7B85"
+          />
+
+          <Text
+            style={{
+              color: '#FFFFFF',
+              fontSize: 23,
+              fontWeight: '900',
+              marginTop: 14,
+            }}
+          >
+            Ti sei addormentato!
+          </Text>
+
+          <Text
+            style={{
+              color: '#91A8C5',
+              fontSize: 12,
+              fontWeight: '800',
+              marginTop: 8,
+            }}
+          >
+            Punteggio finale
+          </Text>
+
+          <Text
+            style={{
+              color: '#F97316',
+              fontSize: 38,
+              fontWeight: '900',
+              marginTop: 4,
+            }}
+          >
+            {punteggio}
+          </Text>
+
+          <Text
+            style={{
+              color: '#A4B4CA',
+              fontSize: 12,
+              marginTop: 3,
+            }}
+          >
+            Round raggiunto: {round}
+          </Text>
+
+          <TouchableOpacity
+            activeOpacity={0.85}
+            onPress={nuovaPartita}
+            style={{
+              width: '100%',
+              minHeight: 52,
+              marginTop: 22,
+              borderRadius: 18,
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: '#C7580D',
+            }}
+          >
+            <Text
+              style={{
+                color: '#FFFFFF',
+                fontSize: 14,
+                fontWeight: '900',
+              }}
+            >
+              RESTA SVEGLIO
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            onPress={onBack}
+            style={{
+              paddingVertical: 13,
+              marginTop: 5,
+            }}
+          >
+            <Text
+              style={{
+                color: '#94A9C5',
+                fontSize: 12,
+                fontWeight: '800',
+              }}
+            >
+              Torna alla Sala Giochi
+            </Text>
+          </TouchableOpacity>
+
+        </View>
+      )}
+
+    </Screen>
+  );
+}
+
+
+
+function SfidaColleghiGameScreen({ onBack }) {
+
+  const domande = [
+    {
+      domanda: 'Quale oggetto appartiene normalmente a una ronda?',
+      corretto: 'Torcia',
+      opzioni: ['Torcia', 'Padella', 'Cuscino'],
+      icona: 'flashlight-outline',
+    },
+    {
+      domanda: 'Quale elemento controlli prima di chiudere un accesso?',
+      corretto: 'Che non ci sia nessuno',
+      opzioni: [
+        'Che non ci sia nessuno',
+        'Il meteo',
+        'La batteria del telefono',
+      ],
+      icona: 'lock-closed-outline',
+    },
+    {
+      domanda: 'Quale tra questi è un mezzo di comunicazione?',
+      corretto: 'Radio',
+      opzioni: ['Radio', 'Chiave', 'Badge'],
+      icona: 'radio-outline',
+    },
+    {
+      domanda: 'Se trovi una porta aperta fuori orario cosa fai?',
+      corretto: 'Verifico e segnalo',
+      opzioni: [
+        'Verifico e segnalo',
+        'La ignoro',
+        'Me ne vado',
+      ],
+      icona: 'warning-outline',
+    },
+    {
+      domanda: 'Cosa indica normalmente un badge?',
+      corretto: 'Autorizzazione o identificazione',
+      opzioni: [
+        'Autorizzazione o identificazione',
+        'Un allarme',
+        'Una telecamera',
+      ],
+      icona: 'card-outline',
+    },
+    {
+      domanda: 'Quale elemento può essere un checkpoint?',
+      corretto: 'Cancello',
+      opzioni: ['Cancello', 'Caffettiera', 'Divano'],
+      icona: 'walk-outline',
+    },
+    {
+      domanda: 'Quale controllo richiede più attenzione visiva?',
+      corretto: 'Videosorveglianza',
+      opzioni: [
+        'Videosorveglianza',
+        'Pausa',
+        'Cambio turno',
+      ],
+      icona: 'videocam-outline',
+    },
+    {
+      domanda: 'Se una targa è AB 123 CD, quale è identica?',
+      corretto: 'AB 123 CD',
+      opzioni: [
+        'AB 123 CD',
+        'AB 132 CD',
+        'AD 123 CB',
+      ],
+      icona: 'car-outline',
+    },
+    {
+      domanda: 'Quale elemento è più legato al passaggio consegne?',
+      corretto: 'Informazioni importanti',
+      opzioni: [
+        'Informazioni importanti',
+        'Playlist musicale',
+        'Foto personali',
+      ],
+      icona: 'clipboard-outline',
+    },
+    {
+      domanda: 'Se ricevi una comunicazione radio cosa devi fare prima?',
+      corretto: 'Ascoltare attentamente',
+      opzioni: [
+        'Ascoltare attentamente',
+        'Parlare sopra',
+        'Spegnere la radio',
+      ],
+      icona: 'headset-outline',
+    },
+    {
+      domanda: 'Quale tra questi segnala una possibile anomalia?',
+      corretto: 'Porta forzata',
+      opzioni: [
+        'Porta forzata',
+        'Luce accesa autorizzata',
+        'Badge valido',
+      ],
+      icona: 'alert-circle-outline',
+    },
+    {
+      domanda: 'Cosa devi ricordare a fine turno?',
+      corretto: 'Le attività ancora aperte',
+      opzioni: [
+        'Le attività ancora aperte',
+        'Il risultato della partita',
+        'Il meteo di domani',
+      ],
+      icona: 'time-outline',
+    },
+  ];
+
+  const mescola = (array) =>
+    [...array].sort(() => Math.random() - 0.5);
+
+  const [fase, setFase] = React.useState('intro');
+  const [tempo, setTempo] = React.useState(30);
+  const [punteggio, setPunteggio] = React.useState(0);
+  const [corrette, setCorrette] = React.useState(0);
+  const [sbagliate, setSbagliate] = React.useState(0);
+
+  const [domanda, setDomanda] =
+    React.useState(null);
+
+  const [opzioni, setOpzioni] =
+    React.useState([]);
+
+  const [feedback, setFeedback] =
+    React.useState('');
+
+  const [ultimoIndice, setUltimoIndice] =
+    React.useState(-1);
+
+  const timerRef = React.useRef(null);
+  const feedbackRef = React.useRef(null);
+
+  const pulisciTimer = () => {
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+
+    if (feedbackRef.current) {
+      clearTimeout(feedbackRef.current);
+      feedbackRef.current = null;
+    }
+  };
+
+  React.useEffect(() => {
+    return () => {
+      pulisciTimer();
+    };
+  }, []);
+
+  const nuovaDomanda = () => {
+
+    let indice =
+      Math.floor(Math.random() * domande.length);
+
+    if (
+      domande.length > 1 &&
+      indice === ultimoIndice
+    ) {
+      indice =
+        (indice + 1) % domande.length;
+    }
+
+    const nuova =
+      domande[indice];
+
+    setUltimoIndice(indice);
+    setDomanda(nuova);
+    setOpzioni(
+      mescola(nuova.opzioni)
+    );
+    setFeedback('');
+  };
+
+  const inizia = () => {
+
+    pulisciTimer();
+
+    setTempo(30);
+    setPunteggio(0);
+    setCorrette(0);
+    setSbagliate(0);
+    setFeedback('');
+    setFase('gioco');
+
+    nuovaDomanda();
+
+    let restante = 30;
+
+    timerRef.current =
+      setInterval(() => {
+
+        restante -= 1;
+        setTempo(restante);
+
+        if (restante <= 0) {
+
+          clearInterval(timerRef.current);
+          timerRef.current = null;
+
+          setFase('fine');
+        }
+
+      }, 1000);
+  };
+
+  const rispondi = (scelta) => {
+
+    if (fase !== 'gioco' || feedback) {
+      return;
+    }
+
+    const ok =
+      scelta === domanda?.corretto;
+
+    if (ok) {
+
+      setCorrette(
+        (prev) => prev + 1
+      );
+
+      setPunteggio(
+        (prev) => prev + 100
+      );
+
+      setFeedback('corretto');
+
+    } else {
+
+      setSbagliate(
+        (prev) => prev + 1
+      );
+
+      setPunteggio(
+        (prev) => Math.max(0, prev - 25)
+      );
+
+      setFeedback('errore');
+    }
+
+    feedbackRef.current =
+      setTimeout(() => {
+
+        if (fase === 'gioco') {
+          nuovaDomanda();
+        }
+
+      }, 450);
+  };
+
+  const valutazione = () => {
+
+    if (punteggio >= 1500) {
+      return 'LEGGENDA DEL TURNO';
+    }
+
+    if (punteggio >= 1000) {
+      return 'OCCHIO DA CENTRALE';
+    }
+
+    if (punteggio >= 600) {
+      return 'OTTIMO SERVIZIO';
+    }
+
+    if (punteggio >= 300) {
+      return 'BUONA PROVA';
+    }
+
+    return 'SERVE ALLENAMENTO';
+  };
+
+  return (
+    <Screen showScrollTop>
+
+      <Back onPress={onBack} />
+
+      <View
+        style={{
+          marginTop: 8,
+          marginBottom: 18,
+          padding: 20,
+          borderRadius: 27,
+          backgroundColor:
+            'rgba(49,39,4,0.95)',
+          borderWidth: 1,
+          borderColor:
+            'rgba(234,179,8,0.42)',
+        }}
+      >
+
+        <View
+          style={{
+            width: 52,
+            height: 52,
+            borderRadius: 17,
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor:
+              'rgba(234,179,8,0.14)',
+          }}
+        >
+          <Ionicons
+            name="trophy-outline"
+            size={29}
+            color="#EAB308"
+          />
+        </View>
+
+        <Text
+          style={{
+            color: '#EAB308',
+            fontSize: 10,
+            fontWeight: '900',
+            letterSpacing: 1.3,
+            marginTop: 15,
+          }}
+        >
+          CHALLENGE · 30 SECONDI
+        </Text>
+
+        <Text
+          style={{
+            color: '#FFFFFF',
+            fontSize: 28,
+            fontWeight: '900',
+            marginTop: 4,
+          }}
+        >
+          Sfida tra Colleghi
+        </Text>
+
+        <Text
+          style={{
+            color: '#C0B88E',
+            fontSize: 12,
+            lineHeight: 18,
+            fontWeight: '700',
+            marginTop: 7,
+          }}
+        >
+          Fai più punti possibile in
+          30 secondi e sfida i colleghi
+          a battere il tuo risultato.
+        </Text>
+
+      </View>
+
+
+      {fase === 'intro' && (
+        <View
+          style={{
+            padding: 22,
+            borderRadius: 24,
+            backgroundColor:
+              'rgba(255,255,255,0.055)',
+            borderWidth: 1,
+            borderColor:
+              'rgba(234,179,8,0.22)',
+          }}
+        >
+
+          <Ionicons
+            name="people-outline"
+            size={45}
+            color="#EAB308"
+          />
+
+          <Text
+            style={{
+              color: '#FFFFFF',
+              fontSize: 20,
+              fontWeight: '900',
+              marginTop: 14,
+            }}
+          >
+            Chi è il più forte?
+          </Text>
+
+          <Text
+            style={{
+              color: '#AEB7C6',
+              fontSize: 13,
+              lineHeight: 20,
+              marginTop: 8,
+            }}
+          >
+            Hai 30 secondi.
+            Ogni risposta corretta vale
+            100 punti. Una risposta errata
+            ti fa perdere 25 punti.
+          </Text>
+
+          <TouchableOpacity
+            activeOpacity={0.85}
+            onPress={inizia}
+            style={{
+              marginTop: 22,
+              minHeight: 52,
+              borderRadius: 18,
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: '#9A7607',
+            }}
+          >
+            <Text
+              style={{
+                color: '#FFFFFF',
+                fontSize: 14,
+                fontWeight: '900',
+              }}
+            >
+              INIZIA LA SFIDA
+            </Text>
+          </TouchableOpacity>
+
+        </View>
+      )}
+
+
+      {fase === 'gioco' && (
+        <>
+
+          <View
+            style={{
+              flexDirection: 'row',
+              marginBottom: 15,
+            }}
+          >
+
+            <View
+              style={{
+                flex: 1,
+                marginRight: 7,
+                padding: 13,
+                borderRadius: 17,
+                alignItems: 'center',
+                backgroundColor:
+                  'rgba(255,255,255,0.05)',
+              }}
+            >
+              <Text
+                style={{
+                  color: '#8996AA',
+                  fontSize: 9,
+                  fontWeight: '900',
+                }}
+              >
+                TEMPO
+              </Text>
+
+              <Text
+                style={{
+                  color:
+                    tempo <= 5
+                      ? '#FF666F'
+                      : '#EAB308',
+                  fontSize: 27,
+                  fontWeight: '900',
+                }}
+              >
+                {tempo}
+              </Text>
+            </View>
+
+            <View
+              style={{
+                flex: 1,
+                marginLeft: 7,
+                padding: 13,
+                borderRadius: 17,
+                alignItems: 'center',
+                backgroundColor:
+                  'rgba(255,255,255,0.05)',
+              }}
+            >
+              <Text
+                style={{
+                  color: '#8996AA',
+                  fontSize: 9,
+                  fontWeight: '900',
+                }}
+              >
+                PUNTI
+              </Text>
+
+              <Text
+                style={{
+                  color: '#EAB308',
+                  fontSize: 27,
+                  fontWeight: '900',
+                }}
+              >
+                {punteggio}
+              </Text>
+            </View>
+
+          </View>
+
+
+          <View
+            style={{
+              padding: 20,
+              borderRadius: 23,
+              backgroundColor:
+                'rgba(15,21,32,0.97)',
+              borderWidth: 1,
+              borderColor:
+                'rgba(234,179,8,0.26)',
+            }}
+          >
+
+            <View
+              style={{
+                width: 48,
+                height: 48,
+                borderRadius: 16,
+                alignItems: 'center',
+                justifyContent: 'center',
+                backgroundColor:
+                  'rgba(234,179,8,0.12)',
+              }}
+            >
+              <Ionicons
+                name={
+                  domanda?.icona ||
+                  'help-outline'
+                }
+                size={26}
+                color="#EAB308"
+              />
+            </View>
+
+            <Text
+              style={{
+                color: '#FFFFFF',
+                fontSize: 17,
+                fontWeight: '900',
+                lineHeight: 23,
+                marginTop: 17,
+              }}
+            >
+              {domanda?.domanda}
+            </Text>
+
+          </View>
+
+
+          <View style={{ marginTop: 15 }}>
+
+            {opzioni.map(
+              (opzione, index) => (
+
+                <TouchableOpacity
+                  key={`${opzione}-${index}`}
+                  activeOpacity={0.8}
+                  disabled={!!feedback}
+                  onPress={() =>
+                    rispondi(opzione)
+                  }
+                  style={{
+                    minHeight: 58,
+                    marginBottom: 10,
+                    paddingHorizontal: 15,
+                    borderRadius: 18,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+
+                    backgroundColor:
+                      feedback === 'corretto' &&
+                      opzione === domanda?.corretto
+                        ? 'rgba(67,230,161,0.13)'
+                        : feedback === 'errore' &&
+                          opzione === domanda?.corretto
+                        ? 'rgba(67,230,161,0.09)'
+                        : 'rgba(255,255,255,0.055)',
+
+                    borderWidth: 1,
+
+                    borderColor:
+                      feedback &&
+                      opzione === domanda?.corretto
+                        ? '#43E6A1'
+                        : 'rgba(234,179,8,0.18)',
+                  }}
+                >
+
+                  <View
+                    style={{
+                      width: 30,
+                      height: 30,
+                      borderRadius: 10,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      backgroundColor:
+                        'rgba(234,179,8,0.10)',
+                    }}
+                  >
+                    <Text
+                      style={{
+                        color: '#EAB308',
+                        fontSize: 11,
+                        fontWeight: '900',
+                      }}
+                    >
+                      {index + 1}
+                    </Text>
+                  </View>
+
+                  <Text
+                    style={{
+                      flex: 1,
+                      color: '#FFFFFF',
+                      fontSize: 12,
+                      fontWeight: '800',
+                      marginLeft: 12,
+                    }}
+                  >
+                    {opzione}
+                  </Text>
+
+                </TouchableOpacity>
+              )
+            )}
+
+          </View>
+
+
+          {!!feedback && (
+            <Text
+              style={{
+                color:
+                  feedback === 'corretto'
+                    ? '#43E6A1'
+                    : '#FF7B85',
+                textAlign: 'center',
+                fontSize: 13,
+                fontWeight: '900',
+                marginTop: 2,
+              }}
+            >
+              {feedback === 'corretto'
+                ? '+100 ✓'
+                : '-25 ✕'}
+            </Text>
+          )}
+
+        </>
+      )}
+
+
+      {fase === 'fine' && (
+        <View
+          style={{
+            padding: 24,
+            borderRadius: 25,
+            alignItems: 'center',
+            backgroundColor:
+              'rgba(255,255,255,0.055)',
+            borderWidth: 1,
+            borderColor:
+              'rgba(234,179,8,0.30)',
+          }}
+        >
+
+          <Ionicons
+            name="trophy-outline"
+            size={52}
+            color="#EAB308"
+          />
+
+          <Text
+            style={{
+              color: '#FFFFFF',
+              fontSize: 24,
+              fontWeight: '900',
+              marginTop: 14,
+            }}
+          >
+            Tempo scaduto!
+          </Text>
+
+          <Text
+            style={{
+              color: '#9CAAC0',
+              fontSize: 10,
+              fontWeight: '900',
+              letterSpacing: 1,
+              marginTop: 15,
+            }}
+          >
+            PUNTEGGIO
+          </Text>
+
+          <Text
+            style={{
+              color: '#EAB308',
+              fontSize: 45,
+              fontWeight: '900',
+              marginTop: 2,
+            }}
+          >
+            {punteggio}
+          </Text>
+
+
+          <View
+            style={{
+              width: '100%',
+              flexDirection: 'row',
+              marginTop: 17,
+            }}
+          >
+
+            <View
+              style={{
+                flex: 1,
+                marginRight: 6,
+                padding: 13,
+                borderRadius: 17,
+                alignItems: 'center',
+                backgroundColor:
+                  'rgba(67,230,161,0.08)',
+              }}
+            >
+              <Text
+                style={{
+                  color: '#43E6A1',
+                  fontSize: 20,
+                  fontWeight: '900',
+                }}
+              >
+                {corrette}
+              </Text>
+
+              <Text
+                style={{
+                  color: '#8FA7A0',
+                  fontSize: 9,
+                  fontWeight: '900',
+                  marginTop: 2,
+                }}
+              >
+                CORRETTE
+              </Text>
+            </View>
+
+            <View
+              style={{
+                flex: 1,
+                marginLeft: 6,
+                padding: 13,
+                borderRadius: 17,
+                alignItems: 'center',
+                backgroundColor:
+                  'rgba(255,100,110,0.08)',
+              }}
+            >
+              <Text
+                style={{
+                  color: '#FF7B85',
+                  fontSize: 20,
+                  fontWeight: '900',
+                }}
+              >
+                {sbagliate}
+              </Text>
+
+              <Text
+                style={{
+                  color: '#A58C94',
+                  fontSize: 9,
+                  fontWeight: '900',
+                  marginTop: 2,
+                }}
+              >
+                ERRATE
+              </Text>
+            </View>
+
+          </View>
+
+
+          <View
+            style={{
+              width: '100%',
+              marginTop: 14,
+              padding: 14,
+              borderRadius: 17,
+              backgroundColor:
+                'rgba(234,179,8,0.09)',
+              borderWidth: 1,
+              borderColor:
+                'rgba(234,179,8,0.20)',
+              alignItems: 'center',
+            }}
+          >
+            <Text
+              style={{
+                color: '#EAB308',
+                fontSize: 12,
+                fontWeight: '900',
+                textAlign: 'center',
+              }}
+            >
+              {valutazione()}
+            </Text>
+          </View>
+
+
+          <TouchableOpacity
+            activeOpacity={0.85}
+            onPress={inizia}
+            style={{
+              width: '100%',
+              minHeight: 52,
+              marginTop: 20,
+              borderRadius: 18,
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: '#9A7607',
+            }}
+          >
+            <Text
+              style={{
+                color: '#FFFFFF',
+                fontSize: 14,
+                fontWeight: '900',
+              }}
+            >
+              NUOVA SFIDA
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            onPress={onBack}
+            style={{
+              paddingVertical: 13,
+              marginTop: 5,
+            }}
+          >
+            <Text
+              style={{
+                color: '#94A9C5',
+                fontSize: 12,
+                fontWeight: '800',
+              }}
+            >
+              Torna alla Sala Giochi
+            </Text>
+          </TouchableOpacity>
+
+        </View>
+      )}
+
+    </Screen>
+  );
+}
+
+
+
+function TrovaAnomaliaGameScreen({ onBack }) {
+
+  const scenari = [
+    {
+      titolo: 'Controllo accessi',
+      normali: [
+        { nome: 'Badge valido', icona: 'card-outline' },
+        { nome: 'Badge valido', icona: 'card-outline' },
+        { nome: 'Badge valido', icona: 'card-outline' },
+        { nome: 'Badge valido', icona: 'card-outline' },
+        { nome: 'Badge valido', icona: 'card-outline' },
+      ],
+      anomalia: {
+        nome: 'Badge scaduto',
+        icona: 'close-circle-outline',
+      },
+    },
+    {
+      titolo: 'Parcheggio aziendale',
+      normali: [
+        { nome: 'Auto autorizzata', icona: 'car-outline' },
+        { nome: 'Auto autorizzata', icona: 'car-outline' },
+        { nome: 'Auto autorizzata', icona: 'car-outline' },
+        { nome: 'Auto autorizzata', icona: 'car-outline' },
+        { nome: 'Auto autorizzata', icona: 'car-outline' },
+      ],
+      anomalia: {
+        nome: 'Veicolo sospetto',
+        icona: 'warning-outline',
+      },
+    },
+    {
+      titolo: 'Perimetro',
+      normali: [
+        { nome: 'Recinzione integra', icona: 'remove-outline' },
+        { nome: 'Recinzione integra', icona: 'remove-outline' },
+        { nome: 'Recinzione integra', icona: 'remove-outline' },
+        { nome: 'Recinzione integra', icona: 'remove-outline' },
+        { nome: 'Recinzione integra', icona: 'remove-outline' },
+      ],
+      anomalia: {
+        nome: 'Varco aperto',
+        icona: 'exit-outline',
+      },
+    },
+    {
+      titolo: 'Videosorveglianza',
+      normali: [
+        { nome: 'Camera online', icona: 'videocam-outline' },
+        { nome: 'Camera online', icona: 'videocam-outline' },
+        { nome: 'Camera online', icona: 'videocam-outline' },
+        { nome: 'Camera online', icona: 'videocam-outline' },
+        { nome: 'Camera online', icona: 'videocam-outline' },
+      ],
+      anomalia: {
+        nome: 'Camera offline',
+        icona: 'videocam-off-outline',
+      },
+    },
+    {
+      titolo: 'Deposito',
+      normali: [
+        { nome: 'Porta chiusa', icona: 'lock-closed-outline' },
+        { nome: 'Porta chiusa', icona: 'lock-closed-outline' },
+        { nome: 'Porta chiusa', icona: 'lock-closed-outline' },
+        { nome: 'Porta chiusa', icona: 'lock-closed-outline' },
+        { nome: 'Porta chiusa', icona: 'lock-closed-outline' },
+      ],
+      anomalia: {
+        nome: 'Porta aperta',
+        icona: 'lock-open-outline',
+      },
+    },
+    {
+      titolo: 'Dotazione',
+      normali: [
+        { nome: 'Radio presente', icona: 'radio-outline' },
+        { nome: 'Radio presente', icona: 'radio-outline' },
+        { nome: 'Radio presente', icona: 'radio-outline' },
+        { nome: 'Radio presente', icona: 'radio-outline' },
+        { nome: 'Radio presente', icona: 'radio-outline' },
+      ],
+      anomalia: {
+        nome: 'Radio mancante',
+        icona: 'help-circle-outline',
+      },
+    },
+  ];
+
+  const [fase, setFase] =
+    React.useState('intro');
+
+  const [round, setRound] =
+    React.useState(1);
+
+  const [vite, setVite] =
+    React.useState(3);
+
+  const [punteggio, setPunteggio] =
+    React.useState(0);
+
+  const [scenario, setScenario] =
+    React.useState(null);
+
+  const [elementi, setElementi] =
+    React.useState([]);
+
+  const [indiceAnomalia, setIndiceAnomalia] =
+    React.useState(-1);
+
+  const [tempo, setTempo] =
+    React.useState(6);
+
+  const [feedback, setFeedback] =
+    React.useState('');
+
+  const timerRef = React.useRef(null);
+  const timeoutRef = React.useRef(null);
+
+  const mescola = (array) =>
+    [...array].sort(() => Math.random() - 0.5);
+
+  const pulisciTimer = () => {
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+    }
+  };
+
+  React.useEffect(() => {
+    return () => {
+      pulisciTimer();
+    };
+  }, []);
+
+  const preparaRound = () => {
+
+    pulisciTimer();
+    setFeedback('');
+
+    const nuovoScenario =
+      scenari[
+        Math.floor(
+          Math.random() * scenari.length
+        )
+      ];
+
+    const quantita =
+      Math.min(
+        12,
+        6 + Math.floor((round - 1) / 2)
+      );
+
+    const base = [];
+
+    for (let i = 0; i < quantita - 1; i++) {
+      base.push(
+        nuovoScenario.normali[
+          i % nuovoScenario.normali.length
+        ]
+      );
+    }
+
+    base.push(nuovoScenario.anomalia);
+
+    const mescolati = mescola(base);
+
+    const indice =
+      mescolati.findIndex(
+        (x) =>
+          x.nome ===
+          nuovoScenario.anomalia.nome
+      );
+
+    setScenario(nuovoScenario);
+    setElementi(mescolati);
+    setIndiceAnomalia(indice);
+
+    const secondi =
+      Math.max(
+        2,
+        7 - Math.floor((round - 1) / 2)
+      );
+
+    setTempo(secondi);
+    setFase('gioco');
+
+    let restante = secondi;
+
+    timerRef.current =
+      setInterval(() => {
+
+        restante -= 1;
+        setTempo(restante);
+
+        if (restante <= 0) {
+
+          clearInterval(timerRef.current);
+          timerRef.current = null;
+
+          const nuoveVite = vite - 1;
+
+          setVite(nuoveVite);
+          setFeedback('tempo');
+          setFase('feedback');
+
+          if (nuoveVite <= 0) {
+            timeoutRef.current =
+              setTimeout(() => {
+                setFase('gameover');
+              }, 1000);
+          } else {
+            timeoutRef.current =
+              setTimeout(() => {
+                setRound(
+                  (prev) => prev + 1
+                );
+                setFase('attesa');
+              }, 1000);
+          }
+        }
+
+      }, 1000);
+  };
+
+  React.useEffect(() => {
+    if (fase === 'attesa') {
+      preparaRound();
+    }
+  }, [fase]);
+
+  const scegliElemento = (indice) => {
+
+    if (fase !== 'gioco') return;
+
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+
+    if (indice === indiceAnomalia) {
+
+      const bonus =
+        100 +
+        Math.max(0, tempo) * 25 +
+        (round - 1) * 15;
+
+      setPunteggio(
+        (prev) => prev + bonus
+      );
+
+      setFeedback('corretto');
+      setFase('feedback');
+
+      timeoutRef.current =
+        setTimeout(() => {
+          setRound((prev) => prev + 1);
+          setFase('attesa');
+        }, 900);
+
+      return;
+    }
+
+    const nuoveVite = vite - 1;
+
+    setVite(nuoveVite);
+    setFeedback('errore');
+    setFase('feedback');
+
+    if (nuoveVite <= 0) {
+      timeoutRef.current =
+        setTimeout(() => {
+          setFase('gameover');
+        }, 1000);
+
+      return;
+    }
+
+    timeoutRef.current =
+      setTimeout(() => {
+        setRound((prev) => prev + 1);
+        setFase('attesa');
+      }, 1000);
+  };
+
+  const nuovaPartita = () => {
+    pulisciTimer();
+
+    setRound(1);
+    setVite(3);
+    setPunteggio(0);
+    setScenario(null);
+    setElementi([]);
+    setIndiceAnomalia(-1);
+    setFeedback('');
+    setFase('intro');
+  };
+
+  return (
+    <Screen showScrollTop>
+
+      <Back onPress={onBack} />
+
+      <View
+        style={{
+          marginTop: 8,
+          marginBottom: 18,
+          padding: 20,
+          borderRadius: 27,
+          backgroundColor:
+            'rgba(5,47,43,0.95)',
+          borderWidth: 1,
+          borderColor:
+            'rgba(45,212,191,0.40)',
+        }}
+      >
+
+        <View
+          style={{
+            width: 52,
+            height: 52,
+            borderRadius: 17,
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor:
+              'rgba(45,212,191,0.14)',
+          }}
+        >
+          <Ionicons
+            name="search-outline"
+            size={29}
+            color="#2DD4BF"
+          />
+        </View>
+
+        <Text
+          style={{
+            color: '#2DD4BF',
+            fontSize: 10,
+            fontWeight: '900',
+            letterSpacing: 1.3,
+            marginTop: 15,
+          }}
+        >
+          CONTROLLO VISIVO
+        </Text>
+
+        <Text
+          style={{
+            color: '#FFFFFF',
+            fontSize: 28,
+            fontWeight: '900',
+            marginTop: 4,
+          }}
+        >
+          Trova l’Anomalia
+        </Text>
+
+        <Text
+          style={{
+            color: '#9CBDB8',
+            fontSize: 12,
+            lineHeight: 18,
+            fontWeight: '700',
+            marginTop: 7,
+          }}
+        >
+          Osserva tutti gli elementi e trova
+          quello che non dovrebbe essere lì.
+        </Text>
+
+      </View>
+
+
+      {fase === 'intro' && (
+        <View
+          style={{
+            padding: 22,
+            borderRadius: 24,
+            backgroundColor:
+              'rgba(255,255,255,0.055)',
+            borderWidth: 1,
+            borderColor:
+              'rgba(45,212,191,0.22)',
+          }}
+        >
+
+          <Ionicons
+            name="eye-outline"
+            size={45}
+            color="#2DD4BF"
+          />
+
+          <Text
+            style={{
+              color: '#FFFFFF',
+              fontSize: 20,
+              fontWeight: '900',
+              marginTop: 14,
+            }}
+          >
+            Qualcosa non torna
+          </Text>
+
+          <Text
+            style={{
+              color: '#AEB7C6',
+              fontSize: 13,
+              lineHeight: 20,
+              marginTop: 8,
+            }}
+          >
+            Tra molti elementi regolari
+            ce n’è sempre uno anomalo.
+            Trovalo prima che il timer
+            arrivi a zero.
+          </Text>
+
+          <TouchableOpacity
+            activeOpacity={0.85}
+            onPress={preparaRound}
+            style={{
+              marginTop: 22,
+              minHeight: 52,
+              borderRadius: 18,
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: '#158C80',
+            }}
+          >
+            <Text
+              style={{
+                color: '#FFFFFF',
+                fontSize: 14,
+                fontWeight: '900',
+              }}
+            >
+              INIZIA IL CONTROLLO
+            </Text>
+          </TouchableOpacity>
+
+        </View>
+      )}
+
+
+      {fase !== 'intro' &&
+       fase !== 'gameover' && (
+        <>
+
+          <View
+            style={{
+              flexDirection: 'row',
+              justifyContent: 'space-between',
+              marginBottom: 15,
+            }}
+          >
+
+            <View style={{
+              flex: 1,
+              marginRight: 6,
+              padding: 11,
+              borderRadius: 16,
+              alignItems: 'center',
+              backgroundColor:
+                'rgba(255,255,255,0.05)',
+            }}>
+              <Text style={{
+                color: '#8399B9',
+                fontSize: 9,
+                fontWeight: '900',
+              }}>
+                ROUND
+              </Text>
+
+              <Text style={{
+                color: '#FFFFFF',
+                fontSize: 19,
+                fontWeight: '900',
+              }}>
+                {round}
+              </Text>
+            </View>
+
+            <View style={{
+              flex: 1,
+              marginHorizontal: 6,
+              padding: 11,
+              borderRadius: 16,
+              alignItems: 'center',
+              backgroundColor:
+                'rgba(255,255,255,0.05)',
+            }}>
+              <Text style={{
+                color: '#8399B9',
+                fontSize: 9,
+                fontWeight: '900',
+              }}>
+                PUNTI
+              </Text>
+
+              <Text style={{
+                color: '#2DD4BF',
+                fontSize: 19,
+                fontWeight: '900',
+              }}>
+                {punteggio}
+              </Text>
+            </View>
+
+            <View style={{
+              flex: 1,
+              marginLeft: 6,
+              padding: 11,
+              borderRadius: 16,
+              alignItems: 'center',
+              backgroundColor:
+                'rgba(255,255,255,0.05)',
+            }}>
+              <Text style={{
+                color: '#8399B9',
+                fontSize: 9,
+                fontWeight: '900',
+              }}>
+                VITE
+              </Text>
+
+              <Text style={{
+                color: '#FF7B85',
+                fontSize: 17,
+                fontWeight: '900',
+              }}>
+                {'♥'.repeat(vite)}
+              </Text>
+            </View>
+
+          </View>
+
+
+          <View
+            style={{
+              padding: 14,
+              borderRadius: 18,
+              marginBottom: 14,
+              flexDirection: 'row',
+              justifyContent:
+                'space-between',
+              alignItems: 'center',
+              backgroundColor:
+                'rgba(45,212,191,0.08)',
+              borderWidth: 1,
+              borderColor:
+                'rgba(45,212,191,0.20)',
+            }}
+          >
+
+            <View>
+              <Text
+                style={{
+                  color: '#80A9A3',
+                  fontSize: 9,
+                  fontWeight: '900',
+                }}
+              >
+                AREA
+              </Text>
+
+              <Text
+                style={{
+                  color: '#FFFFFF',
+                  fontSize: 15,
+                  fontWeight: '900',
+                  marginTop: 3,
+                }}
+              >
+                {scenario?.titolo}
+              </Text>
+            </View>
+
+            <Text
+              style={{
+                color:
+                  tempo <= 2
+                    ? '#FF676F'
+                    : '#2DD4BF',
+                fontSize: 30,
+                fontWeight: '900',
+              }}
+            >
+              {tempo}
+            </Text>
+
+          </View>
+
+
+          {fase === 'gioco' && (
+            <View
+              style={{
+                flexDirection: 'row',
+                flexWrap: 'wrap',
+                justifyContent:
+                  'space-between',
+              }}
+            >
+
+              {elementi.map(
+                (item, index) => (
+
+                  <TouchableOpacity
+                    key={`${item.nome}-${index}`}
+                    activeOpacity={0.74}
+                    onPress={() =>
+                      scegliElemento(index)
+                    }
+                    style={{
+                      width:
+                        elementi.length >= 9
+                          ? '31.5%'
+                          : '48.5%',
+
+                      minHeight:
+                        elementi.length >= 9
+                          ? 105
+                          : 125,
+
+                      marginBottom: 11,
+                      borderRadius: 19,
+                      padding: 8,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      backgroundColor:
+                        'rgba(255,255,255,0.055)',
+                      borderWidth: 1,
+                      borderColor:
+                        'rgba(45,212,191,0.20)',
+                    }}
+                  >
+
+                    <Ionicons
+                      name={item.icona}
+                      size={
+                        elementi.length >= 9
+                          ? 26
+                          : 31
+                      }
+                      color="#8EA8AD"
+                    />
+
+                    <Text
+                      style={{
+                        color: '#FFFFFF',
+                        fontSize:
+                          elementi.length >= 9
+                            ? 9
+                            : 11,
+                        lineHeight: 14,
+                        fontWeight: '800',
+                        textAlign: 'center',
+                        marginTop: 8,
+                      }}
+                    >
+                      {item.nome}
+                    </Text>
+
+                  </TouchableOpacity>
+
+                )
+              )}
+
+            </View>
+          )}
+
+
+          {fase === 'feedback' && (
+            <View
+              style={{
+                padding: 22,
+                borderRadius: 22,
+                alignItems: 'center',
+
+                backgroundColor:
+                  feedback === 'corretto'
+                    ? 'rgba(67,230,161,0.10)'
+                    : 'rgba(255,100,110,0.10)',
+
+                borderWidth: 1,
+
+                borderColor:
+                  feedback === 'corretto'
+                    ? 'rgba(67,230,161,0.35)'
+                    : 'rgba(255,100,110,0.30)',
+              }}
+            >
+
+              <Ionicons
+                name={
+                  feedback === 'corretto'
+                    ? 'checkmark-circle-outline'
+                    : feedback === 'tempo'
+                    ? 'timer-outline'
+                    : 'close-circle-outline'
+                }
+                size={42}
+                color={
+                  feedback === 'corretto'
+                    ? '#43E6A1'
+                    : '#FF7B85'
+                }
+              />
+
+              <Text
+                style={{
+                  color:
+                    feedback === 'corretto'
+                      ? '#43E6A1'
+                      : '#FF7B85',
+                  fontSize: 15,
+                  fontWeight: '900',
+                  marginTop: 10,
+                  textAlign: 'center',
+                }}
+              >
+                {feedback === 'corretto'
+                  ? 'ANOMALIA INDIVIDUATA'
+                  : feedback === 'tempo'
+                  ? 'TEMPO SCADUTO'
+                  : 'ELEMENTO SBAGLIATO'}
+              </Text>
+
+              {feedback !== 'corretto' && (
+                <Text
+                  style={{
+                    color: '#ABB7C6',
+                    fontSize: 12,
+                    textAlign: 'center',
+                    marginTop: 8,
+                  }}
+                >
+                  L’anomalia era:
+                  {' '}
+                  {scenario?.anomalia?.nome}
+                </Text>
+              )}
+
+            </View>
+          )}
+
+        </>
+      )}
+
+
+      {fase === 'gameover' && (
+        <View
+          style={{
+            padding: 24,
+            borderRadius: 25,
+            alignItems: 'center',
+            backgroundColor:
+              'rgba(255,255,255,0.055)',
+            borderWidth: 1,
+            borderColor:
+              'rgba(255,100,110,0.30)',
+          }}
+        >
+
+          <Ionicons
+            name="search-outline"
+            size={49}
+            color="#FF7B85"
+          />
+
+          <Text
+            style={{
+              color: '#FFFFFF',
+              fontSize: 23,
+              fontWeight: '900',
+              marginTop: 14,
+            }}
+          >
+            Controllo terminato
+          </Text>
+
+          <Text
+            style={{
+              color: '#91A8C5',
+              fontSize: 12,
+              fontWeight: '800',
+              marginTop: 8,
+            }}
+          >
+            Punteggio finale
+          </Text>
+
+          <Text
+            style={{
+              color: '#2DD4BF',
+              fontSize: 38,
+              fontWeight: '900',
+              marginTop: 4,
+            }}
+          >
+            {punteggio}
+          </Text>
+
+          <Text
+            style={{
+              color: '#A4B4CA',
+              fontSize: 12,
+              marginTop: 3,
+            }}
+          >
+            Round raggiunto: {round}
+          </Text>
+
+          <TouchableOpacity
+            activeOpacity={0.85}
+            onPress={nuovaPartita}
+            style={{
+              width: '100%',
+              minHeight: 52,
+              marginTop: 22,
+              borderRadius: 18,
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: '#158C80',
+            }}
+          >
+            <Text
+              style={{
+                color: '#FFFFFF',
+                fontSize: 14,
+                fontWeight: '900',
+              }}
+            >
+              NUOVO CONTROLLO
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            onPress={onBack}
+            style={{
+              paddingVertical: 13,
+              marginTop: 5,
+            }}
+          >
+            <Text
+              style={{
+                color: '#94A9C5',
+                fontSize: 12,
+                fontWeight: '800',
+              }}
+            >
+              Torna alla Sala Giochi
+            </Text>
+          </TouchableOpacity>
+
+        </View>
+      )}
+
     </Screen>
   );
 }
