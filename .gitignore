@@ -49,3 +49,9 @@ games/*_BACKUP_*.js
 # File temporanei locali
 output.txt
 output2.txt
+
+# File locali di appoggio
+blocco_notifiche.txt
+
+# Impostazioni locali VS Code
+.vscode/extensions.json

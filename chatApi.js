@@ -270,3 +270,63 @@ export async function caricaRiepilogoConversazioni() {
 
   return riepilogo;
 }
+
+export async function inviaConsegna(destinatarioId, consegna) {
+  const user = await getCurrentUser();
+
+  const { data, error } = await supabase
+    .from('consegne_servizio')
+    .insert({
+      mittente_id: user.id,
+      destinatario_id: destinatarioId,
+      data_servizio: consegna.data || null,
+      ora_servizio: consegna.ora || null,
+      postazione: consegna.postazione || null,
+      accaduto: consegna.accaduto || null,
+      da_fare: consegna.daFare || null,
+      anomalie: consegna.anomalie || null,
+      chiavi: consegna.chiavi || null,
+      apparati: consegna.apparati || null,
+      note: consegna.note || null,
+      letta: false
+    })
+    .select()
+    .single();
+
+  if (error) throw error;
+
+  return data;
+}
+
+export async function caricaConsegneRicevute() {
+  const user = await getCurrentUser();
+
+  const { data, error } = await supabase
+    .from('consegne_servizio')
+    .select('*')
+    .eq('destinatario_id', user.id)
+    .order('created_at', { ascending: false });
+
+  if (error) throw error;
+
+  return data || [];
+}
+
+export async function segnaConsegnaComeLetta(consegnaId) {
+  const user = await getCurrentUser();
+
+  const { data, error } = await supabase
+    .from('consegne_servizio')
+    .update({
+      letta: true,
+      letta_at: new Date().toISOString()
+    })
+    .eq('id', consegnaId)
+    .eq('destinatario_id', user.id)
+    .select()
+    .single();
+
+  if (error) throw error;
+
+  return data;
+}
