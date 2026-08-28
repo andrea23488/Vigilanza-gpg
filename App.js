@@ -17,6 +17,7 @@ import {
   colleghiConConversazione,
   caricaRiepilogoConversazioni,
   segnaMessaggiComeLetti,
+  contaMessaggiNonLetti,
 } from './chatApi';
 import { caricaTurniUtente, creaTurnoUtente, aggiornaTurnoUtente, eliminaTurnoUtente } from './turniApi';
 import { supabase } from './supabase';
@@ -1578,7 +1579,7 @@ export default function App() {
 
 
   useEffect(() => {
-    if (screen !== 'listaChat') return;
+    if (screen !== 'listaChat' && screen !== 'centroNotifiche') return;
 
     let attivo = true;
 
@@ -1601,7 +1602,97 @@ export default function App() {
     };
   }, [screen]);
 
-    /* ===== LIVE LISTA CHAT ===== */
+    /* ===== LIVE CENTRO NOTIFICHE ===== */
+  useEffect(() => {
+    if (screen !== 'centroNotifiche') return;
+
+    let attivo = true;
+
+    const aggiornaCentroNotifiche = async () => {
+      try {
+        const { data: sessionData } = await supabase.auth.getSession();
+        const mioId = sessionData?.session?.user?.id;
+
+        if (!mioId) return;
+
+        const { data: messaggiNonLetti, error } = await supabase
+          .from('messaggi')
+          .select('id, mittente_id, destinatario_id, testo, created_at, letto_at')
+          .eq('destinatario_id', mioId)
+          .is('letto_at', null)
+          .order('created_at', { ascending: false });
+
+        if (error) throw error;
+
+        const listaColleghiNotifiche = await caricaColleghi();
+        const notifiche = [];
+
+        for (const msg of messaggiNonLetti || []) {
+          const mittenteId = String(msg.mittente_id || '');
+          if (!mittenteId) continue;
+
+          const collegaProfilo =
+            (listaColleghiNotifiche || []).find(
+              (c) =>
+                String(c?.altro_user_id || '') === mittenteId ||
+                String(c?.profilo?.user_id || '') === mittenteId
+            ) || null;
+
+          const profilo = collegaProfilo?.profilo || null;
+
+          const nomeMittente =
+            [profilo?.nome, profilo?.cognome]
+              .filter(Boolean)
+              .join(' ')
+              .trim() || 'Collega';
+
+          const testo = String(msg.testo || '');
+
+          const collegaNotifica = {
+            altro_user_id: mittenteId,
+            profilo: profilo || {
+              user_id: mittenteId,
+              nome: nomeMittente,
+              cognome: '',
+            },
+          };
+
+          notifiche.push({
+            id: msg.id,
+            altroUserId: mittenteId,
+            mittenteId,
+            collega: collegaNotifica,
+            nomeMittente,
+            testo,
+            ultimoMessaggio: testo,
+            nonLetti: 1,
+            isConsegna: testo.trim().startsWith('📦 CONSEGNA DI SERVIZIO'),
+            created_at: msg.created_at,
+          });
+        }
+
+        if (!attivo) return;
+
+        setRiepilogoChat(
+          notifiche.reduce((acc, n) => {
+            acc[String(n.id)] = n;
+            return acc;
+          }, {})
+        );
+
+      } catch (error) {
+        console.log('ERRORE CENTRO NOTIFICHE:', error);
+      }
+    };
+
+    aggiornaCentroNotifiche();
+
+    return () => {
+      attivo = false;
+    };
+  }, [screen]);
+
+/* ===== LIVE LISTA CHAT ===== */
   useEffect(() => {
     if (screen !== 'listaChat') return;
 
@@ -1820,6 +1911,31 @@ if (dati.tariffaStraordinario != null) {
   const [colleghi, setColleghi] = useState([]);
   const [chatColleghiIds, setChatColleghiIds] = useState([]);
   const [riepilogoChat, setRiepilogoChat] = useState({});
+  const [numeroNotifiche, setNumeroNotifiche] = useState(0);
+
+  useEffect(() => {
+    let attivo = true;
+
+    const aggiornaNumeroNotifiche = async () => {
+      try {
+        const totale = await contaMessaggiNonLetti();
+        if (attivo) setNumeroNotifiche(totale || 0);
+      } catch (error) {
+        console.log('Errore conteggio notifiche:', error);
+      }
+    };
+
+    aggiornaNumeroNotifiche();
+
+    const timerNotifiche = setInterval(() => {
+      aggiornaNumeroNotifiche();
+    }, 4000);
+
+    return () => {
+      attivo = false;
+      clearInterval(timerNotifiche);
+    };
+  }, []);
   const [colleghiInServizio, setColleghiInServizio] = useState([]);
   const [collegaSelezionato, setCollegaSelezionato] = useState(null);
 
@@ -6443,7 +6559,275 @@ const coefficienteNettoFiduciario = 0.78;
     );
   }
 
-  if (screen === 'colleghi') {
+  
+  if (screen === 'centroNotifiche') {
+    const mittentiNonLetti = Object.entries(riepilogoChat || {})
+      .filter(([_, dati]) => Number(dati?.nonLetti || 0) > 0)
+      .map(([chiaveNotifica, dati]) => {
+        const altroUserId =
+          dati?.altroUserId ||
+          dati?.mittenteId ||
+          chiaveNotifica;
+
+        const collega =
+          (colleghi || []).find(
+            (c) => (
+            String(c?.altro_user_id) === String(altroUserId) ||
+            String(c?.profilo?.user_id) === String(altroUserId)
+          )
+          ) || null;
+
+        const ultimoMessaggio =
+          dati?.ultimoMessaggio || dati?.testo || '';
+
+        const isConsegna =
+          String(ultimoMessaggio)
+            .trim()
+            .startsWith('📦 CONSEGNA DI SERVIZIO');
+
+        return {
+          id: dati?.id || chiaveNotifica,
+          altroUserId,
+          collega,
+          nomeMittente:
+            dati?.nomeMittente ||
+            [collega?.profilo?.nome, collega?.profilo?.cognome]
+              .filter(Boolean)
+              .join(' ')
+              .trim() ||
+            'Collega',
+          nonLetti: Number(dati?.nonLetti || 0),
+          ultimoMessaggio,
+          isConsegna,
+        };
+      });
+
+    return (
+      <Screen>
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{
+            paddingHorizontal: 18,
+            paddingTop: 18,
+            paddingBottom: 120,
+          }}
+        >
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              marginBottom: 24,
+            }}
+          >
+            <TouchableOpacity
+              onPress={() => setScreen('home')}
+              style={{
+                width: 44,
+                height: 44,
+                borderRadius: 22,
+                alignItems: 'center',
+                justifyContent: 'center',
+                backgroundColor: 'rgba(255,255,255,0.08)',
+                borderWidth: 1,
+                borderColor: 'rgba(141,184,255,0.30)',
+                marginRight: 14,
+              }}
+            >
+              <Ionicons name="chevron-back" size={25} color="#FFFFFF" />
+            </TouchableOpacity>
+
+            <View style={{ flex: 1 }}>
+              <Text
+                style={{
+                  color: '#FFFFFF',
+                  fontSize: 26,
+                  fontWeight: '900',
+                }}
+              >
+                Centro Notifiche
+              </Text>
+
+              <Text
+                style={{
+                  color: '#AEB9D6',
+                  fontSize: 13,
+                  fontWeight: '600',
+                  marginTop: 3,
+                }}
+              >
+                Messaggi e aggiornamenti
+              </Text>
+            </View>
+
+            <View
+              style={{
+                width: 46,
+                height: 46,
+                borderRadius: 23,
+                alignItems: 'center',
+                justifyContent: 'center',
+                backgroundColor: 'rgba(255,255,255,0.08)',
+                borderWidth: 1,
+                borderColor: 'rgba(141,184,255,0.30)',
+              }}
+            >
+              <Ionicons
+                name="notifications-outline"
+                size={24}
+                color="#FFFFFF"
+              />
+            </View>
+          </View>
+
+          {mittentiNonLetti.length === 0 ? (
+            <View
+              style={{
+                paddingVertical: 42,
+                paddingHorizontal: 20,
+                borderRadius: 22,
+                backgroundColor: 'rgba(255,255,255,0.06)',
+                borderWidth: 1,
+                borderColor: 'rgba(141,184,255,0.22)',
+                alignItems: 'center',
+              }}
+            >
+              <Ionicons
+                name="notifications-off-outline"
+                size={38}
+                color="#AEB9D6"
+              />
+
+              <Text
+                style={{
+                  color: '#FFFFFF',
+                  fontSize: 18,
+                  fontWeight: '900',
+                  marginTop: 14,
+                }}
+              >
+                Nessuna nuova notifica
+              </Text>
+
+              <Text
+                style={{
+                  color: '#AEB9D6',
+                  fontSize: 13,
+                  textAlign: 'center',
+                  marginTop: 6,
+                }}
+              >
+                Quando riceverai nuovi messaggi li troverai qui.
+              </Text>
+            </View>
+          ) : (
+            mittentiNonLetti.map((n) => (
+              <TouchableOpacity
+                key={String(n.id)}
+                activeOpacity={0.82}
+                onPress={() => {
+                const collegaNotifica =
+                  n.collega || {
+                    altro_user_id: n.altroUserId,
+                    profilo: {
+                      nome: n.nomeMittente || 'Collega',
+                      cognome: ''
+                    }
+                  };
+
+                setCollegaSelezionato(collegaNotifica);
+                setChatMessaggio('');
+                setScreen('chatCollega');
+              }}
+              style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  padding: 15,
+                  marginBottom: 12,
+                  borderRadius: 20,
+                  backgroundColor: 'rgba(255,255,255,0.07)',
+                  borderWidth: 1,
+                  borderColor: 'rgba(93,184,255,0.35)',
+                }}
+              >
+                <View
+                  style={{
+                    width: 48,
+                    height: 48,
+                    borderRadius: 24,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    backgroundColor: '#142044',
+                    marginRight: 13,
+                  }}
+                >
+                  <Ionicons
+                    name="chatbubble-ellipses-outline"
+                    size={23}
+                    color="#5DB8FF"
+                  />
+                </View>
+
+                <View style={{ flex: 1 }}>
+                  <Text
+                    style={{
+                      color: '#FFFFFF',
+                      fontSize: 16,
+                      fontWeight: '900',
+                    }}
+                  >
+                    {n.nomeMittente || 'Collega'}
+                  </Text>
+
+                  <Text
+                    numberOfLines={1}
+                    style={{
+                      color: '#AEB9D6',
+                      fontSize: 13,
+                      marginTop: 4,
+                    }}
+                  >
+                    {n.ultimoMessaggio || 'Nuovo messaggio'}
+                  </Text>
+                </View>
+
+                <View
+                  style={{
+                    minWidth: 25,
+                    height: 25,
+                    paddingHorizontal: 7,
+                    borderRadius: 13,
+                    backgroundColor: '#FF3B30',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    marginLeft: 10,
+                  }}
+                >
+                  <Text
+                    style={{
+                      color: '#FFFFFF',
+                      fontSize: 11,
+                      fontWeight: '900',
+                    }}
+                  >
+                    {n.nonLetti > 99 ? '99+' : n.nonLetti}
+                  </Text>
+                </View>
+
+                <Ionicons
+                  name="chevron-forward"
+                  size={20}
+                  color="#AEB9D6"
+                  style={{ marginLeft: 8 }}
+                />
+              </TouchableOpacity>
+            ))
+          )}
+        </ScrollView>
+      </Screen>
+    );
+  }
+
+if (screen === 'colleghi') {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: '#07142f' }}>
         <ScrollView contentContainerStyle={{ padding: 22, paddingBottom: 50 }}>
@@ -24359,6 +24743,66 @@ if (screen === 'profiloCollega') {
               </TouchableOpacity>
 
               <TouchableOpacity
+              onPress={async () => {
+              try {
+                const dati = await caricaRiepilogoConversazioni();
+                setRiepilogoChat(dati || {});
+              } catch (error) {
+                console.log('Errore aggiornamento Centro Notifiche:', error);
+              }
+              setScreen('centroNotifiche');
+            }}
+              activeOpacity={0.8}
+              style={{
+                width: 46,
+                height: 46,
+                borderRadius: 23,
+                backgroundColor: 'rgba(255,255,255,0.08)',
+                borderWidth: 1,
+                borderColor: 'rgba(141,184,255,0.30)',
+                alignItems: 'center',
+                justifyContent: 'center',
+                position: 'relative',
+                marginRight: 10,
+              }}
+            >
+              <Ionicons
+                name="notifications-outline"
+                size={24}
+                color="#FFFFFF"
+              />
+
+              {numeroNotifiche > 0 && (
+                <View
+                  style={{
+                    position: 'absolute',
+                    top: -4,
+                    right: -4,
+                    minWidth: 20,
+                    height: 20,
+                    paddingHorizontal: 5,
+                    borderRadius: 10,
+                    backgroundColor: '#FF3B30',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    borderWidth: 2,
+                    borderColor: '#101A3D',
+                  }}
+                >
+                  <Text
+                    style={{
+                      color: '#FFFFFF',
+                      fontSize: 10,
+                      fontWeight: '900',
+                    }}
+                  >
+                    {numeroNotifiche > 99 ? '99+' : numeroNotifiche}
+                  </Text>
+                </View>
+              )}
+            </TouchableOpacity>
+
+            <TouchableOpacity
                 onPress={apriProfilo}
                 activeOpacity={0.85}
                 style={{
@@ -25083,52 +25527,113 @@ if (screen === 'profiloCollega') {
       >
 
         {/* HEADER WOW */}
-        <View style={{paddingHorizontal:18,paddingTop:6,paddingBottom:10}}>
-          <View style={{flexDirection:'row',alignItems:'center',justifyContent:'space-between'}}>
-            <TouchableOpacity onPress={apriProfilo} style={{flex:1}}>
-              <Text style={{color:'#FFFFFF',fontSize:19,fontWeight:'700'}}>
-                Buon servizio,
-              </Text>
-              <Text style={{color:'#FFFFFF',fontSize:27,fontWeight:'900',lineHeight:29}}>
-                {profilo.nome} 👋
-              </Text>
-              <Text style={{color:'#AEB9D6',fontSize:13,fontWeight:'700',marginTop:5}}>
-                {profilo.azienda}{' • '}{profilo.ruolo}
-              </Text>
-            </TouchableOpacity>
+<View style={{paddingHorizontal:18,paddingTop:6,paddingBottom:10}}>
+  <View style={{flexDirection:'row',alignItems:'center'}}>
 
-            <TouchableOpacity
-              onPress={apriProfilo}
-              style={{
-                width:52,height:52,borderRadius:26,
-                borderWidth:2,borderColor:'#8DB8FF',
-                alignItems:'center',justifyContent:'center',
-                overflow:'hidden',backgroundColor:'#142044'
-              }}
-            >
-              {fotoProfilo ? (
-                <Image
-                  source={{uri:fotoProfilo}}
-                  style={{width:'100%',height:'100%'}}
-                />
-              ) : (
-                <Ionicons name="person" size={30} color="#FFFFFF" />
-              )}
-            </TouchableOpacity>
-          </View>
+    <TouchableOpacity
+      onPress={apriProfilo}
+      style={{flex:1}}
+    >
+      <Text style={{color:'#FFFFFF',fontSize:19,fontWeight:'700'}}>
+        Buon servizio,
+      </Text>
+      <Text style={{color:'#FFFFFF',fontSize:27,fontWeight:'900',lineHeight:29}}>
+        {profilo.nome} 👋
+      </Text>
+      <Text style={{color:'#AEB9D6',fontSize:13,fontWeight:'700',marginTop:5}}>
+        {profilo.azienda}{' • '}{profilo.ruolo}
+      </Text>
+    </TouchableOpacity>
 
-          <View style={{
-            alignSelf:'flex-start',marginTop:13,
-            backgroundColor:'rgba(41,255,102,0.10)',
-            borderRadius:20,paddingHorizontal:12,paddingVertical:7
-          }}>
-            <Text style={{color:'#42F56C',fontWeight:'900',fontSize:12}}>
-              {turnoInCorso ? '● IN SERVIZIO' : '🌿 FUORI SERVIZIO'}
-            </Text>
-          </View>
+    <TouchableOpacity
+      activeOpacity={0.8}
+      onPress={async () => {
+              try {
+                const dati = await caricaRiepilogoConversazioni();
+                setRiepilogoChat(dati || {});
+              } catch (error) {
+                console.log('Errore aggiornamento Centro Notifiche:', error);
+              }
+              setScreen('centroNotifiche');
+            }}
+      style={{
+        width:46,
+        height:46,
+        borderRadius:23,
+        backgroundColor:'rgba(255,255,255,0.08)',
+        borderWidth:1,
+        borderColor:'rgba(141,184,255,0.30)',
+        alignItems:'center',
+        justifyContent:'center',
+        position:'relative',
+        marginRight:12
+      }}
+    >
+      <Ionicons name="notifications-outline" size={24} color="#FFFFFF" />
+
+      {numeroNotifiche > 0 && (
+        <View style={{
+          position:'absolute',
+          top:-4,
+          right:-4,
+          minWidth:20,
+          height:20,
+          paddingHorizontal:5,
+          borderRadius:10,
+          backgroundColor:'#FF3B30',
+          alignItems:'center',
+          justifyContent:'center',
+          borderWidth:2,
+          borderColor:'#101A3D'
+        }}>
+          <Text style={{color:'#FFFFFF',fontSize:10,fontWeight:'900'}}>
+            {numeroNotifiche > 99 ? '99+' : numeroNotifiche}
+          </Text>
         </View>
+      )}
+    </TouchableOpacity>
 
-        {/* MESE */}
+    <TouchableOpacity
+      onPress={apriProfilo}
+      style={{
+        width:52,
+        height:52,
+        borderRadius:26,
+        borderWidth:2,
+        borderColor:'#8DB8FF',
+        alignItems:'center',
+        justifyContent:'center',
+        overflow:'hidden',
+        backgroundColor:'#142044'
+      }}
+    >
+      {fotoProfilo ? (
+        <Image
+          source={{uri:fotoProfilo}}
+          style={{width:'100%',height:'100%'}}
+        />
+      ) : (
+        <Ionicons name="person" size={30} color="#FFFFFF" />
+      )}
+    </TouchableOpacity>
+
+  </View>
+
+  <View style={{
+    alignSelf:'flex-start',
+    marginTop:13,
+    backgroundColor:'rgba(41,255,102,0.10)',
+    borderRadius:20,
+    paddingHorizontal:12,
+    paddingVertical:7
+  }}>
+    <Text style={{color:'#42F56C',fontWeight:'900',fontSize:12}}>
+      {turnoInCorso ? '● IN SERVIZIO' : '🌿 FUORI SERVIZIO'}
+    </Text>
+  </View>
+</View>
+
+{/* MESE */}
         <View style={{
         marginHorizontal: 16,
         marginBottom: 17,
@@ -28126,10 +28631,41 @@ function ConsegneServizioScreen({
 
       setMostraColleghiConsegna(false);
 
-      Alert.alert(
-        'Consegna inviata',
-        'La consegna è stata inviata nella chat privata del collega.'
+      /* ===== CONSEGNA INVIO CONFERMATO V2 ===== */
+
+    const nomeDestinatarioConsegna =
+      collega?.nome ||
+      collega?.nome_completo ||
+      collega?.display_name ||
+      collega?.email ||
+      'collega';
+
+    const momentoInvioConsegna =
+      new Date().toISOString();
+
+    setArchivioConsegne((prev) => {
+      if (!Array.isArray(prev) || prev.length === 0) {
+        return prev;
+      }
+
+      return prev.map((item, index) =>
+        index === 0
+          ? {
+              ...item,
+              statoInvio: 'inviata',
+              destinatarioNome: nomeDestinatarioConsegna,
+              destinatarioId: destinatarioId,
+              dataOraInvio: momentoInvioConsegna,
+              lettoDestinatario: false,
+            }
+          : item
       );
+    });
+
+    Alert.alert(
+      '✅ Consegna inviata',
+      `Consegna inviata correttamente a ${nomeDestinatarioConsegna}.`
+    );
     } catch (e) {
       console.log(
         'Errore invio consegna:',
