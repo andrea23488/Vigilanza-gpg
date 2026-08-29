@@ -340,6 +340,7 @@ export default function App() {
   const giorniSettimana = ["Dom", "Lun", "Mar", "Mer", "Gio", "Ven", "Sab"];
  const [accessoTest, setAccessoTest] = useState(false);
   const [screen, setScreen] = useState("home");
+  const snakeDirezioneRealeRef = React.useRef({ x: 1, y: 0 });
   const [consegnaSelezionata, setConsegnaSelezionata] = useState(null);
   const [consegneRicevute, setConsegneRicevute] = useState([]);
   const [notificheNascoste, setNotificheNascoste] = useState([]);
@@ -1633,6 +1634,8 @@ export default function App() {
           y: testa.y + snakeDirezione.y,
         };
 
+        snakeDirezioneRealeRef.current = snakeDirezione;
+
         const muro =
           nuovaTesta.x < 0 ||
           nuovaTesta.x >= SNAKE_SIZE ||
@@ -1689,7 +1692,10 @@ export default function App() {
 
         return nuovoCorpo;
       });
-    }, 170);
+    }, Math.max(
+      100,
+      155 - Math.floor(snakePunteggio / 30) * 5
+    ));
 
     return () => clearInterval(timer);
   }, [
@@ -11738,6 +11744,7 @@ if (screen === 'configuraStipendio') {
 
   if (screen === 'snakeGame') {
     const nuovaPartitaSnake = () => {
+      snakeDirezioneRealeRef.current = { x: 1, y: 0 };
       const corpo = [
         { x: 8, y: 9 },
         { x: 7, y: 9 },
@@ -11753,16 +11760,18 @@ if (screen === 'configuraStipendio') {
     };
 
     const cambiaDirezioneSnake = (x, y) => {
-      setSnakeDirezione((attuale) => {
-        if (
-          attuale.x + x === 0 &&
-          attuale.y + y === 0
-        ) {
-          return attuale;
-        }
+      const reale = snakeDirezioneRealeRef.current;
 
-        return { x, y };
-      });
+      // Blocca solo l'inversione rispetto al movimento
+      // realmente eseguito dal serpente.
+      if (
+        reale.x + x === 0 &&
+        reale.y + y === 0
+      ) {
+        return;
+      }
+
+      setSnakeDirezione({ x, y });
 
       if (!snakeGameOver) {
         setSnakeRunning(true);
@@ -11933,6 +11942,18 @@ if (screen === 'configuraStipendio') {
             >
               {snakePunteggio}
             </Text>
+
+            <Text
+              style={{
+                color: '#8FA9B8',
+                fontSize: 10,
+                fontWeight: '800',
+                marginTop: 2,
+                letterSpacing: 0.8,
+              }}
+            >
+              LIVELLO {Math.min(9, Math.floor(snakePunteggio / 30) + 1)}
+            </Text>
           </View>
 
           <Text
@@ -11999,7 +12020,7 @@ if (screen === 'configuraStipendio') {
           <View
             style={{
               flexDirection: 'row',
-              gap: 10,
+              gap: 18,
               marginTop: 9,
             }}
           >
@@ -12012,7 +12033,7 @@ if (screen === 'configuraStipendio') {
         <View
           style={{
             flexDirection: 'row',
-            gap: 10,
+            gap: 18,
             marginTop: 18,
           }}
         >
@@ -13999,6 +14020,8 @@ if (screen === 'configuraStipendio') {
 
 
   if (screen === 'passatempo') {
+    const passatempoScrollRef = React.createRef();
+
     const giochiPassatempo = [
       {
         id: 'snake',
@@ -14132,7 +14155,7 @@ if (screen === 'configuraStipendio') {
 ];
 
     return (
-      <Screen>
+      <Screen showScrollTop>
         <Back onPress={() => setScreen('strumenti')} />
 
         <View
@@ -14450,6 +14473,7 @@ Alert.alert(
     return (
       <Screen>
         <ScrollView
+          ref={passatempoScrollRef}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{
             paddingBottom: 120,
@@ -15513,7 +15537,50 @@ Alert.alert(
               ))
             )}
           </View>
-        </ScrollView>
+        
+        <TouchableOpacity
+          activeOpacity={0.82}
+          onPress={() =>
+            passatempoScrollRef.current?.scrollTo({
+              y: 0,
+              animated: true,
+            })
+          }
+          style={{
+            alignSelf: 'center',
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'center',
+            marginTop: 26,
+            marginBottom: 8,
+            paddingVertical: 13,
+            paddingHorizontal: 22,
+            borderRadius: 18,
+            backgroundColor: 'rgba(111,234,255,0.12)',
+            borderWidth: 1,
+            borderColor: 'rgba(111,234,255,0.42)',
+          }}
+        >
+          <Ionicons
+            name="arrow-up-outline"
+            size={18}
+            color="#6FEAFF"
+          />
+
+          <Text
+            style={{
+              color: '#FFFFFF',
+              fontSize: 13,
+              fontWeight: '900',
+              marginLeft: 7,
+              letterSpacing: 0.8,
+            }}
+          >
+            TORNA SU
+          </Text>
+        </TouchableOpacity>
+
+</ScrollView>
       </Screen>
     );
   }
