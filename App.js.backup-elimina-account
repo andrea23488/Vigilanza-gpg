@@ -6584,90 +6584,7 @@ console.log("🕒 ORA REALE:", new Date().toString());
     );
   }
 
-  
-  async function eliminaAccount() {
-    Alert.alert(
-      'Elimina account',
-      'Questa operazione è definitiva. Verranno eliminati il tuo account e i dati associati.',
-      [
-        {
-          text: 'ANNULLA',
-          style: 'cancel',
-        },
-        {
-          text: 'CONTINUA',
-          style: 'destructive',
-          onPress: () => {
-            Alert.alert(
-              'Sei sicuro?',
-              'Una volta eliminato, l’account non potrà essere recuperato.',
-              [
-                {
-                  text: 'ANNULLA',
-                  style: 'cancel',
-                },
-                {
-                  text: 'ELIMINA DEFINITIVAMENTE',
-                  style: 'destructive',
-                  onPress: async () => {
-                    try {
-                      const {
-                        data: { session },
-                      } = await supabase.auth.getSession();
-
-                      const accessToken = session?.access_token;
-
-                      if (!accessToken) {
-                        throw new Error('Sessione non valida. Accedi nuovamente.');
-                      }
-
-                      const response = await fetch(
-                        `${SUPABASE_URL}/functions/v1/elimina-account`,
-                        {
-                          method: 'POST',
-                          headers: {
-                            Authorization: `Bearer ${accessToken}`,
-                            apikey: SUPABASE_KEY,
-                            'Content-Type': 'application/json',
-                          },
-                        }
-                      );
-
-                      const risultato = await response.json();
-
-                      if (!response.ok) {
-                        throw new Error(
-                          risultato?.error || 'Errore durante l’eliminazione account'
-                        );
-                      }
-
-                      await supabase.auth.signOut();
-
-                      setTurni([]);
-                      setAccessoTest(false);
-                      setScreen('home');
-
-                      Alert.alert(
-                        'Account eliminato',
-                        'Il tuo account è stato eliminato definitivamente.'
-                      );
-                    } catch (error) {
-                      Alert.alert(
-                        'Errore',
-                        error?.message || 'Non è stato possibile eliminare l’account.'
-                      );
-                    }
-                  },
-                },
-              ]
-            );
-          },
-        },
-      ]
-    );
-  }
-
-async function logout() {
+  async function logout() {
     const { error } = await supabase.auth.signOut();
     if (error) {
       Alert.alert("Errore", error.message);
@@ -12000,10 +11917,6 @@ if (screen === 'configuraStipendio') {
 
     return (
       <Screen>
-        {Platform.OS === 'android' && (
-          <View style={{ height: 14 }} />
-        )}
-
         <Back
           onPress={() => {
             setSnakeRunning(false);
@@ -13763,7 +13676,7 @@ Alert.alert(
                 <Text
                   style={{
                     color: '#FFFFFF',
-                    fontSize: Platform.OS === 'android' ? 13 : 15,
+                    fontSize: 15,
                     fontWeight: '900',
                     letterSpacing: 0.4,
                   }}
@@ -23528,32 +23441,6 @@ if (screen === 'profiloCollega') {
             </Text>
           </TouchableOpacity>
 
-          <TouchableOpacity
-            activeOpacity={0.82}
-            onPress={eliminaAccount}
-            style={{
-              marginTop: 14,
-              paddingVertical: 18,
-              borderRadius: 18,
-              backgroundColor: 'rgba(120, 20, 35, 0.30)',
-              borderWidth: 1,
-              borderColor: 'rgba(255, 80, 100, 0.55)',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            <Text
-              style={{
-                color: '#FF7A8A',
-                fontWeight: '900',
-                fontSize: 16,
-                letterSpacing: 0.5,
-              }}
-            >
-              ELIMINA ACCOUNT
-            </Text>
-          </TouchableOpacity>
-
         {fotoProfilo && (
           <TouchableOpacity
             style={
@@ -25136,9 +25023,9 @@ if (screen === 'profiloCollega') {
           {/* ================= HEADER ================= */}
           <View
             style={{
-              paddingHorizontal: Platform.OS === 'android' ? 15 : 18,
-              paddingTop: Platform.OS === 'android' ? 12 : 6,
-              paddingBottom: Platform.OS === 'android' ? 14 : 10,
+              paddingHorizontal: 18,
+              paddingTop: 6,
+              paddingBottom: 10,
             }}
           >
             <View
@@ -25151,18 +25038,12 @@ if (screen === 'profiloCollega') {
               <TouchableOpacity
                 onPress={apriProfilo}
                 activeOpacity={0.85}
-                style={{
-                  flex: 1,
-                  paddingRight: Platform.OS === 'android' ? 8 : 0,
-                }}
+                style={{ flex: 1 }}
               >
                 <Text
-                  numberOfLines={1}
-                  adjustsFontSizeToFit
-                  minimumFontScale={0.80}
                   style={{
                     color: '#FFFFFF',
-                    fontSize: Platform.OS === 'android' ? 21 : 23,
+                    fontSize: 23,
                     fontWeight: '900',
                   }}
                 >
@@ -25170,13 +25051,11 @@ if (screen === 'profiloCollega') {
                 </Text>
 
                 <Text
-                  numberOfLines={2}
                   style={{
-                    color: Platform.OS === 'android' ? '#C8D4EA' : '#AEB9D6',
-                    fontSize: Platform.OS === 'android' ? 11 : 12,
+                    color: '#AEB9D6',
+                    fontSize: 12,
                     fontWeight: '700',
                     marginTop: 4,
-                    lineHeight: Platform.OS === 'android' ? 15 : undefined,
                   }}
                 >
                   {profilo.azienda} · {profilo.ruolo}
@@ -26049,53 +25928,20 @@ if (screen === 'profiloCollega') {
       >
 
         {/* HEADER WOW */}
-<View
-  style={{
-    paddingHorizontal: Platform.OS === 'android' ? 15 : 18,
-    paddingTop: Platform.OS === 'android' ? 12 : 6,
-    paddingBottom: Platform.OS === 'android' ? 14 : 10,
-  }}
->
+<View style={{paddingHorizontal:18,paddingTop:6,paddingBottom:10}}>
   <View style={{flexDirection:'row',alignItems:'center'}}>
 
     <TouchableOpacity
       onPress={apriProfilo}
-      style={{flex:1, paddingRight: Platform.OS === 'android' ? 8 : 0}}
+      style={{flex:1}}
     >
-      <Text
-        style={{
-          color:'#FFFFFF',
-          fontSize: Platform.OS === 'android' ? 17 : 19,
-          fontWeight:'700'
-        }}
-      >
+      <Text style={{color:'#FFFFFF',fontSize:19,fontWeight:'700'}}>
         Buon servizio,
       </Text>
-
-      <Text
-        numberOfLines={1}
-        adjustsFontSizeToFit
-        minimumFontScale={0.82}
-        style={{
-          color:'#FFFFFF',
-          fontSize: Platform.OS === 'android' ? 24 : 27,
-          fontWeight:'900',
-          lineHeight: Platform.OS === 'android' ? 27 : 29,
-        }}
-      >
+      <Text style={{color:'#FFFFFF',fontSize:27,fontWeight:'900',lineHeight:29}}>
         {profilo.nome} 👋
       </Text>
-
-      <Text
-        numberOfLines={2}
-        style={{
-          color: Platform.OS === 'android' ? '#C8D4EA' : '#AEB9D6',
-          fontSize: Platform.OS === 'android' ? 11.5 : 13,
-          fontWeight:'700',
-          marginTop:5,
-          lineHeight: Platform.OS === 'android' ? 15 : undefined,
-        }}
-      >
+      <Text style={{color:'#AEB9D6',fontSize:13,fontWeight:'700',marginTop:5}}>
         {profilo.azienda}{' • '}{profilo.ruolo}
       </Text>
     </TouchableOpacity>
@@ -27533,84 +27379,55 @@ function Calendar({
                       </Text>
                     </View>
                   ) : (
-                    Platform.OS === 'android' ? (
+                    <View
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        backgroundColor: 'rgba(0,0,0,0.18)',
+                        paddingHorizontal: 4,
+                        paddingVertical: 2,
+                        borderRadius: 10,
+                      }}
+                    >
+                      <Ionicons
+                        name={icona}
+                        size={10}
+                        color={colore}
+                        style={{
+                          marginRight: 2,
+                        }}
+                      />
+
                       <View
                         style={{
-                          width: '94%',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          backgroundColor: 'rgba(0,0,0,0.18)',
-                          paddingHorizontal: 1,
-                          paddingVertical: 3,
-                          borderRadius: 8,
                         }}
                       >
                         <Text
-                          numberOfLines={1}
-                          adjustsFontSizeToFit
-                          minimumFontScale={0.72}
                           style={{
-                            width: '100%',
                             color: colore,
-                            fontSize: 7.5,
+                            fontSize: 8.5,
                             fontWeight: '900',
-                            textAlign: 'center',
+                            lineHeight: 10,
                           }}
                         >
-                          {`${String(record.inizio || '').slice(0, 2)}-${String(record.fine || '').slice(0, 2)}`}
+                          {formattaOra(record.inizio)}
+                        </Text>
+
+                        <Text
+                          style={{
+                            color: colore,
+                            fontSize: 8,
+                            fontWeight: '900',
+                            lineHeight: 9,
+                          }}
+                        >
+                          {formattaOra(record.fine)}
                         </Text>
                       </View>
-                    ) : (
-                      <View
-                        style={{
-                          flexDirection: 'row',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          backgroundColor: 'rgba(0,0,0,0.18)',
-                          paddingHorizontal: 4,
-                          paddingVertical: 2,
-                          borderRadius: 10,
-                        }}
-                      >
-                        <Ionicons
-                          name={icona}
-                          size={10}
-                          color={colore}
-                          style={{
-                            marginRight: 2,
-                          }}
-                        />
-
-                        <View
-                          style={{
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                          }}
-                        >
-                          <Text
-                            style={{
-                              color: colore,
-                              fontSize: 8.5,
-                              fontWeight: '900',
-                              lineHeight: 10,
-                            }}
-                          >
-                            {formattaOra(record.inizio)}
-                          </Text>
-
-                          <Text
-                            style={{
-                              color: colore,
-                              fontSize: 8,
-                              fontWeight: '900',
-                              lineHeight: 9,
-                            }}
-                          >
-                            {formattaOra(record.fine)}
-                          </Text>
-                        </View>
-                      </View>
-                    )
+                    </View>
                   )
                 )}
               </View>

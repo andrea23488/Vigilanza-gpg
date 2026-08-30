@@ -6,6 +6,7 @@ import {
   ScrollView,
   Alert,
   Modal,
+  Platform,
 } from 'react-native';
 import NapoletanaCard from './NapoletanaCard';
 
@@ -747,7 +748,7 @@ export default function ScopaGame({ onBack }) {
       style={{
         flex: 1,
         backgroundColor: '#071A12',
-        paddingTop: 12,
+        paddingTop: Platform.OS === 'android' ? 24 : 42,
       }}
     >
       <Modal
@@ -872,7 +873,7 @@ export default function ScopaGame({ onBack }) {
       <ScrollView
         contentContainerStyle={{
           paddingHorizontal: 14,
-          paddingBottom: 30,
+          paddingBottom: Platform.OS === 'android' ? 80 : 30,
         }}
       >
         <View

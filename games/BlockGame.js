@@ -806,8 +806,9 @@ const styles = StyleSheet.create({
   screen: {
     flex: 1,
     backgroundColor: '#030A12',
-    paddingTop: 12,
+    paddingTop: 42,
     paddingHorizontal: 14,
+    paddingBottom: 12,
   },
 
   top: {
@@ -818,9 +819,9 @@ const styles = StyleSheet.create({
   },
 
   back: {
-    width: 45,
-    height: 45,
-    borderRadius: 15,
+    width: 52,
+    height: 52,
+    borderRadius: 17,
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: 'rgba(255,255,255,0.07)',
@@ -828,8 +829,8 @@ const styles = StyleSheet.create({
 
   backText: {
     color: '#FFFFFF',
-    fontSize: 34,
-    marginTop: -4,
+    fontSize: 36,
+    marginTop: -3,
   },
 
   title: {
@@ -881,10 +882,10 @@ const styles = StyleSheet.create({
   },
 
   gameArea: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'flex-start',
-    gap: 9,
+    width: '100%',
+    position: 'relative',
+    alignItems: 'center',
+    justifyContent: 'flex-start',
   },
 
   board: {
@@ -904,13 +905,17 @@ const styles = StyleSheet.create({
   },
 
   nextPanel: {
-    width: 78,
+    position: 'absolute',
+    right: 0,
+    top: 0,
+    width: 68,
     backgroundColor: '#0B1824',
     borderRadius: 13,
     borderWidth: 1,
     borderColor: 'rgba(111,234,255,0.20)',
-    paddingVertical: 10,
+    paddingVertical: 9,
     alignItems: 'center',
+    zIndex: 5,
   },
 
   nextLabel: {

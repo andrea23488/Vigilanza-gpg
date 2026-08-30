@@ -1,6 +1,7 @@
 import React from 'react';
 import {
   SafeAreaView,
+  Platform,
   View,
   Text,
   TouchableOpacity,
@@ -582,7 +583,7 @@ export default function BriscolaGame({ onBack }) {
       <ScrollView
         contentContainerStyle={{
           padding: 18,
-          paddingBottom: 60,
+          paddingBottom: Platform.OS === 'android' ? 90 : 60,
         }}
       >
 

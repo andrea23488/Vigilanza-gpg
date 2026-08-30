@@ -1,0 +1,147 @@
+import { createClient } from 'npm:@supabase/supabase-js@2'
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers':
+    'authorization, x-client-info, apikey, content-type',
+}
+
+Deno.serve(async (req) => {
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders })
+  }
+
+  try {
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')
+    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+
+    if (!supabaseUrl || !serviceRoleKey) {
+      throw new Error('Configurazione Supabase mancante')
+    }
+
+    const authHeader = req.headers.get('Authorization')
+
+    if (!authHeader?.startsWith('Bearer ')) {
+      return new Response(
+        JSON.stringify({ error: 'Utente non autenticato' }),
+        {
+          status: 401,
+          headers: {
+            ...corsHeaders,
+            'Content-Type': 'application/json',
+          },
+        }
+      )
+    }
+
+    const token = authHeader.replace('Bearer ', '')
+
+    const admin = createClient(supabaseUrl, serviceRoleKey)
+
+    const {
+      data: { user },
+      error: userError,
+    } = await admin.auth.getUser(token)
+
+    if (userError || !user) {
+      return new Response(
+        JSON.stringify({ error: 'Sessione non valida' }),
+        {
+          status: 401,
+          headers: {
+            ...corsHeaders,
+            'Content-Type': 'application/json',
+          },
+        }
+      )
+    }
+
+    const uid = user.id
+
+    const elimina = async (
+      tabella: string,
+      filtro: string
+    ) => {
+      const { error } = await admin
+        .from(tabella)
+        .delete()
+        .or(filtro)
+
+      if (error) {
+        throw new Error(`${tabella}: ${error.message}`)
+      }
+    }
+
+    await elimina(
+      'messaggi',
+      `mittente_id.eq.${uid},destinatario_id.eq.${uid}`
+    )
+
+    await elimina(
+      'consegne_servizio',
+      `mittente_id.eq.${uid},destinatario_id.eq.${uid}`
+    )
+
+    await elimina(
+      'colleghi',
+      `user_id.eq.${uid},collega_id.eq.${uid}`
+    )
+
+    const { error: turniError } = await admin
+      .from('turni')
+      .delete()
+      .eq('user_id', uid)
+
+    if (turniError) {
+      throw new Error(`turni: ${turniError.message}`)
+    }
+
+    const { error: profiloError } = await admin
+      .from('profili')
+      .delete()
+      .eq('user_id', uid)
+
+    if (profiloError) {
+      throw new Error(`profili: ${profiloError.message}`)
+    }
+
+    const { error: deleteUserError } =
+      await admin.auth.admin.deleteUser(uid)
+
+    if (deleteUserError) {
+      throw deleteUserError
+    }
+
+    return new Response(
+      JSON.stringify({
+        success: true,
+        message: 'Account eliminato definitivamente',
+      }),
+      {
+        status: 200,
+        headers: {
+          ...corsHeaders,
+          'Content-Type': 'application/json',
+        },
+      }
+    )
+  } catch (error) {
+    console.error('ELIMINA ACCOUNT ERROR:', error)
+
+    return new Response(
+      JSON.stringify({
+        error:
+          error instanceof Error
+            ? error.message
+            : 'Errore sconosciuto',
+      }),
+      {
+        status: 500,
+        headers: {
+          ...corsHeaders,
+          'Content-Type': 'application/json',
+        },
+      }
+    )
+  }
+})
