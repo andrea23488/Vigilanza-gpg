@@ -25807,7 +25807,7 @@ if (screen === 'profiloCollega') {
                   fontWeight: '900',
                 }}
               >
-                AVANZ. {avanzamentoHomeV2}%
+                {avanzamentoHomeV2}%
               </Text>
             </View>
 

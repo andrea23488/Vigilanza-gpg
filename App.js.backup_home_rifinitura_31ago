@@ -25807,7 +25807,7 @@ if (screen === 'profiloCollega') {
                   fontWeight: '900',
                 }}
               >
-                AVANZ. {avanzamentoHomeV2}%
+                {avanzamentoHomeV2}%
               </Text>
             </View>
 
@@ -26024,8 +26024,8 @@ if (screen === 'profiloCollega') {
         style={{
           marginHorizontal: 16,
           marginBottom: 18,
-          paddingVertical: 14,
-          paddingHorizontal: 16,
+          paddingVertical: 18,
+          paddingHorizontal: 18,
           borderRadius: 22,
           backgroundColor: '#0C1728',
           borderWidth: 1,
@@ -26044,9 +26044,9 @@ if (screen === 'profiloCollega') {
         >
           <View
             style={{
-              width: 43,
-              height: 43,
-              borderRadius: 14,
+              width: 48,
+              height: 48,
+              borderRadius: 16,
               backgroundColor: 'rgba(69,207,254,0.10)',
               alignItems: 'center',
               justifyContent: 'center',
@@ -26055,7 +26055,7 @@ if (screen === 'profiloCollega') {
           >
             <Ionicons
               name="calendar-outline"
-              size={23}
+              size={25}
               color="#71D8FF"
             />
           </View>
@@ -26068,7 +26068,7 @@ if (screen === 'profiloCollega') {
                 fontWeight: '900',
               }}
             >
-              CALENDARIO COLLEGHI
+              CALENDARIO CONDIVISO
             </Text>
 
             <Text
@@ -26080,7 +26080,7 @@ if (screen === 'profiloCollega') {
                 lineHeight: 17,
               }}
             >
-              Condividi i turni e consulta quelli dei colleghi
+              Condividi i tuoi turni e vedi quelli degli amici
             </Text>
           </View>
 
@@ -26441,14 +26441,11 @@ if (screen === 'profiloCollega') {
             </View>
           </View>
 
-          <View style={{flexDirection:'row',justifyContent:'space-between',alignItems:'flex-end',marginTop:10}}>
-            <Text style={{color:'#AEB9D6',fontSize:10,fontWeight:'800'}}>
-              AVANZAMENTO MESE
-            </Text>
-
-            <Text style={{color:'#FFFFFF',fontSize:13,fontWeight:'900'}}>
-              {Math.round((new Date().getDate() / new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate()) * 100)}%
-            </Text>
+          <View style={{flexDirection:'row',justifyContent:'space-between',marginTop:10}}>
+            <Text style={{color:'#AEB9D6',fontSize:11,fontWeight:'800'}}>AVANZAMENTO MESE</Text>
+            <Text style={{color:'#FFFFFF',fontSize:12,fontWeight:'900'}}>
+                {Math.round((new Date().getDate() / new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate()) * 100)}%
+              </Text>
           </View>
 
           <View style={{height:6,borderRadius:10,backgroundColor:'#19264A',marginTop:4,overflow:'hidden'}}>
