@@ -28,9 +28,6 @@ import { caricaProfiloUtente, salvaProfiloUtente, caricaFotoProfilo, eliminaFoto
 import { caricaColleghi, aggiungiCollega, rimuoviCollega, accettaCollega, rifiutaCollega } from './colleghiApi';
 import { caricaColleghiInServizio } from './servizioApi';
 import React, { useRef, useEffect, useMemo, useState } from 'react';
-import SchedaPostoScreen from './SchedaPostoScreen';
-import PostiSalvatiScreen from './PostiSalvatiScreen';
-import CalendarioColleghiScreen from './CalendarioColleghiScreen';
 import BriscolaGame from './games/BriscolaGame';
 import ScopaGame from './games/ScopaGame';
 import BlockGame from './games/BlockGame';
@@ -345,7 +342,6 @@ export default function App() {
   const giorniSettimana = ["Dom", "Lun", "Mar", "Mer", "Gio", "Ven", "Sab"];
  const [accessoTest, setAccessoTest] = useState(false);
   const [screen, setScreen] = useState("home");
-  const [schedaPostoLuogo, setSchedaPostoLuogo] = useState('');
   const passatempoScrollRef = React.useRef(null);
   const snakeDirezioneRealeRef = React.useRef({ x: 1, y: 0 });
   const [consegnaSelezionata, setConsegnaSelezionata] = useState(null);
@@ -1765,44 +1761,6 @@ export default function App() {
 
           const mittentiGiaAggiunti = new Set();
 
-          // =================================================
-          // RICHIESTE COLLEGA RICEVUTE
-          // =================================================
-          const richiesteCollegaRicevute =
-            (listaColleghiNotifiche || []).filter(
-              (c) => c?.stato === 'in_attesa' && c?.ricevuta
-            );
-
-          for (const richiesta of richiesteCollegaRicevute) {
-            const profiloRichiedente = richiesta?.profilo || {};
-
-            const nomeCompletoRichiedente =
-              [
-                profiloRichiedente?.nome,
-                profiloRichiedente?.cognome
-              ]
-                .filter(Boolean)
-                .join(' ')
-                .trim() || 'Un collega';
-
-            notifiche.push({
-              id: `richiesta-collega:${richiesta.id}`,
-              richiestaId: richiesta.id,
-              altroUserId: richiesta.altro_user_id,
-              collega: richiesta,
-
-              nomeMittente: nomeCompletoRichiedente,
-              testo: 'Vuole aggiungerti ai suoi colleghi',
-              ultimoMessaggio: 'Vuole aggiungerti ai suoi colleghi',
-
-              nonLetti: 1,
-              isRichiestaCollega: true,
-              isConsegna: false,
-
-              created_at: richiesta.created_at || new Date().toISOString(),
-            });
-          }
-
           for (const msg of messaggiRicevuti || []) {
             const mittenteId = String(msg.mittente_id || '');
 
@@ -2099,39 +2057,23 @@ if (dati.tariffaStraordinario != null) {
 
   const aggiornaNumeroNotifiche = async () => {
     try {
-      const [totaleChat, consegne, listaColleghi] =
-        await Promise.all([
-          contaMessaggiNonLetti(),
-          caricaConsegneRicevute(),
-          caricaColleghi(),
-        ]);
+      const [totaleChat, consegne] = await Promise.all([
+        contaMessaggiNonLetti(),
+        caricaConsegneRicevute(),
+      ]);
 
       const totaleConsegne = (consegne || []).filter(
         (c) => !c.letta
       ).length;
 
-      const totaleRichiesteCollega =
-        (listaColleghi || []).filter(
-          (c) =>
-            c?.stato === 'in_attesa' &&
-            c?.ricevuta === true
-        ).length;
-
       const totale =
-        Number(totaleChat || 0) +
-        totaleConsegne +
-        totaleRichiesteCollega;
+        Number(totaleChat || 0) + totaleConsegne;
 
-      if (attivo) {
-        setNumeroNotifiche(totale);
+      if (attivo) setNumeroNotifiche(totale);
+      } catch (error) {
+        console.log('Errore conteggio notifiche:', error);
       }
-    } catch (error) {
-      console.log(
-        'Errore conteggio notifiche:',
-        error
-      );
-    }
-  };
+    };
 
     aggiornaNumeroNotifiche();
 
@@ -4109,12 +4051,6 @@ const cambiaStatoDotazione = (id, stato) => {
       setLoadingColleghi(false);
     }
   }
-
-  useEffect(() => {
-    if (screen !== 'colleghi') return;
-    aggiornaColleghi();
-  }, [screen]);
-
 
   const [giorno, setGiorno] =
     useState(1);
@@ -7189,41 +7125,24 @@ async function logout() {
           dati?.ultimoMessaggio || dati?.testo || '';
 
         const isConsegna =
-          dati?.isConsegna === true ||
           String(ultimoMessaggio)
             .trim()
             .startsWith('📦 CONSEGNA DI SERVIZIO');
 
-        const isRichiestaCollega =
-          dati?.isRichiestaCollega === true;
-
         return {
           id: dati?.id || chiaveNotifica,
           altroUserId,
-
-          // Se la notifica aveva già il collega associato,
-          // lo conserviamo. È importante per le richieste pendenti.
-          collega: dati?.collega || collega,
-
+          collega,
           nomeMittente:
             dati?.nomeMittente ||
-            [dati?.collega?.profilo?.nome, dati?.collega?.profilo?.cognome]
-              .filter(Boolean)
-              .join(' ')
-              .trim() ||
             [collega?.profilo?.nome, collega?.profilo?.cognome]
               .filter(Boolean)
               .join(' ')
               .trim() ||
             'Collega',
-
           nonLetti: Number(dati?.nonLetti || 0),
           ultimoMessaggio,
-
           isConsegna,
-          isRichiestaCollega,
-
-          richiestaId: dati?.richiestaId || null,
         };
       });
 
@@ -7429,7 +7348,7 @@ async function logout() {
                   marginTop: 6,
                 }}
               >
-                Messaggi, consegne e richieste collega appariranno qui.
+                Quando riceverai nuovi messaggi li troverai qui.
               </Text>
             </View>
           ) : (
@@ -7438,21 +7357,6 @@ async function logout() {
                 key={String(n.id)}
                 activeOpacity={0.82}
           onPress={() => {
-            if (n.isRichiestaCollega) {
-              aggiornaColleghi()
-                .catch((error) => {
-                  console.log(
-                    'Errore aggiornamento richiesta collega:',
-                    error
-                  );
-                })
-                .finally(() => {
-                  setScreen('colleghi');
-                });
-
-              return;
-            }
-
             if (n.isConsegna) {
               setConsegnaSelezionata(n);
               setScreen('dettaglioConsegna');
@@ -16952,36 +16856,6 @@ if (screen === 'strumenti') {
   /* =====================================================
      POSTAZIONI - V1
      ===================================================== */
-
-  if (screen === 'calendarioColleghi') {
-    return (
-      <CalendarioColleghiScreen
-        onBack={() => setScreen('home')}
-      />
-    );
-  }
-
-  if (screen === 'postiSalvati') {
-    return (
-      <PostiSalvatiScreen
-        onBack={() => setScreen('home')}
-        onApriPosto={(nomePosto) => {
-          setSchedaPostoLuogo(nomePosto);
-          setScreen('schedaPosto');
-        }}
-      />
-    );
-  }
-
-  if (screen === 'schedaPosto') {
-    return (
-      <SchedaPostoScreen
-        luogo={schedaPostoLuogo}
-        onBack={() => setScreen('turni')}
-      />
-    );
-  }
-
   if (screen === 'postazioni') {
 
     return (
@@ -24424,53 +24298,6 @@ if (screen === 'profiloCollega') {
           onChange={setLuogo}
         />
 
-          <TouchableOpacity
-            onPress={() => {
-              const nomePosto = String(luogo || '').trim();
-
-              if (!nomePosto) {
-                Alert.alert(
-                  'Luogo mancante',
-                  'Inserisci prima il luogo del servizio.'
-                );
-                return;
-              }
-
-              setSchedaPostoLuogo(nomePosto);
-              setScreen('schedaPosto');
-            }}
-            style={{
-              marginTop: 10,
-              marginBottom: 4,
-              paddingVertical: 13,
-              paddingHorizontal: 14,
-              borderRadius: 14,
-              backgroundColor: 'rgba(49,88,168,0.22)',
-              borderWidth: 1,
-              borderColor: 'rgba(141,184,255,0.34)',
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            <Ionicons
-              name="location-outline"
-              size={20}
-              color="#8DB8FF"
-            />
-            <Text
-              style={{
-                color: '#FFFFFF',
-                fontSize: 14,
-                fontWeight: '900',
-                marginLeft: 8,
-              }}
-            >
-              Apri Scheda Posto
-            </Text>
-          </TouchableOpacity>
-
-
           <Field
         label="POSIZIONE PER IL METEO"
         value={localitaMeteoTurno}
@@ -25212,46 +25039,6 @@ if (screen === 'profiloCollega') {
                 <Text style={styles.turnSub}>
                   ♧ {t.luogo || 'Luogo non indicato'}
                 </Text>
-        {/* CARD_SCHEDA_POSTO */}
-        {!!String(t.luogo || '').trim() && (
-          <TouchableOpacity
-            onPress={(e) => {
-              e?.stopPropagation?.();
-              setSchedaPostoLuogo(String(t.luogo || '').trim());
-              setScreen('schedaPosto');
-            }}
-            activeOpacity={0.8}
-            style={{
-              alignSelf: 'flex-start',
-              marginTop: 8,
-              marginBottom: 3,
-              flexDirection: 'row',
-              alignItems: 'center',
-              paddingHorizontal: 11,
-              paddingVertical: 7,
-              borderRadius: 11,
-              backgroundColor: 'rgba(49,88,168,0.22)',
-              borderWidth: 1,
-              borderColor: 'rgba(141,184,255,0.30)',
-            }}
-          >
-            <Ionicons
-              name="location-outline"
-              size={16}
-              color="#8DB8FF"
-            />
-            <Text
-              style={{
-                color: '#DCE6FF',
-                fontSize: 12,
-                fontWeight: '900',
-                marginLeft: 6,
-              }}
-            >
-              Scheda posto
-            </Text>
-          </TouchableOpacity>
-        )}
 
                 <View style={{
                   flexDirection: 'row',
@@ -26017,81 +25804,98 @@ if (screen === 'profiloCollega') {
             />
           </TouchableOpacity>
 
-          {/* HOME_CALENDARIO_CONDIVISO */}
-      <TouchableOpacity
-        onPress={() => setScreen('calendarioColleghi')}
-        activeOpacity={0.82}
-        style={{
-          marginHorizontal: 16,
-          marginBottom: 18,
-          paddingVertical: 18,
-          paddingHorizontal: 18,
-          borderRadius: 22,
-          backgroundColor: '#0C1728',
-          borderWidth: 1,
-          borderColor: '#2B4568',
-          shadowColor: '#45CFFE',
-          shadowOpacity: 0.08,
-          shadowRadius: 12,
-          shadowOffset: { width: 0, height: 5 },
-        }}
-      >
-        <View
-          style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-          }}
-        >
-          <View
+          {/* ================= IN SERVIZIO CON TE ================= */}
+          <TouchableOpacity
+            activeOpacity={0.84}
+            onPress={() => setScreen('colleghi')}
             style={{
-              width: 48,
-              height: 48,
-              borderRadius: 16,
-              backgroundColor: 'rgba(69,207,254,0.10)',
-              alignItems: 'center',
-              justifyContent: 'center',
-              marginRight: 14,
+              marginHorizontal: 16,
+              marginTop: 8,
+              paddingHorizontal: 16,
+              paddingVertical: 13,
+              borderRadius: 18,
+              backgroundColor: '#0B1930',
+              borderWidth: 1,
+              borderColor: '#315C87',
             }}
           >
-            <Ionicons
-              name="calendar-outline"
-              size={25}
-              color="#71D8FF"
-            />
-          </View>
-
-          <View style={{ flex: 1 }}>
-            <Text
+            <View
               style={{
-                color: '#FFFFFF',
-                fontSize: 16,
-                fontWeight: '900',
+                flexDirection: 'row',
+                alignItems: 'center',
               }}
             >
-              CALENDARIO CONDIVISO
-            </Text>
+              <Ionicons
+                name="people-outline"
+                size={23}
+                color="#63DFFF"
+              />
+
+              <Text
+                style={{
+                  color: '#FFFFFF',
+                  fontSize: 14,
+                  fontWeight: '900',
+                  marginLeft: 13,
+                  flex: 1,
+                }}
+              >
+                IN SERVIZIO CON TE
+              </Text>
+
+              <Ionicons
+                name="chevron-forward"
+                size={20}
+                color="#FFFFFF"
+              />
+            </View>
 
             <Text
               style={{
-                color: '#AEB9D6',
+                color: '#C8D0E0',
                 fontSize: 12,
-                fontWeight: '600',
-                marginTop: 5,
-                lineHeight: 17,
+                fontWeight: '700',
+                marginTop: 9,
               }}
             >
-              Condividi i tuoi turni e vedi quelli degli amici
+              {colleghiInServizio.length > 0
+                ? `${colleghiInServizio.length} ${
+                    colleghiInServizio.length === 1
+                      ? 'collega collegato'
+                      : 'colleghi collegati'
+                  } in servizio oggi`
+                : 'Nessun collega collegato in servizio oggi'}
             </Text>
-          </View>
 
-          <Ionicons
-            name="chevron-forward"
-            size={22}
-            color="#77BFD9"
-          />
-        </View>
-      </TouchableOpacity>
-
+            <TouchableOpacity
+              onPress={async () => {
+                try {
+                  await aggiornaColleghi();
+                  await aggiornaColleghiInServizioOggi();
+                } catch (e) {
+                  console.log(
+                    'Errore aggiornamento colleghi Home V2:',
+                    e
+                  );
+                }
+              }}
+              activeOpacity={0.75}
+              style={{
+                alignSelf: 'flex-start',
+                marginTop: 8,
+              }}
+            >
+              <Text
+                style={{
+                  color: '#4BE66B',
+                  fontSize: 12,
+                  fontWeight: '900',
+                }}
+              >
+                ↻ Aggiorna
+              </Text>
+            </TouchableOpacity>
+          </TouchableOpacity>
 
           {/* ================= BARRA RAPIDA ================= */}
           <View
@@ -27124,8 +26928,7 @@ if (screen === 'profiloCollega') {
           </TouchableOpacity>
         </View>
 
-        
-      {/* ACCESSI RAPIDI */}
+        {/* ACCESSI RAPIDI */}
       <View style={{
         marginHorizontal: 16,
         marginBottom: 20,

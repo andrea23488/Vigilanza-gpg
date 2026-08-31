@@ -2099,39 +2099,23 @@ if (dati.tariffaStraordinario != null) {
 
   const aggiornaNumeroNotifiche = async () => {
     try {
-      const [totaleChat, consegne, listaColleghi] =
-        await Promise.all([
-          contaMessaggiNonLetti(),
-          caricaConsegneRicevute(),
-          caricaColleghi(),
-        ]);
+      const [totaleChat, consegne] = await Promise.all([
+        contaMessaggiNonLetti(),
+        caricaConsegneRicevute(),
+      ]);
 
       const totaleConsegne = (consegne || []).filter(
         (c) => !c.letta
       ).length;
 
-      const totaleRichiesteCollega =
-        (listaColleghi || []).filter(
-          (c) =>
-            c?.stato === 'in_attesa' &&
-            c?.ricevuta === true
-        ).length;
-
       const totale =
-        Number(totaleChat || 0) +
-        totaleConsegne +
-        totaleRichiesteCollega;
+        Number(totaleChat || 0) + totaleConsegne;
 
-      if (attivo) {
-        setNumeroNotifiche(totale);
+      if (attivo) setNumeroNotifiche(totale);
+      } catch (error) {
+        console.log('Errore conteggio notifiche:', error);
       }
-    } catch (error) {
-      console.log(
-        'Errore conteggio notifiche:',
-        error
-      );
-    }
-  };
+    };
 
     aggiornaNumeroNotifiche();
 
@@ -26017,7 +26001,100 @@ if (screen === 'profiloCollega') {
             />
           </TouchableOpacity>
 
-          {/* HOME_CALENDARIO_CONDIVISO */}
+          {/* ================= IN SERVIZIO CON TE ================= */}
+          <TouchableOpacity
+            activeOpacity={0.84}
+            onPress={() => setScreen('colleghi')}
+            style={{
+              marginHorizontal: 16,
+              marginTop: 8,
+              paddingHorizontal: 16,
+              paddingVertical: 13,
+              borderRadius: 18,
+              backgroundColor: '#0B1930',
+              borderWidth: 1,
+              borderColor: '#315C87',
+            }}
+          >
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+              }}
+            >
+              <Ionicons
+                name="people-outline"
+                size={23}
+                color="#63DFFF"
+              />
+
+              <Text
+                style={{
+                  color: '#FFFFFF',
+                  fontSize: 14,
+                  fontWeight: '900',
+                  marginLeft: 13,
+                  flex: 1,
+                }}
+              >
+                IN SERVIZIO CON TE
+              </Text>
+
+              <Ionicons
+                name="chevron-forward"
+                size={20}
+                color="#FFFFFF"
+              />
+            </View>
+
+            <Text
+              style={{
+                color: '#C8D0E0',
+                fontSize: 12,
+                fontWeight: '700',
+                marginTop: 9,
+              }}
+            >
+              {colleghiInServizio.length > 0
+                ? `${colleghiInServizio.length} ${
+                    colleghiInServizio.length === 1
+                      ? 'collega collegato'
+                      : 'colleghi collegati'
+                  } in servizio oggi`
+                : 'Nessun collega collegato in servizio oggi'}
+            </Text>
+
+            <TouchableOpacity
+              onPress={async () => {
+                try {
+                  await aggiornaColleghi();
+                  await aggiornaColleghiInServizioOggi();
+                } catch (e) {
+                  console.log(
+                    'Errore aggiornamento colleghi Home V2:',
+                    e
+                  );
+                }
+              }}
+              activeOpacity={0.75}
+              style={{
+                alignSelf: 'flex-start',
+                marginTop: 8,
+              }}
+            >
+              <Text
+                style={{
+                  color: '#4BE66B',
+                  fontSize: 12,
+                  fontWeight: '900',
+                }}
+              >
+                ↻ Aggiorna
+              </Text>
+            </TouchableOpacity>
+          </TouchableOpacity>
+
+      {/* HOME_CALENDARIO_CONDIVISO */}
       <TouchableOpacity
         onPress={() => setScreen('calendarioColleghi')}
         activeOpacity={0.82}

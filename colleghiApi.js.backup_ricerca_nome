@@ -1,0 +1,142 @@
+import { supabase } from './supabase';
+
+async function getCurrentUser() {
+  const {
+    data: { session },
+    error,
+  } = await supabase.auth.getSession();
+
+  if (error) throw error;
+  if (!session?.user) throw new Error('Utente non autenticato.');
+
+  return session.user;
+}
+
+export async function caricaColleghi() {
+  const user = await getCurrentUser();
+
+  const { data, error } = await supabase
+    .from('colleghi')
+    .select('id, user_id, collega_id, stato, created_at')
+    .or(`user_id.eq.${user.id},collega_id.eq.${user.id}`)
+    .order('created_at', { ascending: false });
+
+  if (error) throw error;
+
+  const relazioni = data || [];
+
+  const risultati = await Promise.all(
+    relazioni.map(async (relazione) => {
+      const altroUserId =
+        relazione.user_id === user.id
+          ? relazione.collega_id
+          : relazione.user_id;
+
+      const { data: profilo, error: profiloError } = await supabase
+        .from('profili')
+        .select('user_id, nome, cognome, azienda, sede, foto_url, codice_gpg')
+        .eq('user_id', altroUserId)
+        .maybeSingle();
+
+      if (profiloError) throw profiloError;
+
+      return {
+        ...relazione,
+        altro_user_id: altroUserId,
+        ricevuta: relazione.collega_id === user.id,
+        profilo: profilo || null,
+      };
+    })
+  );
+
+  return risultati;
+}
+
+export async function aggiungiCollega(codiceGpg) {
+  const user = await getCurrentUser();
+
+  const codice = codiceGpg.trim().toUpperCase();
+
+  if (!codice) {
+    throw new Error('Inserisci il codice GPG del collega.');
+  }
+
+  const { data: profiloCollega, error: erroreProfilo } = await supabase
+    .from('profili')
+    .select('user_id, nome, cognome, codice_gpg')
+    .eq('codice_gpg', codice)
+    .maybeSingle();
+
+  if (erroreProfilo) throw erroreProfilo;
+
+  if (!profiloCollega) {
+    throw new Error('Nessun collega trovato con questo codice GPG.');
+  }
+
+  const collegaId = profiloCollega.user_id;
+
+  if (collegaId === user.id) {
+    throw new Error('Non puoi aggiungere te stesso.');
+  }
+
+  const { data, error } = await supabase
+    .from('colleghi')
+    .insert({
+      user_id: user.id,
+      collega_id: collegaId,
+      stato: 'in_attesa',
+    })
+    .select()
+    .single();
+
+  if (error) {
+    if (error.code === '23505') {
+      const { data: esistente } = await supabase
+        .from('colleghi')
+        .select('stato')
+        .eq('user_id', user.id)
+        .eq('collega_id', collegaId)
+        .maybeSingle();
+
+      if (esistente?.stato === 'accettato') {
+        throw new Error('Siete già colleghi.');
+      }
+
+      if (esistente?.stato === 'in_attesa') {
+        throw new Error('Richiesta già inviata.');
+      }
+
+      throw new Error('Collegamento già esistente.');
+    }
+
+    throw error;
+  }
+
+  return data;
+}
+
+export async function rimuoviCollega(idRelazione) {
+  await getCurrentUser();
+
+  const { error } = await supabase
+    .from('colleghi')
+    .delete()
+    .eq('id', idRelazione);
+
+  if (error) throw error;
+
+  return true;
+}
+export async function accettaCollega(idRelazione) {
+  const user = await getCurrentUser();
+  const { data, error } = await supabase.from("colleghi").update({ stato: "accettato" }).eq("id", idRelazione).eq("collega_id", user.id).eq("stato", "in_attesa").select().single();
+  if (error) throw error;
+  return data;
+}
+
+export async function rifiutaCollega(idRelazione) {
+  const user = await getCurrentUser();
+  const { error } = await supabase.from("colleghi").delete().eq("id", idRelazione).eq("collega_id", user.id).eq("stato", "in_attesa");
+  if (error) throw error;
+  return true;
+}

@@ -1,0 +1,1155 @@
+import React, { useEffect, useMemo, useState } from 'react';
+import {
+  View,
+  Text,
+  ScrollView,
+  TouchableOpacity,
+  Modal,
+  Alert,
+  ActivityIndicator,
+} from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+
+import { caricaTurniUtente } from './turniApi';
+import { caricaColleghi } from './colleghiApi';
+
+import {
+  caricaTurniCondivisiRicevuti,
+  condividiTurniConColleghi,
+  rimuoviCondivisioneTurni,
+  caricaMieCondivisioni,
+} from './turniCondivisiApi';
+
+const GIORNI = [
+  'Lunedì',
+  'Martedì',
+  'Mercoledì',
+  'Giovedì',
+  'Venerdì',
+  'Sabato',
+  'Domenica',
+];
+
+const MESI = [
+  'gen',
+  'feb',
+  'mar',
+  'apr',
+  'mag',
+  'giu',
+  'lug',
+  'ago',
+  'set',
+  'ott',
+  'nov',
+  'dic',
+];
+
+function dataTurno(turno) {
+  const g = Number(turno?.giorno);
+  const m = Number(turno?.mese);
+  const a = Number(turno?.anno);
+
+  if (!g || !m || !a) return null;
+
+  return new Date(a, m - 1, g, 12, 0, 0, 0);
+}
+
+function lunediDellaSettimana(data) {
+  const d = new Date(data);
+  d.setHours(12, 0, 0, 0);
+
+  const giorno = d.getDay();
+  const differenza = giorno === 0 ? -6 : 1 - giorno;
+
+  d.setDate(d.getDate() + differenza);
+  return d;
+}
+
+function aggiungiGiorni(data, giorni) {
+  const d = new Date(data);
+  d.setDate(d.getDate() + giorni);
+  return d;
+}
+
+function stessaData(a, b) {
+  return (
+    a &&
+    b &&
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate()
+  );
+}
+
+function formattaBreve(data) {
+  return `${data.getDate()} ${MESI[data.getMonth()]}`;
+}
+
+function nomeProfilo(profilo) {
+  const nome = String(profilo?.nome || '').trim();
+  const cognome = String(profilo?.cognome || '').trim();
+
+  return `${nome} ${cognome}`.trim() || 'Collega';
+}
+
+function orarioTurno(turno) {
+  if (turno?.inizio && turno?.fine) {
+    return `${turno.inizio} – ${turno.fine}`;
+  }
+
+  const tipo = String(turno?.tipo || '').trim();
+
+  if (tipo && tipo !== 'turno') {
+    return tipo.toUpperCase();
+  }
+
+  return 'Orario non indicato';
+}
+
+export default function CalendarioColleghiScreen({ onBack }) {
+  const [inizioSettimana, setInizioSettimana] = useState(
+    lunediDellaSettimana(new Date())
+  );
+
+  const [mieiTurni, setMieiTurni] = useState([]);
+  const [ricevuti, setRicevuti] = useState([]);
+  const [colleghi, setColleghi] = useState([]);
+  const [mieCondivisioni, setMieCondivisioni] = useState([]);
+
+  const [loading, setLoading] = useState(true);
+  const [modalCondivisione, setModalCondivisione] = useState(false);
+  const [selezionati, setSelezionati] = useState([]);
+  const [livello, setLivello] = useState('orari_luogo');
+  const [salvataggio, setSalvataggio] = useState(false);
+
+  const fineSettimana = useMemo(
+    () => aggiungiGiorni(inizioSettimana, 6),
+    [inizioSettimana]
+  );
+
+  const giorniSettimana = useMemo(
+    () =>
+      Array.from({ length: 7 }, (_, i) =>
+        aggiungiGiorni(inizioSettimana, i)
+      ),
+    [inizioSettimana]
+  );
+
+  const caricaTutto = async () => {
+    try {
+      setLoading(true);
+
+      const [
+        turni,
+        turniRicevuti,
+        relazioni,
+        condivisioni,
+      ] = await Promise.all([
+        caricaTurniUtente(),
+        caricaTurniCondivisiRicevuti(),
+        caricaColleghi(),
+        caricaMieCondivisioni(),
+      ]);
+
+      setMieiTurni(Array.isArray(turni) ? turni : []);
+      setRicevuti(Array.isArray(turniRicevuti) ? turniRicevuti : []);
+
+      setColleghi(
+        (Array.isArray(relazioni) ? relazioni : []).filter(
+          c => c?.stato === 'accettato'
+        )
+      );
+
+      setMieCondivisioni(
+        Array.isArray(condivisioni) ? condivisioni : []
+      );
+    } catch (e) {
+      console.log('Errore Calendario Colleghi:', e);
+
+      Alert.alert(
+        'Calendario colleghi',
+        e?.message || 'Errore durante il caricamento.'
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    caricaTutto();
+  }, []);
+
+  const mieiTurniSettimana = useMemo(() => {
+    return mieiTurni.filter(turno => {
+      const d = dataTurno(turno);
+
+      return (
+        d &&
+        d >= inizioSettimana &&
+        d <= fineSettimana
+      );
+    });
+  }, [mieiTurni, inizioSettimana, fineSettimana]);
+
+  const ricevutiSettimana = useMemo(() => {
+    return ricevuti.filter(elemento => {
+      const d = dataTurno(elemento?.turno);
+
+      return (
+        d &&
+        d >= inizioSettimana &&
+        d <= fineSettimana
+      );
+    });
+  }, [ricevuti, inizioSettimana, fineSettimana]);
+
+  const apriCondivisione = () => {
+    const idsTurni = new Set(
+      mieiTurniSettimana
+        .map(t => String(t?.id || ''))
+        .filter(Boolean)
+    );
+
+    const condivisioniSettimana =
+      mieCondivisioni.filter(c =>
+        idsTurni.has(String(c?.turno_id))
+      );
+
+    const destinatari = Array.from(
+      new Set(
+        condivisioniSettimana
+          .map(c => c?.destinatario_id)
+          .filter(Boolean)
+      )
+    );
+
+    setSelezionati(destinatari);
+
+    if (condivisioniSettimana[0]?.livello) {
+      setLivello(condivisioniSettimana[0].livello);
+    } else {
+      setLivello('orari_luogo');
+    }
+
+    setModalCondivisione(true);
+  };
+
+  const toggleCollega = id => {
+    setSelezionati(prev =>
+      prev.includes(id)
+        ? prev.filter(x => x !== id)
+        : [...prev, id]
+    );
+  };
+
+  const selezionaTutti = () => {
+    const tutti = colleghi
+      .map(c => c?.altro_user_id)
+      .filter(Boolean);
+
+    if (
+      tutti.length > 0 &&
+      tutti.every(id => selezionati.includes(id))
+    ) {
+      setSelezionati([]);
+    } else {
+      setSelezionati(tutti);
+    }
+  };
+
+  const salvaCondivisione = async () => {
+    const turnoIds = mieiTurniSettimana
+      .map(t => t?.id)
+      .filter(Boolean)
+      .map(String);
+
+    if (turnoIds.length === 0) {
+      Alert.alert(
+        'Nessun turno',
+        'Non hai turni inseriti in questa settimana.'
+      );
+      return;
+    }
+
+    try {
+      setSalvataggio(true);
+
+      // La selezione del popup diventa la configurazione
+      // effettiva della settimana.
+      await rimuoviCondivisioneTurni({
+        turnoIds,
+        collegaIds: [],
+      });
+
+      if (selezionati.length > 0) {
+        await condividiTurniConColleghi({
+          turnoIds,
+          collegaIds: selezionati,
+          livello,
+        });
+      }
+
+      await caricaTutto();
+
+      setModalCondivisione(false);
+
+      Alert.alert(
+        'Condivisione aggiornata',
+        selezionati.length === 0
+          ? 'La settimana non è più condivisa.'
+          : `Settimana condivisa con ${selezionati.length} ${
+              selezionati.length === 1
+                ? 'collega'
+                : 'colleghi'
+            }.`
+      );
+    } catch (e) {
+      Alert.alert(
+        'Errore',
+        e?.message ||
+          'Non è stato possibile aggiornare la condivisione.'
+      );
+    } finally {
+      setSalvataggio(false);
+    }
+  };
+
+  const elementiDelGiorno = giorno => {
+    const elementi = [];
+
+    mieiTurniSettimana.forEach(turno => {
+      if (stessaData(dataTurno(turno), giorno)) {
+        elementi.push({
+          id: `mio_${turno.id}`,
+          mio: true,
+          nome: 'Tu',
+          profilo: null,
+          turno,
+          livello: 'orari_luogo',
+        });
+      }
+    });
+
+    ricevutiSettimana.forEach(elemento => {
+      if (stessaData(dataTurno(elemento.turno), giorno)) {
+        elementi.push({
+          id: `collega_${elemento.condivisione_id}`,
+          mio: false,
+          nome: nomeProfilo(elemento.profilo),
+          profilo: elemento.profilo,
+          turno: elemento.turno,
+          livello: elemento.livello,
+        });
+      }
+    });
+
+    return elementi.sort((a, b) =>
+      String(a?.turno?.inizio || '99:99').localeCompare(
+        String(b?.turno?.inizio || '99:99')
+      )
+    );
+  };
+
+  const tuttiSelezionati =
+    colleghi.length > 0 &&
+    colleghi.every(c =>
+      selezionati.includes(c?.altro_user_id)
+    );
+
+  return (
+    <View
+      style={{
+        flex: 1,
+        backgroundColor: '#07111F',
+      }}
+    >
+      <ScrollView
+        contentContainerStyle={{
+          paddingHorizontal: 17,
+          paddingTop: 56,
+          paddingBottom: 70,
+        }}
+      >
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            marginBottom: 22,
+          }}
+        >
+          <TouchableOpacity
+            onPress={onBack}
+            style={{
+              width: 42,
+              height: 42,
+              borderRadius: 21,
+              backgroundColor: '#101B34',
+              alignItems: 'center',
+              justifyContent: 'center',
+              marginRight: 12,
+            }}
+          >
+            <Ionicons
+              name="chevron-back"
+              size={25}
+              color="#FFFFFF"
+            />
+          </TouchableOpacity>
+
+          <View style={{ flex: 1 }}>
+            <Text
+              style={{
+                color: '#8DB8FF',
+                fontSize: 11,
+                fontWeight: '900',
+                letterSpacing: 1.2,
+              }}
+            >
+              TURNI CONDIVISI
+            </Text>
+
+            <Text
+              style={{
+                color: '#FFFFFF',
+                fontSize: 24,
+                fontWeight: '900',
+                marginTop: 3,
+              }}
+            >
+              Calendario colleghi
+            </Text>
+          </View>
+
+          <Ionicons
+            name="people"
+            size={29}
+            color="#8DB8FF"
+          />
+        </View>
+
+        <View
+          style={{
+            backgroundColor: '#101B34',
+            borderRadius: 18,
+            borderWidth: 1,
+            borderColor: 'rgba(130,160,255,0.20)',
+            padding: 14,
+            marginBottom: 16,
+          }}
+        >
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+            }}
+          >
+            <TouchableOpacity
+              onPress={() =>
+                setInizioSettimana(prev =>
+                  aggiungiGiorni(prev, -7)
+                )
+              }
+              style={{
+                width: 42,
+                height: 42,
+                borderRadius: 13,
+                backgroundColor: 'rgba(255,255,255,0.05)',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <Ionicons
+                name="chevron-back"
+                size={22}
+                color="#FFFFFF"
+              />
+            </TouchableOpacity>
+
+            <View style={{ alignItems: 'center' }}>
+              <Text
+                style={{
+                  color: '#FFFFFF',
+                  fontSize: 16,
+                  fontWeight: '900',
+                }}
+              >
+                {formattaBreve(inizioSettimana)}
+                {'  –  '}
+                {formattaBreve(fineSettimana)}
+              </Text>
+
+              <Text
+                style={{
+                  color: '#8190AD',
+                  fontSize: 11,
+                  marginTop: 4,
+                }}
+              >
+                Settimana condivisa
+              </Text>
+            </View>
+
+            <TouchableOpacity
+              onPress={() =>
+                setInizioSettimana(prev =>
+                  aggiungiGiorni(prev, 7)
+                )
+              }
+              style={{
+                width: 42,
+                height: 42,
+                borderRadius: 13,
+                backgroundColor: 'rgba(255,255,255,0.05)',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <Ionicons
+                name="chevron-forward"
+                size={22}
+                color="#FFFFFF"
+              />
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        <TouchableOpacity
+          onPress={apriCondivisione}
+          activeOpacity={0.82}
+          style={{
+            backgroundColor: '#3158A8',
+            borderRadius: 17,
+            minHeight: 54,
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'center',
+            marginBottom: 22,
+          }}
+        >
+          <Ionicons
+            name="share-social-outline"
+            size={21}
+            color="#FFFFFF"
+          />
+
+          <Text
+            style={{
+              color: '#FFFFFF',
+              fontSize: 15,
+              fontWeight: '900',
+              marginLeft: 8,
+            }}
+          >
+            Condividi la mia settimana
+          </Text>
+        </TouchableOpacity>
+
+        {loading ? (
+          <View
+            style={{
+              paddingVertical: 60,
+              alignItems: 'center',
+            }}
+          >
+            <ActivityIndicator />
+            <Text
+              style={{
+                color: '#8190AD',
+                marginTop: 12,
+              }}
+            >
+              Caricamento turni...
+            </Text>
+          </View>
+        ) : (
+          giorniSettimana.map((giorno, indice) => {
+            const elementi = elementiDelGiorno(giorno);
+
+            return (
+              <View
+                key={giorno.toISOString()}
+                style={{
+                  marginBottom: 18,
+                }}
+              >
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'baseline',
+                    marginBottom: 9,
+                  }}
+                >
+                  <Text
+                    style={{
+                      color: '#FFFFFF',
+                      fontSize: 17,
+                      fontWeight: '900',
+                    }}
+                  >
+                    {GIORNI[indice]}
+                  </Text>
+
+                  <Text
+                    style={{
+                      color: '#8DB8FF',
+                      fontSize: 13,
+                      fontWeight: '800',
+                      marginLeft: 7,
+                    }}
+                  >
+                    {giorno.getDate()}{' '}
+                    {MESI[giorno.getMonth()]}
+                  </Text>
+                </View>
+
+                {elementi.length === 0 ? (
+                  <View
+                    style={{
+                      backgroundColor: '#0D172B',
+                      borderRadius: 15,
+                      padding: 14,
+                      borderWidth: 1,
+                      borderColor:
+                        'rgba(130,160,255,0.10)',
+                    }}
+                  >
+                    <Text
+                      style={{
+                        color: '#5F6D87',
+                        fontSize: 12,
+                      }}
+                    >
+                      Nessun turno condiviso
+                    </Text>
+                  </View>
+                ) : (
+                  elementi.map(elemento => {
+                    const luogo =
+                      String(
+                        elemento?.turno?.luogo || ''
+                      ).trim();
+
+                    return (
+                      <View
+                        key={elemento.id}
+                        style={{
+                          backgroundColor:
+                            elemento.mio
+                              ? 'rgba(49,88,168,0.20)'
+                              : '#101B34',
+                          borderRadius: 17,
+                          padding: 14,
+                          marginBottom: 8,
+                          borderWidth: 1,
+                          borderColor:
+                            elemento.mio
+                              ? 'rgba(141,184,255,0.32)'
+                              : 'rgba(130,160,255,0.16)',
+                        }}
+                      >
+                        <View
+                          style={{
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                          }}
+                        >
+                          <View
+                            style={{
+                              width: 39,
+                              height: 39,
+                              borderRadius: 20,
+                              backgroundColor:
+                                'rgba(141,184,255,0.13)',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              marginRight: 11,
+                            }}
+                          >
+                            <Ionicons
+                              name={
+                                elemento.mio
+                                  ? 'person'
+                                  : 'shield-outline'
+                              }
+                              size={19}
+                              color="#8DB8FF"
+                            />
+                          </View>
+
+                          <View style={{ flex: 1 }}>
+                            <Text
+                              style={{
+                                color: '#FFFFFF',
+                                fontSize: 15,
+                                fontWeight: '900',
+                              }}
+                            >
+                              {elemento.nome}
+                            </Text>
+
+                            <Text
+                              style={{
+                                color: '#D7E1F7',
+                                fontSize: 14,
+                                fontWeight: '800',
+                                marginTop: 3,
+                              }}
+                            >
+                              {orarioTurno(
+                                elemento.turno
+                              )}
+                            </Text>
+                          </View>
+
+                          {elemento.mio && (
+                            <View
+                              style={{
+                                paddingHorizontal: 8,
+                                paddingVertical: 4,
+                                borderRadius: 8,
+                                backgroundColor:
+                                  'rgba(141,184,255,0.13)',
+                              }}
+                            >
+                              <Text
+                                style={{
+                                  color: '#8DB8FF',
+                                  fontSize: 9,
+                                  fontWeight: '900',
+                                }}
+                              >
+                                TU
+                              </Text>
+                            </View>
+                          )}
+                        </View>
+
+                        {luogo ? (
+                          <View
+                            style={{
+                              flexDirection: 'row',
+                              alignItems: 'center',
+                              marginTop: 11,
+                              marginLeft: 50,
+                            }}
+                          >
+                            <Ionicons
+                              name="location-outline"
+                              size={15}
+                              color="#8190AD"
+                            />
+
+                            <Text
+                              style={{
+                                color: '#AAB6CF',
+                                fontSize: 12,
+                                marginLeft: 5,
+                                flex: 1,
+                              }}
+                            >
+                              {luogo}
+                            </Text>
+                          </View>
+                        ) : !elemento.mio &&
+                          elemento.livello ===
+                            'solo_orari' ? (
+                          <View
+                            style={{
+                              flexDirection: 'row',
+                              alignItems: 'center',
+                              marginTop: 11,
+                              marginLeft: 50,
+                            }}
+                          >
+                            <Ionicons
+                              name="lock-closed-outline"
+                              size={14}
+                              color="#667590"
+                            />
+
+                            <Text
+                              style={{
+                                color: '#667590',
+                                fontSize: 11,
+                                marginLeft: 5,
+                              }}
+                            >
+                              Luogo non condiviso
+                            </Text>
+                          </View>
+                        ) : null}
+                      </View>
+                    );
+                  })
+                )}
+              </View>
+            );
+          })
+        )}
+      </ScrollView>
+
+      <Modal
+        visible={modalCondivisione}
+        transparent
+        animationType="slide"
+        onRequestClose={() =>
+          setModalCondivisione(false)
+        }
+      >
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: 'rgba(0,0,0,0.70)',
+            justifyContent: 'flex-end',
+          }}
+        >
+          <View
+            style={{
+              backgroundColor: '#0B1629',
+              borderTopLeftRadius: 28,
+              borderTopRightRadius: 28,
+              maxHeight: '85%',
+              paddingTop: 20,
+              paddingHorizontal: 18,
+              paddingBottom: 34,
+            }}
+          >
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                marginBottom: 18,
+              }}
+            >
+              <View style={{ flex: 1 }}>
+                <Text
+                  style={{
+                    color: '#FFFFFF',
+                    fontSize: 21,
+                    fontWeight: '900',
+                  }}
+                >
+                  Condividi settimana
+                </Text>
+
+                <Text
+                  style={{
+                    color: '#8190AD',
+                    fontSize: 12,
+                    marginTop: 4,
+                  }}
+                >
+                  {formattaBreve(inizioSettimana)}
+                  {' – '}
+                  {formattaBreve(fineSettimana)}
+                </Text>
+              </View>
+
+              <TouchableOpacity
+                onPress={() =>
+                  setModalCondivisione(false)
+                }
+                style={{
+                  width: 40,
+                  height: 40,
+                  borderRadius: 20,
+                  backgroundColor:
+                    'rgba(255,255,255,0.06)',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <Ionicons
+                  name="close"
+                  size={23}
+                  color="#FFFFFF"
+                />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView>
+              <Text
+                style={{
+                  color: '#FFFFFF',
+                  fontSize: 14,
+                  fontWeight: '900',
+                  marginBottom: 10,
+                }}
+              >
+                Cosa possono vedere?
+              </Text>
+
+              <View
+                style={{
+                  flexDirection: 'row',
+                  marginBottom: 22,
+                }}
+              >
+                <TouchableOpacity
+                  onPress={() =>
+                    setLivello('solo_orari')
+                  }
+                  style={{
+                    flex: 1,
+                    padding: 13,
+                    borderRadius: 14,
+                    marginRight: 6,
+                    backgroundColor:
+                      livello === 'solo_orari'
+                        ? '#3158A8'
+                        : '#101B34',
+                    borderWidth: 1,
+                    borderColor:
+                      livello === 'solo_orari'
+                        ? '#8DB8FF'
+                        : 'rgba(130,160,255,0.18)',
+                  }}
+                >
+                  <Text
+                    style={{
+                      color: '#FFFFFF',
+                      fontWeight: '900',
+                      textAlign: 'center',
+                    }}
+                  >
+                    Solo orari
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  onPress={() =>
+                    setLivello('orari_luogo')
+                  }
+                  style={{
+                    flex: 1,
+                    padding: 13,
+                    borderRadius: 14,
+                    marginLeft: 6,
+                    backgroundColor:
+                      livello === 'orari_luogo'
+                        ? '#3158A8'
+                        : '#101B34',
+                    borderWidth: 1,
+                    borderColor:
+                      livello === 'orari_luogo'
+                        ? '#8DB8FF'
+                        : 'rgba(130,160,255,0.18)',
+                  }}
+                >
+                  <Text
+                    style={{
+                      color: '#FFFFFF',
+                      fontWeight: '900',
+                      textAlign: 'center',
+                    }}
+                  >
+                    Orari + luogo
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              <View
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  marginBottom: 10,
+                }}
+              >
+                <Text
+                  style={{
+                    flex: 1,
+                    color: '#FFFFFF',
+                    fontSize: 14,
+                    fontWeight: '900',
+                  }}
+                >
+                  Scegli i colleghi
+                </Text>
+
+                {colleghi.length > 0 && (
+                  <TouchableOpacity
+                    onPress={selezionaTutti}
+                  >
+                    <Text
+                      style={{
+                        color: '#8DB8FF',
+                        fontSize: 12,
+                        fontWeight: '900',
+                      }}
+                    >
+                      {tuttiSelezionati
+                        ? 'Deseleziona tutti'
+                        : 'Seleziona tutti'}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+
+              {colleghi.length === 0 ? (
+                <View
+                  style={{
+                    padding: 20,
+                    backgroundColor: '#101B34',
+                    borderRadius: 16,
+                  }}
+                >
+                  <Text
+                    style={{
+                      color: '#8997B5',
+                      textAlign: 'center',
+                    }}
+                  >
+                    Non hai ancora colleghi accettati.
+                  </Text>
+                </View>
+              ) : (
+                colleghi.map(collega => {
+                  const id =
+                    collega?.altro_user_id;
+
+                  const selezionato =
+                    selezionati.includes(id);
+
+                  return (
+                    <TouchableOpacity
+                      key={
+                        collega.id ||
+                        id
+                      }
+                      onPress={() =>
+                        toggleCollega(id)
+                      }
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        backgroundColor: '#101B34',
+                        borderRadius: 15,
+                        padding: 13,
+                        marginBottom: 8,
+                        borderWidth: 1,
+                        borderColor: selezionato
+                          ? '#8DB8FF'
+                          : 'rgba(130,160,255,0.15)',
+                      }}
+                    >
+                      <Ionicons
+                        name={
+                          selezionato
+                            ? 'checkbox'
+                            : 'square-outline'
+                        }
+                        size={23}
+                        color={
+                          selezionato
+                            ? '#8DB8FF'
+                            : '#667590'
+                        }
+                      />
+
+                      <View
+                        style={{
+                          flex: 1,
+                          marginLeft: 10,
+                        }}
+                      >
+                        <Text
+                          style={{
+                            color: '#FFFFFF',
+                            fontSize: 14,
+                            fontWeight: '900',
+                          }}
+                        >
+                          {nomeProfilo(
+                            collega.profilo
+                          )}
+                        </Text>
+
+                        {!!collega?.profilo
+                          ?.azienda && (
+                          <Text
+                            style={{
+                              color: '#8190AD',
+                              fontSize: 11,
+                              marginTop: 3,
+                            }}
+                          >
+                            {
+                              collega.profilo
+                                .azienda
+                            }
+                          </Text>
+                        )}
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })
+              )}
+
+              <View
+                style={{
+                  marginTop: 15,
+                  marginBottom: 18,
+                  padding: 13,
+                  borderRadius: 14,
+                  backgroundColor:
+                    'rgba(141,184,255,0.08)',
+                }}
+              >
+                <Text
+                  style={{
+                    color: '#AEB9D6',
+                    fontSize: 11,
+                    lineHeight: 17,
+                  }}
+                >
+                  I turni restano privati per tutti gli
+                  altri utenti. Solo i colleghi selezionati
+                  potranno vedere questa settimana.
+                </Text>
+              </View>
+            </ScrollView>
+
+            <TouchableOpacity
+              disabled={salvataggio}
+              onPress={salvaCondivisione}
+              style={{
+                backgroundColor: '#3158A8',
+                borderRadius: 16,
+                minHeight: 54,
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexDirection: 'row',
+                opacity: salvataggio ? 0.6 : 1,
+              }}
+            >
+              {salvataggio ? (
+                <ActivityIndicator color="#FFFFFF" />
+              ) : (
+                <>
+                  <Ionicons
+                    name="people-outline"
+                    size={21}
+                    color="#FFFFFF"
+                  />
+
+                  <Text
+                    style={{
+                      color: '#FFFFFF',
+                      fontSize: 15,
+                      fontWeight: '900',
+                      marginLeft: 8,
+                    }}
+                  >
+                    Salva condivisione
+                  </Text>
+                </>
+              )}
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+    </View>
+  );
+}

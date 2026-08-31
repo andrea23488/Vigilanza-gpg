@@ -52,31 +52,113 @@ export async function caricaColleghi() {
   return risultati;
 }
 
-export async function aggiungiCollega(codiceGpg) {
+export async function aggiungiCollega(testoRicerca) {
   const user = await getCurrentUser();
 
-  const codice = codiceGpg.trim().toUpperCase();
+  const ricerca = String(testoRicerca || '').trim();
 
-  if (!codice) {
-    throw new Error('Inserisci il codice GPG del collega.');
+  if (!ricerca) {
+    throw new Error(
+      'Inserisci nome, cognome, matricola o codice GPG.'
+    );
   }
 
-  const { data: profiloCollega, error: erroreProfilo } = await supabase
-    .from('profili')
-    .select('user_id, nome, cognome, codice_gpg')
-    .eq('codice_gpg', codice)
-    .maybeSingle();
+  let profiliTrovati = [];
 
-  if (erroreProfilo) throw erroreProfilo;
+  // Prima prova il codice GPG esatto
+  const codice = ricerca.toUpperCase();
 
-  if (!profiloCollega) {
-    throw new Error('Nessun collega trovato con questo codice GPG.');
+  const { data: profiloCodice, error: erroreCodice } =
+    await supabase
+      .from('profili')
+      .select('user_id, nome, cognome, codice_gpg, azienda, sede')
+      .eq('codice_gpg', codice)
+      .maybeSingle();
+
+  if (erroreCodice) throw erroreCodice;
+
+  if (profiloCodice) {
+    profiliTrovati = [profiloCodice];
+  } else {
+    // Ricerca per nome/cognome
+    const parole = ricerca
+      .split(/\s+/)
+      .map(x => x.trim())
+      .filter(Boolean);
+
+    let query = supabase
+      .from('profili')
+      .select('user_id, nome, cognome, codice_gpg, azienda, sede')
+      .neq('user_id', user.id);
+
+    if (parole.length >= 2) {
+      const nome = parole[0];
+      const cognome = parole.slice(1).join(' ');
+
+      query = query
+        .ilike('nome', nome)
+        .ilike('cognome', cognome);
+    } else {
+      const q = parole[0];
+
+      query = query.or(
+        `nome.ilike.%${q}%,cognome.ilike.%${q}%,codice_gpg.ilike.%${q}%`
+      );
+    }
+
+    const { data, error } = await query.limit(20);
+
+    if (error) throw error;
+
+    profiliTrovati = data || [];
   }
 
+  profiliTrovati = profiliTrovati.filter(
+    p => p.user_id !== user.id
+  );
+
+  if (profiliTrovati.length === 0) {
+    throw new Error(
+      'Nessun collega trovato. Prova con nome e cognome completi oppure con la matricola.'
+    );
+  }
+
+  if (profiliTrovati.length > 1) {
+    const esempi = profiliTrovati
+      .slice(0, 3)
+      .map(
+        p =>
+          `${p.nome || ''} ${p.cognome || ''}`.trim()
+      )
+      .filter(Boolean)
+      .join(', ');
+
+    throw new Error(
+      `Ho trovato più colleghi${esempi ? `: ${esempi}` : ''}. Scrivi nome e cognome completi oppure la matricola.`
+    );
+  }
+
+  const profiloCollega = profiliTrovati[0];
   const collegaId = profiloCollega.user_id;
 
-  if (collegaId === user.id) {
-    throw new Error('Non puoi aggiungere te stesso.');
+  const { data: esistenti, error: erroreEsistenti } =
+    await supabase
+      .from('colleghi')
+      .select('id, user_id, collega_id, stato')
+      .or(
+        `and(user_id.eq.${user.id},collega_id.eq.${collegaId}),and(user_id.eq.${collegaId},collega_id.eq.${user.id})`
+      );
+
+  if (erroreEsistenti) throw erroreEsistenti;
+
+  const esistente = (esistenti || [])[0];
+
+  if (esistente?.stato === 'accettato') {
+    throw new Error('Siete già colleghi.');
+  }
+
+  if (esistente?.stato === 'in_attesa') {
+    throw new Error('Esiste già una richiesta in attesa.');
   }
 
   const { data, error } = await supabase
@@ -89,30 +171,12 @@ export async function aggiungiCollega(codiceGpg) {
     .select()
     .single();
 
-  if (error) {
-    if (error.code === '23505') {
-      const { data: esistente } = await supabase
-        .from('colleghi')
-        .select('stato')
-        .eq('user_id', user.id)
-        .eq('collega_id', collegaId)
-        .maybeSingle();
+  if (error) throw error;
 
-      if (esistente?.stato === 'accettato') {
-        throw new Error('Siete già colleghi.');
-      }
-
-      if (esistente?.stato === 'in_attesa') {
-        throw new Error('Richiesta già inviata.');
-      }
-
-      throw new Error('Collegamento già esistente.');
-    }
-
-    throw error;
-  }
-
-  return data;
+  return {
+    ...data,
+    profilo: profiloCollega,
+  };
 }
 
 export async function rimuoviCollega(idRelazione) {

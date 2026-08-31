@@ -1,0 +1,771 @@
+import React, { useEffect, useState } from 'react';
+import {
+  View,
+  Text,
+  ScrollView,
+  TouchableOpacity,
+  TextInput,
+  Image,
+  Alert,
+  Linking,
+} from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as ImagePicker from 'expo-image-picker';
+import { Ionicons } from '@expo/vector-icons';
+
+const CHIAVE_BASE = 'vigilanza_scheda_posto_';
+
+const creaChiave = (luogo = '') =>
+  CHIAVE_BASE +
+  String(luogo)
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9àèéìòù]+/gi, '_');
+
+const DEFAULT_DATA = {
+  bagno: null,
+  clima: null,
+  corrente: null,
+  ristoro: null,
+  auto: null,
+  isolata: null,
+  cambio: null,
+  segnale: 'Non indicato',
+  note: '',
+  segnalazioni: '',
+  media: [],
+  aggiornatoIl: null,
+};
+
+function InfoToggle({ icon, titolo, value, onChange }) {
+  const testo =
+    value === true ? 'Sì' :
+    value === false ? 'No' :
+    'Non indicato';
+
+  const colore =
+    value === true ? '#63D391' :
+    value === false ? '#FF7474' :
+    '#AEB9D6';
+
+  return (
+    <TouchableOpacity
+      onPress={() => {
+        if (value === null || value === undefined) onChange(true);
+        else if (value === true) onChange(false);
+        else onChange(null);
+      }}
+      style={{
+        width: '48%',
+        minHeight: 88,
+        backgroundColor: '#101B34',
+        borderRadius: 18,
+        borderWidth: 1,
+        borderColor: 'rgba(130,160,255,0.20)',
+        padding: 14,
+        marginBottom: 10,
+      }}
+    >
+      <Ionicons name={icon} size={23} color="#8DB8FF" />
+      <Text
+        style={{
+          color: '#FFFFFF',
+          fontSize: 14,
+          fontWeight: '800',
+          marginTop: 8,
+        }}
+      >
+        {titolo}
+      </Text>
+
+      <Text
+        style={{
+          color: colore,
+          fontSize: 13,
+          fontWeight: '800',
+          marginTop: 4,
+        }}
+      >
+        {testo}
+      </Text>
+    </TouchableOpacity>
+  );
+}
+
+export default function SchedaPostoScreen({ luogo, onBack }) {
+  const [data, setData] = useState(DEFAULT_DATA);
+  const [caricato, setCaricato] = useState(false);
+
+  const chiave = creaChiave(luogo);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const raw = await AsyncStorage.getItem(chiave);
+        if (raw) {
+          setData({
+            ...DEFAULT_DATA,
+            ...JSON.parse(raw),
+          });
+        }
+      } catch (e) {
+        console.log('Errore caricamento Scheda Posto:', e);
+      } finally {
+        setCaricato(true);
+      }
+    })();
+  }, [chiave]);
+
+  const aggiorna = (campo, valore) => {
+    setData(prev => ({
+      ...prev,
+      [campo]: valore,
+    }));
+  };
+
+  const salva = async () => {
+    try {
+      const nuovo = {
+        ...data,
+        aggiornatoIl: new Date().toISOString(),
+      };
+
+      setData(nuovo);
+      await AsyncStorage.setItem(chiave, JSON.stringify(nuovo));
+
+      Alert.alert(
+        'Scheda salvata',
+        'Le informazioni del posto sono state aggiornate.'
+      );
+    } catch (e) {
+      Alert.alert('Errore', 'Non è stato possibile salvare la scheda.');
+    }
+  };
+
+  const scegliMedia = async tipo => {
+    try {
+      const permesso =
+        await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+      if (!permesso.granted) {
+        Alert.alert(
+          'Permesso necessario',
+          'Consenti l’accesso alla libreria per aggiungere foto e video.'
+        );
+        return;
+      }
+
+      const risultato =
+        await ImagePicker.launchImageLibraryAsync({
+          mediaTypes:
+            tipo === 'foto'
+              ? ImagePicker.MediaTypeOptions.Images
+              : ImagePicker.MediaTypeOptions.Videos,
+          allowsEditing: false,
+          quality: tipo === 'foto' ? 0.7 : 0.6,
+          videoMaxDuration: 30,
+        });
+
+      if (risultato.canceled) return;
+
+      const asset = risultato.assets?.[0];
+      if (!asset?.uri) return;
+
+      const nuovoMedia = {
+        id: `${Date.now()}_${Math.random().toString(36).slice(2)}`,
+        tipo,
+        uri: asset.uri,
+        data: new Date().toISOString(),
+        descrizione: '',
+      };
+
+      const nuoviMedia = [nuovoMedia, ...(data.media || [])];
+
+      const nuovo = {
+        ...data,
+        media: nuoviMedia,
+        aggiornatoIl: new Date().toISOString(),
+      };
+
+      setData(nuovo);
+      await AsyncStorage.setItem(chiave, JSON.stringify(nuovo));
+    } catch (e) {
+      console.log(e);
+      Alert.alert('Errore', 'Non è stato possibile aggiungere il contenuto.');
+    }
+  };
+
+  const scattaFoto = async () => {
+    try {
+      const permesso =
+        await ImagePicker.requestCameraPermissionsAsync();
+
+      if (!permesso.granted) {
+        Alert.alert(
+          'Permesso necessario',
+          'Consenti l’accesso alla fotocamera.'
+        );
+        return;
+      }
+
+      const risultato =
+        await ImagePicker.launchCameraAsync({
+          mediaTypes: ImagePicker.MediaTypeOptions.Images,
+          quality: 0.7,
+        });
+
+      if (risultato.canceled) return;
+
+      const asset = risultato.assets?.[0];
+      if (!asset?.uri) return;
+
+      const nuovoMedia = {
+        id: `${Date.now()}_${Math.random().toString(36).slice(2)}`,
+        tipo: 'foto',
+        uri: asset.uri,
+        data: new Date().toISOString(),
+        descrizione: '',
+      };
+
+      const nuovo = {
+        ...data,
+        media: [nuovoMedia, ...(data.media || [])],
+        aggiornatoIl: new Date().toISOString(),
+      };
+
+      setData(nuovo);
+      await AsyncStorage.setItem(chiave, JSON.stringify(nuovo));
+    } catch (e) {
+      Alert.alert('Errore', 'Non è stato possibile scattare la foto.');
+    }
+  };
+
+  const eliminaMedia = media => {
+    Alert.alert(
+      'Elimina contenuto',
+      media.tipo === 'video'
+        ? 'Vuoi eliminare questo video?'
+        : 'Vuoi eliminare questa foto?',
+      [
+        { text: 'Annulla', style: 'cancel' },
+        {
+          text: 'Elimina',
+          style: 'destructive',
+          onPress: async () => {
+            const nuovo = {
+              ...data,
+              media: (data.media || []).filter(x => x.id !== media.id),
+            };
+
+            setData(nuovo);
+            await AsyncStorage.setItem(chiave, JSON.stringify(nuovo));
+          },
+        },
+      ]
+    );
+  };
+
+  if (!caricato) return null;
+
+  const titoloSezione = testo => (
+    <Text
+      style={{
+        color: '#FFFFFF',
+        fontSize: 18,
+        fontWeight: '900',
+        marginBottom: 12,
+      }}
+    >
+      {testo}
+    </Text>
+  );
+
+  return (
+    <View style={{ flex: 1, backgroundColor: '#07111F' }}>
+      <ScrollView
+        contentContainerStyle={{
+          paddingHorizontal: 18,
+          paddingTop: 58,
+          paddingBottom: 60,
+        }}
+      >
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            marginBottom: 22,
+          }}
+        >
+          <TouchableOpacity
+            onPress={onBack}
+            style={{
+              width: 42,
+              height: 42,
+              borderRadius: 21,
+              backgroundColor: '#101B34',
+              alignItems: 'center',
+              justifyContent: 'center',
+              marginRight: 13,
+            }}
+          >
+            <Ionicons
+              name="chevron-back"
+              size={25}
+              color="#FFFFFF"
+            />
+          </TouchableOpacity>
+
+          <View style={{ flex: 1 }}>
+            <Text
+              style={{
+                color: '#8DB8FF',
+                fontSize: 12,
+                fontWeight: '900',
+                letterSpacing: 1.3,
+              }}
+            >
+              SCHEDA POSTO
+            </Text>
+
+            <Text
+              numberOfLines={2}
+              style={{
+                color: '#FFFFFF',
+                fontSize: 23,
+                fontWeight: '900',
+                marginTop: 3,
+              }}
+            >
+              {luogo || 'Luogo non indicato'}
+            </Text>
+          </View>
+
+          <Ionicons
+            name="location"
+            size={30}
+            color="#8DB8FF"
+          />
+        </View>
+
+        <View
+          style={{
+            backgroundColor: 'rgba(65,101,190,0.13)',
+            borderRadius: 18,
+            borderWidth: 1,
+            borderColor: 'rgba(141,184,255,0.22)',
+            padding: 15,
+            marginBottom: 24,
+          }}
+        >
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+            }}
+          >
+            <Ionicons
+              name="shield-checkmark-outline"
+              size={21}
+              color="#8DB8FF"
+            />
+
+            <Text
+              style={{
+                flex: 1,
+                color: '#DCE6FF',
+                fontSize: 13,
+                lineHeight: 19,
+                marginLeft: 10,
+              }}
+            >
+              Inserisci solo informazioni utili al servizio.
+              Non caricare volti, targhe, documenti,
+              monitor o dati riservati del cliente.
+            </Text>
+          </View>
+        </View>
+
+        {titoloSezione('Informazioni pratiche')}
+
+        <View
+          style={{
+            flexDirection: 'row',
+            flexWrap: 'wrap',
+            justifyContent: 'space-between',
+            marginBottom: 8,
+          }}
+        >
+          <InfoToggle
+            icon="water-outline"
+            titolo="Bagno"
+            value={data.bagno}
+            onChange={v => aggiorna('bagno', v)}
+          />
+
+          <InfoToggle
+            icon="snow-outline"
+            titolo="Climatizzazione"
+            value={data.clima}
+            onChange={v => aggiorna('clima', v)}
+          />
+
+          <InfoToggle
+            icon="flash-outline"
+            titolo="Presa corrente"
+            value={data.corrente}
+            onChange={v => aggiorna('corrente', v)}
+          />
+
+          <InfoToggle
+            icon="cafe-outline"
+            titolo="Ristoro"
+            value={data.ristoro}
+            onChange={v => aggiorna('ristoro', v)}
+          />
+
+          <InfoToggle
+            icon="car-outline"
+            titolo="Auto / parcheggio"
+            value={data.auto}
+            onChange={v => aggiorna('auto', v)}
+          />
+
+          <InfoToggle
+            icon="moon-outline"
+            titolo="Postazione isolata"
+            value={data.isolata}
+            onChange={v => aggiorna('isolata', v)}
+          />
+
+          <InfoToggle
+            icon="swap-horizontal-outline"
+            titolo="Cambio sul posto"
+            value={data.cambio}
+            onChange={v => aggiorna('cambio', v)}
+          />
+        </View>
+
+        <Text
+          style={{
+            color: '#AEB9D6',
+            fontSize: 12,
+            fontWeight: '800',
+            marginBottom: 7,
+          }}
+        >
+          SEGNALE TELEFONICO
+        </Text>
+
+        <View
+          style={{
+            flexDirection: 'row',
+            flexWrap: 'wrap',
+            marginBottom: 25,
+          }}
+        >
+          {['Ottimo', 'Buono', 'Scarso', 'Assente'].map(voce => (
+            <TouchableOpacity
+              key={voce}
+              onPress={() => aggiorna('segnale', voce)}
+              style={{
+                paddingHorizontal: 13,
+                paddingVertical: 9,
+                borderRadius: 12,
+                marginRight: 7,
+                marginBottom: 7,
+                backgroundColor:
+                  data.segnale === voce
+                    ? '#3158A8'
+                    : '#101B34',
+                borderWidth: 1,
+                borderColor:
+                  data.segnale === voce
+                    ? '#8DB8FF'
+                    : 'rgba(130,160,255,0.20)',
+              }}
+            >
+              <Text
+                style={{
+                  color: '#FFFFFF',
+                  fontWeight: '800',
+                  fontSize: 13,
+                }}
+              >
+                {voce}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        {titoloSezione('Foto e video del posto')}
+
+        <View
+          style={{
+            flexDirection: 'row',
+            flexWrap: 'wrap',
+            marginBottom: 15,
+          }}
+        >
+          <TouchableOpacity
+            onPress={scattaFoto}
+            style={{
+              backgroundColor: '#3158A8',
+              paddingHorizontal: 14,
+              paddingVertical: 12,
+              borderRadius: 14,
+              flexDirection: 'row',
+              alignItems: 'center',
+              marginRight: 8,
+              marginBottom: 8,
+            }}
+          >
+            <Ionicons name="camera" size={19} color="#FFFFFF" />
+            <Text
+              style={{
+                color: '#FFFFFF',
+                fontWeight: '900',
+                marginLeft: 7,
+              }}
+            >
+              Scatta
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            onPress={() => scegliMedia('foto')}
+            style={{
+              backgroundColor: '#101B34',
+              paddingHorizontal: 14,
+              paddingVertical: 12,
+              borderRadius: 14,
+              flexDirection: 'row',
+              alignItems: 'center',
+              marginRight: 8,
+              marginBottom: 8,
+            }}
+          >
+            <Ionicons
+              name="images-outline"
+              size={19}
+              color="#8DB8FF"
+            />
+            <Text
+              style={{
+                color: '#FFFFFF',
+                fontWeight: '900',
+                marginLeft: 7,
+              }}
+            >
+              Foto
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            onPress={() => scegliMedia('video')}
+            style={{
+              backgroundColor: '#101B34',
+              paddingHorizontal: 14,
+              paddingVertical: 12,
+              borderRadius: 14,
+              flexDirection: 'row',
+              alignItems: 'center',
+              marginBottom: 8,
+            }}
+          >
+            <Ionicons
+              name="videocam-outline"
+              size={19}
+              color="#8DB8FF"
+            />
+            <Text
+              style={{
+                color: '#FFFFFF',
+                fontWeight: '900',
+                marginLeft: 7,
+              }}
+            >
+              Video
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {(data.media || []).length === 0 ? (
+          <View
+            style={{
+              padding: 22,
+              backgroundColor: '#101B34',
+              borderRadius: 18,
+              alignItems: 'center',
+              marginBottom: 25,
+            }}
+          >
+            <Ionicons
+              name="images-outline"
+              size={30}
+              color="#62718F"
+            />
+            <Text
+              style={{
+                color: '#8997B5',
+                fontSize: 13,
+                marginTop: 9,
+              }}
+            >
+              Nessuna foto o video ancora
+            </Text>
+          </View>
+        ) : (
+          <View
+            style={{
+              flexDirection: 'row',
+              flexWrap: 'wrap',
+              marginBottom: 24,
+            }}
+          >
+            {(data.media || []).map(media => (
+              <TouchableOpacity
+                key={media.id}
+                onPress={() => {
+                  if (media.tipo === 'video') {
+                    Linking.openURL(media.uri).catch(() =>
+                      Alert.alert(
+                        'Video',
+                        'Non riesco ad aprire questo video.'
+                      )
+                    );
+                  }
+                }}
+                onLongPress={() => eliminaMedia(media)}
+                style={{
+                  width: '31%',
+                  aspectRatio: 1,
+                  marginRight: '2%',
+                  marginBottom: 9,
+                  borderRadius: 13,
+                  overflow: 'hidden',
+                  backgroundColor: '#101B34',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                {media.tipo === 'foto' ? (
+                  <Image
+                    source={{ uri: media.uri }}
+                    style={{
+                      width: '100%',
+                      height: '100%',
+                    }}
+                  />
+                ) : (
+                  <>
+                    <Ionicons
+                      name="play-circle"
+                      size={37}
+                      color="#FFFFFF"
+                    />
+                    <Text
+                      style={{
+                        color: '#AEB9D6',
+                        fontSize: 10,
+                        fontWeight: '800',
+                        marginTop: 3,
+                      }}
+                    >
+                      VIDEO
+                    </Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
+
+        {titoloSezione('Note dei colleghi')}
+
+        <TextInput
+          multiline
+          value={data.note}
+          onChangeText={v => aggiorna('note', v)}
+          placeholder="Es. servizio tranquillo, bagno dietro la portineria..."
+          placeholderTextColor="#61708F"
+          style={{
+            minHeight: 110,
+            backgroundColor: '#101B34',
+            borderRadius: 17,
+            borderWidth: 1,
+            borderColor: 'rgba(130,160,255,0.20)',
+            padding: 15,
+            color: '#FFFFFF',
+            textAlignVertical: 'top',
+            fontSize: 14,
+            marginBottom: 22,
+          }}
+        />
+
+        {titoloSezione('Segnalazioni utili')}
+
+        <TextInput
+          multiline
+          value={data.segnalazioni}
+          onChangeText={v => aggiorna('segnalazioni', v)}
+          placeholder="Es. cancello laterale guasto, illuminazione scarsa..."
+          placeholderTextColor="#61708F"
+          style={{
+            minHeight: 110,
+            backgroundColor: '#101B34',
+            borderRadius: 17,
+            borderWidth: 1,
+            borderColor: 'rgba(255,174,90,0.28)',
+            padding: 15,
+            color: '#FFFFFF',
+            textAlignVertical: 'top',
+            fontSize: 14,
+            marginBottom: 12,
+          }}
+        />
+
+        {data.aggiornatoIl ? (
+          <Text
+            style={{
+              color: '#667590',
+              fontSize: 11,
+              textAlign: 'center',
+              marginBottom: 15,
+            }}
+          >
+            Ultimo aggiornamento:{' '}
+            {new Date(data.aggiornatoIl).toLocaleString('it-IT')}
+          </Text>
+        ) : null}
+
+        <TouchableOpacity
+          onPress={salva}
+          style={{
+            backgroundColor: '#3158A8',
+            borderRadius: 17,
+            paddingVertical: 16,
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexDirection: 'row',
+          }}
+        >
+          <Ionicons
+            name="save-outline"
+            size={21}
+            color="#FFFFFF"
+          />
+          <Text
+            style={{
+              color: '#FFFFFF',
+              fontSize: 16,
+              fontWeight: '900',
+              marginLeft: 8,
+            }}
+          >
+            Salva Scheda Posto
+          </Text>
+        </TouchableOpacity>
+      </ScrollView>
+    </View>
+  );
+}

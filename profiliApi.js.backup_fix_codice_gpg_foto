@@ -46,6 +46,7 @@ export async function salvaProfiloUtente(profilo) {
     ruolo: profilo.ruolo || '',
     sede: profilo.sede || '',
     punto_partenza: profilo.punto_partenza || '',
+    codice_gpg: profilo.codice_gpg || '',
     in_servizio_dal:
       profilo.in_servizio_dal === '' ||
       profilo.in_servizio_dal === null ||
@@ -54,17 +55,6 @@ export async function salvaProfiloUtente(profilo) {
         : Number(profilo.in_servizio_dal),
     updated_at: new Date().toISOString(),
   };
-
-  // codice_gpg è un campo UNIQUE.
-  // Se questa funzione viene usata per aggiornare solo foto o altri dati,
-  // NON dobbiamo sovrascrivere il codice esistente con stringa vuota.
-  if (profilo.codice_gpg !== undefined) {
-    const codiceGpg = String(profilo.codice_gpg || '')
-      .trim()
-      .toUpperCase();
-
-    payload.codice_gpg = codiceGpg || null;
-  }
 
   if (profilo.foto_url !== undefined) {
     payload.foto_url = profilo.foto_url;
