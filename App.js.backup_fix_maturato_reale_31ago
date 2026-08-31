@@ -5259,34 +5259,46 @@ const totaleCompetenzeFiduciario =
   };
 
 
-  // Quota della paga base realmente maturata sulle ore concluse
-const oreSettimanaliContrattoMaturato = Math.max(
-  1,
-  Number(
-    String(stipendioOreSettimanali || '40')
-      .replace(',', '.')
-  ) || 40
-);
+  // Quota temporale della paga mensile
+  const dataInizioMeseMaturato =
+    new Date(
+      Number(anno),
+      Number(mese),
+      1
+    );
 
-// Media mensile contrattuale: ore settimanali × 52 / 12
-const oreMensiliContrattualiMaturato =
-  (oreSettimanaliContrattoMaturato * 52) / 12;
+  const dataFineMeseMaturato =
+    new Date(
+      Number(anno),
+      Number(mese) + 1,
+      1
+    );
 
-// Le ore extra sono già valorizzate separatamente:
-// qui maturiamo esclusivamente la componente ordinaria della paga base.
-const oreOrdinarieCompletateMaturato = Math.max(
-  0,
-  Number(oreCompletateStipendio || 0) -
-  Number(extraCompletatoStipendio || 0)
-);
+  let quotaTempoMese = 0;
 
-const quotaTempoMese = Math.min(
-  1,
-  oreOrdinarieCompletateMaturato /
-    Math.max(1, oreMensiliContrattualiMaturato)
-);
+  if (adessoMaturato >= dataFineMeseMaturato) {
+    quotaTempoMese = 1;
+  } else if (
+    adessoMaturato >= dataInizioMeseMaturato
+  ) {
+    const durata =
+      dataFineMeseMaturato -
+      dataInizioMeseMaturato;
 
-// ===== GPG: componenti realmente maturate =====
+    quotaTempoMese =
+      Math.min(
+        1,
+        Math.max(
+          0,
+          (adessoMaturato -
+            dataInizioMeseMaturato) /
+            durata
+        )
+      );
+  }
+
+
+  // ===== GPG: componenti realmente maturate =====
 
   const maturatoGpgAdOggi =
     (
@@ -24310,36 +24322,6 @@ if (screen === 'profiloCollega') {
                   )
                 }
               />
-
-      <Quick
-        title="07–15"
-        onPress={() =>
-          turnoRapido(
-            '07:00',
-            '15:00'
-          )
-        }
-      />
-
-      <Quick
-        title="15–23"
-        onPress={() =>
-          turnoRapido(
-            '15:00',
-            '23:00'
-          )
-        }
-      />
-
-      <Quick
-        title="23–07"
-        onPress={() =>
-          turnoRapido(
-            '23:00',
-            '07:00'
-          )
-        }
-      />
             </View>
 
             <View
