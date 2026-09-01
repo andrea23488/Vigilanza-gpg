@@ -8482,8 +8482,6 @@ if (screen === 'colleghi') {
           </Text>
         </View>
 
-{String(stipendioLivello || '').trim() ? (
-          <>
 <Text
             style={{
               color: '#dfe6ff',
@@ -8526,38 +8524,6 @@ if (screen === 'colleghi') {
     >
       € {nettoStimatoAdOggi.toFixed(2)}
     </Text>
-          </>
-        ) : (
-          <View
-            style={{
-              paddingVertical: 18,
-              paddingHorizontal: 4,
-            }}
-          >
-            <Text
-              style={{
-                color: '#FFFFFF',
-                fontSize: 18,
-                fontWeight: '900',
-                lineHeight: 24,
-              }}
-            >
-              Completa il profilo
-            </Text>
-
-            <Text
-              style={{
-                color: '#B9C6E2',
-                fontSize: 13,
-                fontWeight: '700',
-                lineHeight: 19,
-                marginTop: 7,
-              }}
-            >
-              Imposta il tuo livello per calcolare correttamente lo stipendio.
-            </Text>
-          </View>
-        )}
         </View>
 
         <View
