@@ -356,9 +356,22 @@ export default function LoginScreen({ onEnterTest }) {
     }
   }
 
+  const loginScrollRef = React.useRef(null);
+
+
+
   return (
+
+
     <SafeAreaView style={styles.safe}>
+
+
       <ScrollView
+
+
+        ref={loginScrollRef}
+
+
         style={styles.screen}
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
@@ -480,7 +493,16 @@ E FIDUCIARI
             onChange={setPassword}
             placeholder="Almeno 6 caratteri"
             secureTextEntry
-          />
+          
+        onFocus={() => {
+          setTimeout(() => {
+            loginScrollRef.current?.scrollTo({
+              y: 245,
+              animated: true,
+            });
+          }, 120);
+        }}
+      />
 
           <TouchableOpacity
             style={[
@@ -541,69 +563,7 @@ E FIDUCIARI
         </Text>
       </ScrollView>
     
-      {loginKeyboard.visible ? (
-        <View
-          pointerEvents="box-none"
-          style={{
-            position: 'absolute',
-            left: 0,
-            right: 0,
-            bottom: loginKeyboard.height,
-            zIndex: 99999,
-          }}
-        >
-          <View
-            style={{
-              minHeight: 46,
-
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'flex-end',
-
-              paddingHorizontal: 14,
-              paddingVertical: 5,
-
-              backgroundColor: 'rgba(10,21,39,0.97)',
-
-              borderTopWidth: 1,
-              borderTopColor: 'rgba(89,211,255,0.24)',
-            }}
-          >
-            <TouchableOpacity
-              activeOpacity={0.82}
-              onPress={() => Keyboard.dismiss()}
-              style={{
-                minWidth: 92,
-                height: 36,
-
-                paddingHorizontal: 14,
-
-                flexDirection: 'row',
-                alignItems: 'center',
-                justifyContent: 'center',
-
-                borderRadius: 12,
-
-                backgroundColor: 'rgba(20,136,176,0.98)',
-
-                borderWidth: 1,
-                borderColor: 'rgba(106,232,255,0.68)',
-              }}
-            >
-              <Text
-                style={{
-                  color: '#FFFFFF',
-                  fontSize: 10,
-                  fontWeight: '900',
-                  letterSpacing: 0.7,
-                }}
-              >
-                ✓ FINE
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      ) : null}
+      
 
 </SafeAreaView>
   );
@@ -616,6 +576,7 @@ function Field({
   placeholder,
   keyboardType,
   secureTextEntry,
+  onFocus,
 }) {
   return (
     <View style={styles.fieldWrap}>
@@ -627,6 +588,7 @@ function Field({
         style={styles.input}
         value={value}
         onChangeText={onChange}
+        onFocus={onFocus}
         placeholder={placeholder}
         placeholderTextColor="#667A91"
         keyboardType={keyboardType}

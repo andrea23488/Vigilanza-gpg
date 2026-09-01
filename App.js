@@ -347,6 +347,7 @@ export default function App() {
   const [screen, setScreen] = useState("home");
   const [schedaPostoLuogo, setSchedaPostoLuogo] = useState('');
   const passatempoScrollRef = React.useRef(null);
+  const editScreenScrollRef = React.useRef(null);
   const snakeDirezioneRealeRef = React.useRef({ x: 1, y: 0 });
   const [consegnaSelezionata, setConsegnaSelezionata] = useState(null);
   const [consegneRicevute, setConsegneRicevute] = useState([]);
@@ -24096,7 +24097,7 @@ if (screen === 'profiloCollega') {
 
 
     return (
-      <Screen>
+      <Screen scrollRef={editScreenScrollRef}>
         <Back
           onPress={
             () => { setEditingId(null); setScreen("turni"); }
@@ -24580,7 +24581,16 @@ if (screen === 'profiloCollega') {
           label="ES. RONDA, PIANTONAMENTO..."
           value={luogo}
           onChange={setLuogo}
-        />
+        
+            onFocus={() => {
+              setTimeout(() => {
+                editScreenScrollRef.current?.scrollTo({
+                  y: 520,
+                  animated: true,
+                });
+              }, 180);
+            }}
+          />
 
         {operativitaRecenti.length > 0 && (
           <View
@@ -26110,7 +26120,86 @@ if (screen === 'profiloCollega') {
               </TouchableOpacity>
           </View>
 
-          {/* ================= MESE ================= */}
+          {/* ===== CTA AGGIUNGI TURNO HOME ===== */}
+<TouchableOpacity
+  activeOpacity={0.85}
+  onPress={() => {
+    const oggiReale = new Date();
+
+    const domani = new Date(oggiReale);
+    domani.setDate(domani.getDate() + 1);
+
+    Alert.alert(
+      'Aggiungi turno',
+      'Quando vuoi inserire il turno?',
+      [
+        {
+          text: 'Oggi',
+          onPress: () => {
+            setMese(oggiReale.getMonth());
+            setAnno(oggiReale.getFullYear());
+            nuovoGiorno(oggiReale.getDate());
+          },
+        },
+        {
+          text: 'Domani',
+          onPress: () => {
+            setMese(domani.getMonth());
+            setAnno(domani.getFullYear());
+            nuovoGiorno(domani.getDate());
+          },
+        },
+        {
+          text: 'Scegli dal calendario',
+          onPress: () => {
+            setEditingId(null);
+            setMese(oggiReale.getMonth());
+            setAnno(oggiReale.getFullYear());
+            setScreen('calendar');
+          },
+        },
+        {
+          text: 'Annulla',
+          style: 'cancel',
+        },
+      ]
+    );
+  }}
+  style={{
+    marginHorizontal: 16,
+    marginTop: 10,
+    marginBottom: 12,
+    height: 50,
+    borderRadius: 18,
+    borderWidth: 1.2,
+    borderColor: 'rgba(105,223,255,0.70)',
+    backgroundColor: 'rgba(49,103,210,0.16)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  }}
+>
+  <Ionicons
+    name="add-circle-outline"
+    size={21}
+    color="#69DFFF"
+  />
+  <Text
+    style={{
+      color: '#FFFFFF',
+      fontSize: 13,
+      fontWeight: '900',
+      marginLeft: 8,
+      letterSpacing: 0.35,
+    }}
+  >
+    {(turnoInCorso || turnoOggi)
+      ? 'AGGIUNGI TURNO'
+      : 'AGGIUNGI IL TURNO DI OGGI'}
+  </Text>
+</TouchableOpacity>
+
+{/* ================= MESE ================= */}
           <TouchableOpacity
             activeOpacity={0.86}
             onPress={() => setScreen('calendar')}
@@ -39686,8 +39775,10 @@ function Screen({
   children,
   contentOffset,
   showScrollTop = false,
+  scrollRef,
 }) {
-  const screenScrollRef = React.useRef(null);
+  const internalScreenScrollRef = React.useRef(null);
+  const screenScrollRef = scrollRef || internalScreenScrollRef;
   const [mostraTornaSu, setMostraTornaSu] = React.useState(false);
   return (
     <SafeAreaView
@@ -40034,6 +40125,7 @@ function Field({
   onChange,
   keyboardType,
   profile = false,
+  onFocus,
 }) {
   return (
     <View
@@ -40053,6 +40145,7 @@ function Field({
         onChangeText={
           onChange
         }
+        onFocus={onFocus}
         keyboardType={
           keyboardType
         }
