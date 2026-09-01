@@ -515,26 +515,24 @@ E FIDUCIARI
           )}
         </View>
 
-        {__DEV__ && (
-          <View style={styles.testBox}>
-            <Text style={styles.testTitle}>
-              Modalità sviluppo
-            </Text>
+        <View style={styles.testBox}>
+          <Text style={styles.testTitle}>
+            Modalità sviluppo
+          </Text>
 
-            <Text style={styles.testText}>
-              Durante lo sviluppo puoi ancora entrare nell’app senza account.
-            </Text>
+          <Text style={styles.testText}>
+            Durante lo sviluppo puoi ancora entrare nell’app senza account.
+          </Text>
 
-            <TouchableOpacity
-              style={styles.testButton}
-              onPress={onEnterTest}
-            >
-              <Text style={styles.testButtonText}>
-                ENTRA IN MODALITÀ TEST
-              </Text>
-            </TouchableOpacity>
-          </View>
-        )}
+          <TouchableOpacity
+            style={styles.testButton}
+            onPress={onEnterTest}
+          >
+            <Text style={styles.testButtonText}>
+              ENTRA IN MODALITÀ TEST
+            </Text>
+          </TouchableOpacity>
+        </View>
 
         <Text style={styles.footer}>
           VIGILANZA GPG • VERSIONE TEST
