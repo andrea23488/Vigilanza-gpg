@@ -4022,10 +4022,10 @@ const cambiaStatoDotazione = (id, stato) => {
     useState('home');
 
   const [mese, setMese] =
-    useState(7);
+    useState(() => new Date().getMonth());
 
   const [anno, setAnno] =
-    useState(2026);
+    useState(() => new Date().getFullYear());
 
   const [turni, setTurni] =
     useState([]);
@@ -4131,6 +4131,35 @@ const cambiaStatoDotazione = (id, stato) => {
   const [luogo, setLuogo] =
     useState('');
   const [localitaMeteoTurno, setLocalitaMeteoTurno] = useState('');
+const [mostraOperativitaRecenti, setMostraOperativitaRecenti] = useState(false);
+const [mostraSediRecenti, setMostraSediRecenti] = useState(false);
+
+const [operativitaNascoste, setOperativitaNascoste] = useState([]);
+const [sediNascoste, setSediNascoste] = useState([]);
+
+useEffect(() => {
+    const caricaRecentiNascosti = async () => {
+      try {
+        const [opSalvate, sediSalvate] = await Promise.all([
+          AsyncStorage.getItem('@vigilanza_operativita_nascoste'),
+          AsyncStorage.getItem('@vigilanza_sedi_nascoste'),
+        ]);
+
+        setOperativitaNascoste(
+          opSalvate ? JSON.parse(opSalvate) : []
+        );
+
+        setSediNascoste(
+          sediSalvate ? JSON.parse(sediSalvate) : []
+        );
+      } catch (e) {
+        console.log('Errore caricamento recenti nascosti:', e);
+      }
+    };
+
+    caricaRecentiNascosti();
+  }, []);
+
 
   const [indirizzoServizio, setIndirizzoServizio] =
     useState('');
@@ -6601,7 +6630,11 @@ console.log("🕒 ORA REALE:", new Date().toString());
   }
 
   function tornaHome() {
+    const oggiReale = new Date();
+
     setEditingId(null);
+    setMese(oggiReale.getMonth());
+    setAnno(oggiReale.getFullYear());
     setScreen('home');
   }
 
@@ -23989,6 +24022,79 @@ if (screen === 'profiloCollega') {
       editingId !==
         undefined;
 
+  const nascondiOperativitaRecente = async (voce) => {
+    const nuovaLista = Array.from(
+      new Set([...operativitaNascoste, voce])
+    );
+
+    setOperativitaNascoste(nuovaLista);
+
+    await AsyncStorage.setItem(
+      '@vigilanza_operativita_nascoste',
+      JSON.stringify(nuovaLista)
+    );
+  };
+
+  const nascondiSedeRecente = async (voce) => {
+    const nuovaLista = Array.from(
+      new Set([...sediNascoste, voce])
+    );
+
+    setSediNascoste(nuovaLista);
+
+    await AsyncStorage.setItem(
+      '@vigilanza_sedi_nascoste',
+      JSON.stringify(nuovaLista)
+    );
+  };
+
+  const valoriRecentiTurni = (campo, esclusi = [], limite = 6) => {
+    const risultati = [];
+
+    for (let i = (turni || []).length - 1; i >= 0; i--) {
+      const valore = String(
+        turni[i]?.[campo] || ''
+      ).trim();
+
+      const nascosto = esclusi.some(
+        (x) =>
+          String(x).toLowerCase() ===
+          valore.toLowerCase()
+      );
+
+      if (
+        valore &&
+        !nascosto &&
+        !risultati.some(
+          (x) =>
+            x.toLowerCase() ===
+            valore.toLowerCase()
+        )
+      ) {
+        risultati.push(valore);
+      }
+
+      if (risultati.length >= limite) {
+        break;
+      }
+    }
+
+    return risultati;
+  };
+
+  const operativitaRecenti =
+    valoriRecentiTurni(
+      'luogo',
+      operativitaNascoste
+    );
+
+  const sediRecenti =
+    valoriRecentiTurni(
+      'indirizzo_servizio',
+      sediNascoste
+    );
+
+
     return (
       <Screen>
         <Back
@@ -24476,51 +24582,122 @@ if (screen === 'profiloCollega') {
           onChange={setLuogo}
         />
 
-          <TouchableOpacity
-            onPress={() => {
-              const nomePosto = String(luogo || '').trim();
-
-              if (!nomePosto) {
-                Alert.alert(
-                  'Luogo mancante',
-                  'Inserisci prima il luogo del servizio.'
-                );
-                return;
-              }
-
-              setSchedaPostoLuogo(nomePosto);
-              setScreen('schedaPosto');
-            }}
+        {operativitaRecenti.length > 0 && (
+          <View
             style={{
-              marginTop: 10,
-              marginBottom: 4,
-              paddingVertical: 13,
-              paddingHorizontal: 14,
-              borderRadius: 14,
-              backgroundColor: 'rgba(49,88,168,0.22)',
-              borderWidth: 1,
-              borderColor: 'rgba(141,184,255,0.34)',
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'center',
+              marginTop: -3,
+              marginBottom: 10,
             }}
           >
-            <Ionicons
-              name="location-outline"
-              size={20}
-              color="#8DB8FF"
-            />
-            <Text
+            <TouchableOpacity
+              activeOpacity={0.8}
+              onPress={() =>
+                setMostraOperativitaRecenti(
+                  !mostraOperativitaRecenti
+                )
+              }
               style={{
-                color: '#FFFFFF',
-                fontSize: 14,
-                fontWeight: '900',
-                marginLeft: 8,
+                flexDirection: 'row',
+                alignItems: 'center',
+                alignSelf: 'flex-start',
+                paddingVertical: 6,
               }}
             >
-              Apri Scheda Posto
-            </Text>
-          </TouchableOpacity>
+              <Ionicons
+                name="time-outline"
+                size={14}
+                color="#69DFFF"
+              />
+
+              <Text
+                style={{
+                  color: '#8FAFCC',
+                  fontSize: 11,
+                  fontWeight: '800',
+                  marginLeft: 5,
+                }}
+              >
+                Usate di recente {mostraOperativitaRecenti ? '▲' : '▼'}
+              </Text>
+            </TouchableOpacity>
+
+            {mostraOperativitaRecenti && (
+              <View
+                style={{
+                  flexDirection: 'row',
+                  flexWrap: 'wrap',
+                  marginTop: 2,
+                }}
+              >
+                {operativitaRecenti.map((voce) => (
+                  <View
+                    key={voce}
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      borderRadius: 12,
+                      backgroundColor: '#10213A',
+                      borderWidth: 1,
+                      borderColor: 'rgba(105,223,255,0.28)',
+                      marginRight: 7,
+                      marginBottom: 7,
+                      overflow: 'hidden',
+                    }}
+                  >
+                    <TouchableOpacity
+                      activeOpacity={0.8}
+                      onPress={() => {
+                        setLuogo(voce);
+                        setMostraOperativitaRecenti(false);
+                      }}
+                      style={{
+                        paddingLeft: 10,
+                        paddingRight: 7,
+                        paddingVertical: 7,
+                      }}
+                    >
+                      <Text
+                        numberOfLines={1}
+                        style={{
+                          color: '#DCEBFF',
+                          fontSize: 11,
+                          fontWeight: '800',
+                        }}
+                      >
+                        {voce}
+                      </Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      activeOpacity={0.7}
+                      onPress={() =>
+                        nascondiOperativitaRecente(voce)
+                      }
+                      style={{
+                        paddingHorizontal: 8,
+                        paddingVertical: 7,
+                        borderLeftWidth: 1,
+                        borderLeftColor: 'rgba(255,255,255,0.10)',
+                      }}
+                    >
+                      <Text
+                        style={{
+                          color: '#FF8B9A',
+                          fontSize: 13,
+                          fontWeight: '900',
+                        }}
+                      >
+                        ×
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                ))}
+              </View>
+            )}
+          </View>
+        )}
+
+          
 
 
           <Field
@@ -24537,7 +24714,7 @@ if (screen === 'profiloCollega') {
           marginBottom: 10,
         }}
       >
-        📍 Es. Fiumicino, Roma · Ciampino, Roma · Treviso
+        📍 Es. Fiumicino, Roma · Ciampino, Roma
       </Text>
 
       <Field
@@ -24545,6 +24722,121 @@ if (screen === 'profiloCollega') {
             value={indirizzoServizio}
             onChange={setIndirizzoServizio}
           />
+
+          {sediRecenti.length > 0 && (
+            <View
+              style={{
+                marginTop: -3,
+                marginBottom: 7,
+              }}
+            >
+              <TouchableOpacity
+                activeOpacity={0.8}
+                onPress={() =>
+                  setMostraSediRecenti(
+                    !mostraSediRecenti
+                  )
+                }
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  alignSelf: 'flex-start',
+                  paddingVertical: 6,
+                }}
+              >
+                <Ionicons
+                  name="location-outline"
+                  size={14}
+                  color="#69DFFF"
+                />
+
+                <Text
+                  style={{
+                    color: '#8FAFCC',
+                    fontSize: 11,
+                    fontWeight: '800',
+                    marginLeft: 5,
+                  }}
+                >
+                  Luoghi usati di recente {mostraSediRecenti ? '▲' : '▼'}
+                </Text>
+              </TouchableOpacity>
+
+              {mostraSediRecenti && (
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    flexWrap: 'wrap',
+                    marginTop: 2,
+                  }}
+                >
+                  {sediRecenti.map((voce) => (
+                    <View
+                      key={voce}
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        borderRadius: 12,
+                        backgroundColor: '#10213A',
+                        borderWidth: 1,
+                        borderColor: 'rgba(105,223,255,0.28)',
+                        marginRight: 7,
+                        marginBottom: 7,
+                        overflow: 'hidden',
+                      }}
+                    >
+                      <TouchableOpacity
+                        activeOpacity={0.8}
+                        onPress={() => {
+                          setIndirizzoServizio(voce);
+                          setMostraSediRecenti(false);
+                        }}
+                        style={{
+                          paddingLeft: 10,
+                          paddingRight: 7,
+                          paddingVertical: 7,
+                        }}
+                      >
+                        <Text
+                          numberOfLines={1}
+                          style={{
+                            color: '#DCEBFF',
+                            fontSize: 11,
+                            fontWeight: '800',
+                          }}
+                        >
+                          {voce}
+                        </Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        activeOpacity={0.7}
+                        onPress={() =>
+                          nascondiSedeRecente(voce)
+                        }
+                        style={{
+                          paddingHorizontal: 8,
+                          paddingVertical: 7,
+                          borderLeftWidth: 1,
+                          borderLeftColor: 'rgba(255,255,255,0.10)',
+                        }}
+                      >
+                        <Text
+                          style={{
+                            color: '#FF8B9A',
+                            fontSize: 13,
+                            fontWeight: '900',
+                          }}
+                        >
+                          ×
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  ))}
+                </View>
+              )}
+            </View>
+          )}
 
           <Text
             style={{
@@ -25464,7 +25756,7 @@ if (screen === 'profiloCollega') {
                       fontWeight: '900',
                     }}
                   >
-                    ● IN SERVIZIO
+                    {turnoInCorso ? '● IN SERVIZIO' : '○ FUORI SERVIZIO'}
                   </Text>
                 </View>
               </TouchableOpacity>
@@ -39725,10 +40017,11 @@ function Quick({
       }
     >
       <Text
-        style={
-          styles.quickText
-        }
-      >
+      style={styles.quickText}
+      numberOfLines={1}
+      adjustsFontSizeToFit
+      minimumFontScale={0.70}
+    >
         {title}
       </Text>
     </TouchableOpacity>
@@ -40476,7 +40769,7 @@ const styles =
       flex: 1,
       backgroundColor: '#10213A',
       paddingVertical: 13,
-      paddingHorizontal: 8,
+      paddingHorizontal: 3,
       marginHorizontal: 3,
       borderRadius: 14,
       borderWidth: 1,
