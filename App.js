@@ -25384,8 +25384,24 @@ if (screen === 'profiloCollega') {
                     styles.turnCard,
 
                     t.tipo !== 'turno' && {
-                      backgroundColor: '#0B3823',
-                      borderColor: '#52E487',
+                      backgroundColor:
+                        t.tipo === 'congedo30' ? '#4A2C0A' :
+                        t.tipo === 'congedo80' ? '#0B3040' :
+                        t.tipo === 'legge104' ? '#2E1648' :
+                        t.tipo === 'ferie' ? '#102A55' :
+                        t.tipo === 'malattia' ? '#4A1820' :
+                        t.tipo === 'permesso' ? '#243447' :
+                        '#0B3823',
+
+                      borderColor:
+                        t.tipo === 'congedo30' ? '#FF9F2D' :
+                        t.tipo === 'congedo80' ? '#49CFFF' :
+                        t.tipo === 'legge104' ? '#B06CFF' :
+                        t.tipo === 'ferie' ? '#5A8CFF' :
+                        t.tipo === 'malattia' ? '#FF6B7A' :
+                        t.tipo === 'permesso' ? '#8FA5CC' :
+                        '#52E487',
+
                       borderWidth: 1.5,
                     },
 
@@ -25705,22 +25721,57 @@ if (screen === 'profiloCollega') {
               </>
             ) : (
               <>
-                <Text style={{
-                  color: '#55E47B',
+                <Text
+                style={{
+                  color:
+                    t.tipo === 'congedo30' ? '#FFB45C' :
+                    t.tipo === 'congedo80' ? '#72DDFF' :
+                    t.tipo === 'legge104' ? '#C999FF' :
+                    t.tipo === 'ferie' ? '#8FB0FF' :
+                    t.tipo === 'malattia' ? '#FF98A3' :
+                    t.tipo === 'permesso' ? '#C5D2E6' :
+                    '#55E47B',
                   fontSize: 18,
                   fontWeight: '900',
-                }}>
-                  🍃 RIPOSO
-                </Text>
+                }}
+              >
+                {t.tipo === 'congedo30'
+                  ? '🟠 CONGEDO 30%'
+                  : t.tipo === 'congedo80'
+                  ? '🔵 CONGEDO 80%'
+                  : t.tipo === 'legge104'
+                  ? '🟣 LEGGE 104'
+                  : t.tipo === 'ferie'
+                  ? '🏖 FERIE'
+                  : t.tipo === 'malattia'
+                  ? '🩺 MALATTIA'
+                  : t.tipo === 'permesso'
+                  ? '📄 PERMESSO'
+                  : '🌿 RIPOSO'}
+              </Text>
 
-                <Text style={{
+              <Text
+                style={{
                   color: '#A7CDB2',
                   fontSize: 12,
                   fontWeight: '600',
                   marginTop: 5,
-                }}>
-                  ◉ Giornata non lavorata
-                </Text>
+                }}
+              >
+                {t.tipo === 'congedo30'
+                  ? 'Congedo parentale al 30%'
+                  : t.tipo === 'congedo80'
+                  ? 'Congedo parentale all’80%'
+                  : t.tipo === 'legge104'
+                  ? 'Permesso retribuito L.104'
+                  : t.tipo === 'ferie'
+                  ? 'Ferie'
+                  : t.tipo === 'malattia'
+                  ? 'Assenza per malattia'
+                  : t.tipo === 'permesso'
+                  ? 'Permesso'
+                  : 'Giornata non lavorata'}
+              </Text>
               </>
             )}
           </View>
@@ -26969,16 +27020,56 @@ if (screen === 'profiloCollega') {
                 TURNO DI OGGI
               </Text>
 
-        <Text style={{color:'#FFFFFF',fontSize:29,fontWeight:'900',marginTop:8}}>
-          {(turnoInCorso || turnoOggi)
-            ? ((turnoInCorso || turnoOggi).tipo === 'turno'
-                ? `${(turnoInCorso || turnoOggi).inizio || '--:--'} - ${(turnoInCorso || turnoOggi).fine || '--:--'}`
-                : '🌿 RIPOSO')
-            : '--:-- - --:--'}
-        </Text>
+        <Text
+                style={{
+                  color:
+                    t.tipo === 'congedo30' ? '#FFB45C' :
+                    t.tipo === 'congedo80' ? '#72DDFF' :
+                    t.tipo === 'legge104' ? '#C999FF' :
+                    t.tipo === 'ferie' ? '#8FB0FF' :
+                    t.tipo === 'malattia' ? '#FF98A3' :
+                    t.tipo === 'permesso' ? '#C5D2E6' :
+                    '#55E47B',
+                  fontSize: 18,
+                  fontWeight: '900',
+                }}
+              >
+                {t.tipo === 'congedo30'
+                  ? '🟠 CONGEDO 30%'
+                  : t.tipo === 'congedo80'
+                  ? '🔵 CONGEDO 80%'
+                  : t.tipo === 'legge104'
+                  ? '🟣 LEGGE 104'
+                  : t.tipo === 'ferie'
+                  ? '🏖 FERIE'
+                  : t.tipo === 'malattia'
+                  ? '🩺 MALATTIA'
+                  : t.tipo === 'permesso'
+                  ? '📄 PERMESSO'
+                  : '🌿 RIPOSO'}
+              </Text>
 
-        <Text style={{color:'#C8D0E0',fontSize:14,marginTop:6}}>
-                📍 {(turnoInCorso || turnoOggi) ? ((turnoInCorso || turnoOggi).luogo || 'Luogo non indicato') : 'Luogo non indicato'}
+              <Text
+                style={{
+                  color: '#A7CDB2',
+                  fontSize: 12,
+                  fontWeight: '600',
+                  marginTop: 5,
+                }}
+              >
+                {t.tipo === 'congedo30'
+                  ? 'Congedo parentale al 30%'
+                  : t.tipo === 'congedo80'
+                  ? 'Congedo parentale all’80%'
+                  : t.tipo === 'legge104'
+                  ? 'Permesso retribuito L.104'
+                  : t.tipo === 'ferie'
+                  ? 'Ferie'
+                  : t.tipo === 'malattia'
+                  ? 'Assenza per malattia'
+                  : t.tipo === 'permesso'
+                  ? 'Permesso'
+                  : 'Giornata non lavorata'}
               </Text>
             </View>
 
