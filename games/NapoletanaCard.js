@@ -1,4 +1,6 @@
 import React from 'react';
+import { Image } from 'react-native';
+import { CARTE_PIACENTINE } from './cartePiacentine';
 import {
   View,
   Text,
@@ -777,81 +779,30 @@ function Figura({ carta }) {
 
 
 function FronteCarta({ carta }) {
-  if (carta.valore >= 8) {
-    return <Figura carta={carta} />;
+  if (!carta) return null;
+
+  const seme = String(carta.seme || '').toLowerCase();
+  const valore = Number(carta.valore);
+
+  const immagine =
+    CARTE_PIACENTINE?.[seme]?.[valore];
+
+  if (!immagine) {
+    return null;
   }
 
-  const posizioni =
-    POSIZIONI[carta.valore] || POSIZIONI[1];
-
   return (
-    <Svg
-      viewBox="0 0 100 120"
-      width="100%"
-      height="100%"
-    >
-      <Rect
-        x="2"
-        y="2"
-        width="96"
-        height="116"
-        rx="8"
-        fill="#FFF8E9"
-        stroke="#D1C099"
-        strokeWidth="1.5"
-      />
-
-      {carta.valore === 1 ? (
-        <>
-          <Circle
-            cx="50"
-            cy="60"
-            r="25"
-            fill="#F8F0D8"
-            stroke="#D2BE91"
-            strokeWidth="1.2"
-          />
-
-          <SuitSymbol
-            seme={carta.seme}
-            x={50}
-            y={60}
-            scale={1.55}
-            rotate={0}
-          />
-
-          <Circle
-            cx="50"
-            cy="60"
-            r="31"
-            fill="none"
-            stroke="#E6D8B5"
-            strokeWidth="1"
-          />
-        </>
-      ) : (
-        posizioni.map(([x, y], index) => (
-          <SuitSymbol
-            key={index}
-            seme={carta.seme}
-            x={x}
-            y={y}
-            scale={carta.valore >= 6 ? 0.62 : 0.74}
-            rotate={
-              carta.seme === 'spade' ||
-              carta.seme === 'bastoni'
-                ? index % 2 === 0
-                  ? -12
-                  : 12
-                : 0
-            }
-          />
-        ))
-      )}
-    </Svg>
+    <Image
+      source={immagine}
+      resizeMode="cover"
+      style={{
+        width: '100%',
+        height: '100%',
+        borderRadius: 8,
+      }}
+    />
   );
 }
-
 
 export default function NapoletanaCard({
   retroLabel = 'BRISCOLA',
@@ -937,6 +888,7 @@ export default function NapoletanaCard({
       {/* Nome del seme sempre visibile */}
       <View
         style={{
+          display: 'none',
           position: 'absolute',
           left: 5,
           right: 5,
@@ -984,6 +936,7 @@ export default function NapoletanaCard({
         <Text
           numberOfLines={1}
           style={{
+            display: 'none',
             color: '#282828',
             fontSize: piccola ? 8 : 10,
             fontWeight: '900',
