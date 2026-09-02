@@ -488,7 +488,7 @@ export default function App() {
   const [stipendioOreGiornaliere, setStipendioOreGiornaliere] = useState('7:00');
 
   const [stipendioTariffaStraordinario, setStipendioTariffaStraordinario] =
-    useState('11.03783');
+    useState('10.47417');
 
   const [stipendioTariffaDomenicale, setStipendioTariffaDomenicale] =
     useState('0.71');
@@ -505,7 +505,7 @@ export default function App() {
     useState('4.18');
 
   const [stipendioTariffaRiposo, setStipendioTariffaRiposo] =
-    useState('11.8869');
+    useState('11.27987');
 
   const [mostraImportiCalcolo, setMostraImportiCalcolo] =
     useState(false);
@@ -560,7 +560,7 @@ export default function App() {
 
 
 
-  const [stipendioIndennita20724, setStipendioIndennita20724] = useState('103.64');
+  const [stipendioIndennita20724, setStipendioIndennita20724] = useState('0');
   const [chatMessaggio, setChatMessaggio] = useState('');
   const [chatMessaggi, setChatMessaggi] = useState([]);
   const [chatMioId, setChatMioId] = useState(null);
@@ -4763,8 +4763,8 @@ const leggiTariffa = (valore, fallback) => {
 
 const tariffaStraordinario30 =
   stipendioProfiloCalcolo === 'automatico'
-    ? 11.03783
-    : leggiTariffa(stipendioTariffaStraordinario, 11.03783);
+    ? 10.47417
+    : leggiTariffa(stipendioTariffaStraordinario, 10.47417);
 
 const tariffaDomenicale =
   stipendioProfiloCalcolo === 'automatico'
@@ -4791,8 +4791,8 @@ const tariffaPiantonamentoNotturno =
 
 const tariffaRiposoLavorato =
   stipendioProfiloCalcolo === 'automatico'
-    ? 11.8869
-    : leggiTariffa(stipendioTariffaRiposo, 11.8869);
+    ? 11.27987
+    : leggiTariffa(stipendioTariffaRiposo, 11.27987);
 
 const extraPagateMese = giornateStipendioMese.reduce(
   (tot, t) =>
@@ -4823,6 +4823,61 @@ const importoRiposoLavoratoMese =
 const indennita20724Numero =
   Number(String(stipendioIndennita20724 || '0').replace(',', '.')) || 0;
 
+// ===== CONGEDI E PERMESSI RETRIBUITI =====
+// La paga base mensile parte intera.
+// Congedo 80%: si sottrae solo il 20% della quota ordinaria.
+// Congedo 30%: si sottrae solo il 70% della quota ordinaria.
+// Legge 104: nessuna decurtazione.
+const pagaOrariaOrdinariaGPG =
+  lordoBaseLivello > 0 ? lordoBaseLivello / 173 : 0;
+
+const oreCausale = (t) => {
+  const oreInserite = Number(t?.ore || 0);
+
+  if (oreInserite > 0) {
+    return Math.min(
+      oreInserite,
+      Number(oreOrdinarieGiornaliereNumero || oreInserite)
+    );
+  }
+
+  return Number(oreOrdinarieGiornaliereNumero || 0);
+};
+
+const oreCongedo80Mese = turniStipendioMese.reduce(
+  (tot, t) =>
+    t.tipo === 'congedo80'
+      ? tot + oreCausale(t)
+      : tot,
+  0
+);
+
+const oreCongedo30Mese = turniStipendioMese.reduce(
+  (tot, t) =>
+    t.tipo === 'congedo30'
+      ? tot + oreCausale(t)
+      : tot,
+  0
+);
+
+const oreLegge104Mese = turniStipendioMese.reduce(
+  (tot, t) =>
+    t.tipo === 'legge104'
+      ? tot + oreCausale(t)
+      : tot,
+  0
+);
+
+const decurtazioneCongedo80Mese =
+  oreCongedo80Mese * pagaOrariaOrdinariaGPG * 0.20;
+
+const decurtazioneCongedo30Mese =
+  oreCongedo30Mese * pagaOrariaOrdinariaGPG * 0.70;
+
+const decurtazioneCongediMese =
+  decurtazioneCongedo80Mese +
+  decurtazioneCongedo30Mese;
+
 const totaleCompetenzeStimate =
   lordoBaseLivello +
   importoStraordinarioMese +
@@ -4831,7 +4886,8 @@ const totaleCompetenzeStimate =
   importoIndennitaCompensativaMese +
   importoPiantonamentoNotturnoMese +
   importoRiposoLavoratoMese +
-  indennita20724Numero;
+  indennita20724Numero -
+  decurtazioneCongediMese;
 
   // ===== MOTORE ECONOMICO FIDUCIARIO =====
 
@@ -5407,7 +5463,7 @@ const quotaTempoMese = Math.min(
   const coefficienteNettoAdOggi =
     stipendioTipoOperatore === 'fiduciario'
       ? 0.78
-      : (1992.00 / 2577.16);
+      : (1860.00 / 2273.30);
 
   const nettoStimatoAdOggi =
     Number(maturatoAdOggi || 0) *
@@ -5505,7 +5561,7 @@ const coefficienteNettoFiduciario = 0.78;
     (
       stipendioTipoOperatore === 'fiduciario'
         ? 0.78
-        : (1992.00 / 2577.16)
+        : (1860.00 / 2273.30)
     );
 
 
@@ -7352,7 +7408,7 @@ async function logout() {
                 backgroundColor: 'rgba(255,255,255,0.08)',
                 borderWidth: 1,
                 borderColor: 'rgba(141,184,255,0.30)',
-                marginRight: 14,
+                marginRight: 11,
               }}
             >
               <Ionicons name="chevron-back" size={25} color="#FFFFFF" />
@@ -11198,7 +11254,7 @@ if (screen === 'configuraStipendio') {
 
               alignItems: 'center',
               justifyContent: 'center',
-              marginRight: 14,
+              marginRight: 11,
 
               shadowColor:
                 (riepilogoChat[c.altro_user_id]?.nonLetti || 0) > 0
@@ -11786,7 +11842,7 @@ if (screen === 'configuraStipendio') {
               borderTopRightRadius: mio ? 6 : 19,
               borderTopLeftRadius: mio ? 19 : 6,
               paddingHorizontal: 13,
-              paddingVertical: 10,
+              paddingVertical: 7,
               marginBottom: 12,
               maxWidth: '76%',
               borderWidth: 1,
@@ -14027,7 +14083,7 @@ Alert.alert(
           <View
             style={{
               marginTop: 8,
-              marginHorizontal: 16,
+              marginHorizontal: 28,
               padding: 20,
               borderRadius: 26,
               backgroundColor: 'rgba(17,39,78,0.96)',
@@ -14624,7 +14680,7 @@ Alert.alert(
                             }
                             style={{
                               flex: 1,
-                              minHeight: 38,
+                              minHeight: 32,
                               borderRadius: 12,
                               alignItems:
                                 'center',
@@ -14659,7 +14715,7 @@ Alert.alert(
                             }
                             style={{
                               flex: 1,
-                              minHeight: 38,
+                              minHeight: 32,
                               borderRadius: 12,
                               alignItems:
                                 'center',
@@ -19427,7 +19483,7 @@ if (screen === 'strumenti') {
                   flexDirection: 'row',
                   alignItems: 'center',
 
-                  paddingVertical: 10,
+                  paddingVertical: 7,
                   paddingHorizontal: 12,
 
                   borderRadius: 16,
@@ -21497,9 +21553,9 @@ if (screen === 'strumenti') {
         >
           <View
             style={{
-              width: 43,
-              height: 43,
-              borderRadius: 14,
+              width: 32,
+              height: 32,
+              borderRadius: 10,
 
               alignItems: 'center',
               justifyContent: 'center',
@@ -24368,6 +24424,21 @@ if (screen === 'profiloCollega') {
               'permesso',
               'Permesso',
             ],
+
+            [
+              'congedo80',
+              'Congedo parentale 80%',
+            ],
+
+            [
+              'congedo30',
+              'Congedo parentale 30%',
+            ],
+
+            [
+              'legge104',
+              'Permesso L.104',
+            ],
           ].map(
             ([
               id,
@@ -25879,9 +25950,10 @@ if (screen === 'profiloCollega') {
           {/* ================= TURNO ================= */}
           <View
             style={{
-              marginHorizontal: 16,
-              marginTop: 10,
-              padding: 18,
+              marginHorizontal: 28,
+              marginTop: 7,
+              paddingHorizontal: 18,
+              paddingVertical: 8,
               borderRadius: 25,
 
               backgroundColor: turnoInCorso
@@ -25928,9 +26000,9 @@ if (screen === 'profiloCollega') {
                 style={{
                   color: '#FFFFFF',
                   textAlign: 'center',
-                  fontSize: 31,
+                  fontSize: 28,
                   fontWeight: '900',
-                  marginTop: 12,
+                  marginTop: 7,
                 }}
               >
                 {turnoHomeV2?.tipo === 'turno'
@@ -25944,9 +26016,9 @@ if (screen === 'profiloCollega') {
                 style={{
                   color: '#C8D0E0',
                   textAlign: 'center',
-                  fontSize: 15,
+                  fontSize: 13,
                   fontWeight: '700',
-                  marginTop: 8,
+                  marginTop: 5,
                 }}
               >
                 📍 {turnoHomeV2?.luogo || 'Luogo non indicato'}
@@ -25958,8 +26030,8 @@ if (screen === 'profiloCollega') {
               style={{
                 height: 1,
                 backgroundColor: 'rgba(85,244,124,0.18)',
-                marginTop: 16,
-                marginBottom: 12,
+                marginTop: 10,
+                marginBottom: 8,
               }}
             />
 
@@ -25983,7 +26055,7 @@ if (screen === 'profiloCollega') {
               <Text
                 style={{
                   color: '#FFFFFF',
-                  fontSize: 24,
+                  fontSize: 21,
                   fontWeight: '900',
                   marginTop: 2,
                 }}
@@ -25997,8 +26069,8 @@ if (screen === 'profiloCollega') {
                 style={{
                   height: 1,
                   backgroundColor: 'rgba(85,244,124,0.18)',
-                  marginTop: 13,
-                  marginBottom: 11,
+                  marginTop: 8,
+                  marginBottom: 7,
                 }}
               />
 
@@ -26167,9 +26239,9 @@ if (screen === 'profiloCollega') {
   }}
   style={{
     marginHorizontal: 16,
-    marginTop: 10,
-    marginBottom: 12,
-    height: 50,
+    marginTop: 7,
+    marginBottom: 7,
+    height: 42,
     borderRadius: 18,
     borderWidth: 1.2,
     borderColor: 'rgba(105,223,255,0.70)',
@@ -26205,9 +26277,9 @@ if (screen === 'profiloCollega') {
             onPress={() => setScreen('calendar')}
             style={{
               marginHorizontal: 16,
-              marginTop: 13,
-              paddingHorizontal: 15,
-              paddingVertical: 13,
+              marginTop: 7,
+              paddingHorizontal: 14,
+              paddingVertical: 9,
               borderRadius: 19,
 
               backgroundColor: '#0B1930',
@@ -26249,7 +26321,7 @@ if (screen === 'profiloCollega') {
                 height: 5,
                 borderRadius: 10,
                 backgroundColor: '#19264A',
-                marginTop: 9,
+                marginTop: 6,
                 overflow: 'hidden',
               }}
             >
@@ -26266,7 +26338,7 @@ if (screen === 'profiloCollega') {
             <View
               style={{
                 flexDirection: 'row',
-                marginTop: 12,
+                marginTop: 8,
               }}
             >
               <View
@@ -26278,7 +26350,7 @@ if (screen === 'profiloCollega') {
                 <Text
                   style={{
                     color: '#FFFFFF',
-                    fontSize: 19,
+                    fontSize: 17,
                     fontWeight: '900',
                   }}
                 >
@@ -26312,7 +26384,7 @@ if (screen === 'profiloCollega') {
                 <Text
                   style={{
                     color: '#FFFFFF',
-                    fontSize: 19,
+                    fontSize: 17,
                     fontWeight: '900',
                   }}
                 >
@@ -26372,8 +26444,8 @@ if (screen === 'profiloCollega') {
             onPress={() => setScreen('stipendio')}
             style={{
               marginHorizontal: 16,
-              marginTop: 12,
-              minHeight: 58,
+              marginTop: 7,
+              minHeight: 50,
               paddingHorizontal: 16,
               borderRadius: 18,
               backgroundColor: '#0B1930',
@@ -26414,8 +26486,8 @@ if (screen === 'profiloCollega') {
             onPress={() => setScreen('strumenti')}
             style={{
               marginHorizontal: 16,
-              marginTop: 8,
-              minHeight: 58,
+              marginTop: 6,
+              minHeight: 50,
               paddingHorizontal: 16,
               borderRadius: 18,
               backgroundColor: 'rgba(16,38,78,0.95)',
@@ -26451,88 +26523,55 @@ if (screen === 'profiloCollega') {
           </TouchableOpacity>
 
           {/* HOME_CALENDARIO_CONDIVISO */}
-      <TouchableOpacity
-        onPress={() => setScreen('calendarioColleghi')}
-        activeOpacity={0.82}
-        style={{
-          marginHorizontal: 16,
-          marginBottom: 18,
-          paddingVertical: 14,
-          paddingHorizontal: 16,
-          borderRadius: 22,
-          backgroundColor: '#0C1728',
-          borderWidth: 1,
-          borderColor: '#2B4568',
-          shadowColor: '#45CFFE',
-          shadowOpacity: 0.08,
-          shadowRadius: 12,
-          shadowOffset: { width: 0, height: 5 },
-        }}
-      >
-        <View
-          style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-          }}
-        >
-          <View
+          <TouchableOpacity
+            onPress={() => setScreen('calendarioColleghi')}
+            activeOpacity={0.84}
             style={{
-              width: 43,
-              height: 43,
-              borderRadius: 14,
-              backgroundColor: 'rgba(69,207,254,0.10)',
+              marginHorizontal: 16,
+              marginTop: 6,
+              minHeight: 50,
+              paddingHorizontal: 16,
+              borderRadius: 18,
+              backgroundColor: '#0B1930',
+              borderWidth: 1,
+              borderColor: '#315C87',
+              flexDirection: 'row',
               alignItems: 'center',
-              justifyContent: 'center',
-              marginRight: 14,
             }}
           >
             <Ionicons
               name="calendar-outline"
               size={23}
-              color="#71D8FF"
+              color="#63DFFF"
             />
-          </View>
 
-          <View style={{ flex: 1 }}>
             <Text
               style={{
                 color: '#FFFFFF',
-                fontSize: 16,
+                fontSize: 15,
                 fontWeight: '900',
+                marginLeft: 13,
+                flex: 1,
               }}
             >
               CALENDARIO COLLEGHI
             </Text>
 
-            <Text
-              style={{
-                color: '#AEB9D6',
-                fontSize: 12,
-                fontWeight: '600',
-                marginTop: 5,
-                lineHeight: 17,
-              }}
-            >
-              Condividi i turni e consulta quelli dei colleghi
-            </Text>
-          </View>
-
-          <Ionicons
-            name="chevron-forward"
-            size={22}
-            color="#77BFD9"
-          />
-        </View>
-      </TouchableOpacity>
+            <Ionicons
+              name="chevron-forward"
+              size={21}
+              color="#63DFFF"
+            />
+          </TouchableOpacity>
 
 
           {/* ================= BARRA RAPIDA ================= */}
           <View
             style={{
               marginHorizontal: 16,
-              marginTop: 12,
-              marginBottom: 15,
-              minHeight: 82,
+              marginTop: 7,
+              marginBottom: 8,
+              minHeight: 68,
               borderRadius: 21,
               borderWidth: 1,
               borderColor: '#31516F',
@@ -27931,6 +27970,47 @@ function Calendar({
             !record ||
             record.tipo === 'riposo';
 
+          const tipoFerie =
+            record?.tipo === 'ferie';
+
+          const tipoMalattia =
+            record?.tipo === 'malattia';
+
+          const tipoPermesso =
+            record?.tipo === 'permesso';
+
+          const tipoCongedo80 =
+            record?.tipo === 'congedo80';
+
+          const tipoCongedo30 =
+            record?.tipo === 'congedo30';
+
+          const tipoLegge104 =
+            record?.tipo === 'legge104';
+
+          const tipoAssenzaSpeciale =
+            tipoFerie ||
+            tipoMalattia ||
+            tipoPermesso ||
+            tipoCongedo80 ||
+            tipoCongedo30 ||
+            tipoLegge104;
+
+          const etichettaAssenzaSpeciale =
+            tipoFerie
+              ? 'FER'
+              : tipoMalattia
+              ? 'MAL'
+              : tipoPermesso
+              ? 'PER'
+              : tipoCongedo80
+              ? 'C80'
+              : tipoCongedo30
+              ? 'C30'
+              : tipoLegge104
+              ? '104'
+              : '';
+
           const oraInizio =
             record?.inizio
               ? Number(String(record.inizio).split(':')[0])
@@ -28163,6 +28243,27 @@ function Calendar({
                         }}
                       >
                         RIP
+                      </Text>
+                    </View>
+                  ) : tipoAssenzaSpeciale ? (
+                    <View
+                      style={{
+                        backgroundColor: 'rgba(90,120,255,0.18)',
+                        borderWidth: 1,
+                        borderColor: 'rgba(130,160,255,0.45)',
+                        paddingHorizontal: 6,
+                        paddingVertical: 2,
+                        borderRadius: 10,
+                      }}
+                    >
+                      <Text
+                        style={{
+                          color: '#DCE5FF',
+                          fontSize: 8,
+                          fontWeight: '900',
+                        }}
+                      >
+                        {etichettaAssenzaSpeciale}
                       </Text>
                     </View>
                   ) : (
@@ -40294,6 +40395,27 @@ function nomeTipo(
     'permesso'
   ) {
     return 'Permesso';
+  }
+
+  if (
+    tipo ===
+    'congedo80'
+  ) {
+    return 'Congedo parentale 80%';
+  }
+
+  if (
+    tipo ===
+    'congedo30'
+  ) {
+    return 'Congedo parentale 30%';
+  }
+
+  if (
+    tipo ===
+    'legge104'
+  ) {
+    return 'Permesso L.104';
   }
 
   return 'Turno';
