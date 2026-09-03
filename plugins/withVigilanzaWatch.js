@@ -4,10 +4,10 @@ const { withXcodeProject } = require('@expo/config-plugins');
 
 const TARGET_NAME = 'VigilanzaWatch';
 const WATCH_DIRECTORY = 'VigilanzaWatch';
-// The `xcode` package bundled with Expo SDK 54 maps its `watch2_app` target to
-// this product type. This plugin creates only that app target and never creates
-// a separate WatchKit extension target.
-const WATCH_PRODUCT_TYPE = 'com.apple.product-type.application.watchapp2';
+// Modern single-target watchOS apps are ordinary application targets whose
+// platform/build settings point at watchOS. Using the legacy watch2_app product
+// type can make Xcode generate the Watch executable twice during archive.
+const WATCH_PRODUCT_TYPE = 'com.apple.product-type.application';
 const DEFAULT_DEPLOYMENT_TARGET = '10.0';
 const OWNED_FILES = [
   { name: 'VigilanzaWatchApp.swift', phase: 'Sources' },
@@ -314,7 +314,7 @@ function addOrReconcileWatchTarget(
   } else {
     target = project.addTarget(
       TARGET_NAME,
-      'watch2_app',
+      'application',
       WATCH_DIRECTORY,
       bundleIdentifier
     );
