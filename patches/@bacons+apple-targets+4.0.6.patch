@@ -1,0 +1,13 @@
+diff --git a/node_modules/@bacons/apple-targets/build/configuration-list.js b/node_modules/@bacons/apple-targets/build/configuration-list.js
+index 8b042f9..d7593c7 100644
+--- a/node_modules/@bacons/apple-targets/build/configuration-list.js
++++ b/node_modules/@bacons/apple-targets/build/configuration-list.js
+@@ -316,7 +316,7 @@ function createWatchAppConfigurationList(project, { name, displayName, cwd, bund
+             SWIFT_COMPILATION_MODE: "wholemodule",
+             SWIFT_OPTIMIZATION_LEVEL: "-O",
+             COPY_PHASE_STRIP: "NO",
+-            DEBUG_INFORMATION_FORMAT: "dwarf-with-dsym",
++            DEBUG_INFORMATION_FORMAT: "dwarf",
+         },
+     };
+ }
