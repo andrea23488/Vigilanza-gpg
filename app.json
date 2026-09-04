@@ -11,7 +11,8 @@
       "bundleIdentifier": "com.vigilanzagpg.app",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
-      }
+      },
+      "appleTeamId": "CAA4U7J8QJ"
     },
     "android": {
       "adaptiveIcon": {
@@ -31,7 +32,8 @@
       }
     },
     "plugins": [
-      "expo-font"
+      "expo-font",
+      "@bacons/apple-targets"
     ],
     "scheme": "vigilanzagpg"
   }
