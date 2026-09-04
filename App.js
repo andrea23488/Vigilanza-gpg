@@ -36,6 +36,17 @@ import ScopaGame from './games/ScopaGame';
 import BlockGame from './games/BlockGame';
 import PongGame from './games/PongGame';
 import * as Clipboard from 'expo-clipboard';
+import stipendioEngine from './stipendioEngine';
+
+const {
+  calcolaDurataOre,
+  calcolaOreDomenicali,
+  calcolaOreRiposoLavorato,
+  calcolaStraordinariConfigurati,
+  coefficienteNetto,
+  creaIntervalloTurno,
+  filtraTurniConclusi,
+} = stipendioEngine;
 
 import {
   SafeAreaView,
@@ -225,121 +236,6 @@ function KeyboardDoneOverlay() {
 }
 
 
-
-function calcolaStraordinariConfigurati({
-  giornateMese,
-  tuttiTurni,
-  modalita,
-  sogliaGiornaliera,
-  sogliaSettimanale,
-  meseTarget,
-  annoTarget,
-}) {
-  // MODALITÀ GIORNALIERA
-  if (modalita !== 'settimanale') {
-    return giornateMese.reduce((tot, t) => {
-      if (t.riposo_lavorato === true) return tot;
-
-      const oreTurno = Number(t.ore || 0);
-
-      return (
-        tot +
-        Math.max(
-          0,
-          oreTurno - Number(sogliaGiornaliera || 0)
-        )
-      );
-    }, 0);
-  }
-
-  // MODALITÀ SETTIMANALE
-  const limiteSettimanale =
-    Number(sogliaSettimanale) > 0
-      ? Number(sogliaSettimanale)
-      : 40;
-
-  const turniUtili = tuttiTurni
-    .filter(
-      (t) =>
-        t.tipo === 'turno' &&
-        t.riposo_lavorato !== true &&
-        Number(t.ore || 0) > 0 &&
-        Number(t.giorno) > 0 &&
-        Number(t.mese) > 0 &&
-        Number(t.anno) > 0
-    )
-    .map((t) => {
-      const data = new Date(
-        Number(t.anno),
-        Number(t.mese) - 1,
-        Number(t.giorno),
-        12,
-        0,
-        0
-      );
-
-      const giornoSettimana = data.getDay();
-      const distanzaLunedi =
-        giornoSettimana === 0
-          ? -6
-          : 1 - giornoSettimana;
-
-      const lunedi = new Date(data);
-      lunedi.setDate(data.getDate() + distanzaLunedi);
-      lunedi.setHours(0, 0, 0, 0);
-
-      return {
-        ...t,
-        data,
-        chiaveSettimana: [
-          lunedi.getFullYear(),
-          String(lunedi.getMonth() + 1).padStart(2, '0'),
-          String(lunedi.getDate()).padStart(2, '0'),
-        ].join('-'),
-      };
-    })
-    .sort((a, b) => a.data - b.data);
-
-  const settimane = {};
-
-  turniUtili.forEach((t) => {
-    if (!settimane[t.chiaveSettimana]) {
-      settimane[t.chiaveSettimana] = [];
-    }
-
-    settimane[t.chiaveSettimana].push(t);
-  });
-
-  let extraMese = 0;
-
-  Object.values(settimane).forEach((turniSettimana) => {
-    let cumulato = 0;
-
-    turniSettimana.forEach((t) => {
-      const oreTurno = Number(t.ore || 0);
-
-      const extraPrima =
-        Math.max(0, cumulato - limiteSettimanale);
-
-      cumulato += oreTurno;
-
-      const extraDopo =
-        Math.max(0, cumulato - limiteSettimanale);
-
-      const extraTurno =
-        Math.max(0, extraDopo - extraPrima);
-
-      if (
-        Number(t.mese) === Number(meseTarget) &&
-        Number(t.anno) === Number(annoTarget)
-      ) {
-        extraMese += extraTurno;
-      }
-    });
-  });
-
-  return extraMese;
-}
 
 export default function App() {
   const giorniSettimana = ["Dom", "Lun", "Mar", "Mer", "Gio", "Ven", "Sab"];
@@ -4065,7 +3961,7 @@ const cambiaStatoDotazione = (id, stato) => {
   const extraStipendioMese =
     calcolaStraordinariConfigurati({
       giornateMese: giornateStipendioMese,
-      tuttiTurni: turni,
+      tuttiTurni: filtraTurniConclusi(turni, adessoMaturato),
       modalita: stipendioCalcoloStraordinari,
       sogliaGiornaliera: oreOrdinarieGiornaliereNumero,
       sogliaSettimanale: Number(
@@ -4466,42 +4362,8 @@ const debugLuglio = lista
     (t) => t.tipo === 'turno'
   );
 
-  const oreDomenicaliMese = giornateStipendioMese.reduce((tot, t) => {
-  if (!t.inizio || !t.fine) return tot;
-
-  const giorno = Number(t.giorno);
-  const meseTurno = Number(t.mese);
-  const annoTurno = Number(t.anno);
-
-  const [hi, mi] = t.inizio.split(':').map(Number);
-  const [hf, mf] = t.fine.split(':').map(Number);
-
-  const start = new Date(annoTurno, meseTurno - 1, giorno, hi, mi, 0);
-  let end = new Date(annoTurno, meseTurno - 1, giorno, hf, mf, 0);
-
-  if (end <= start) {
-    end.setDate(end.getDate() + 1);
-  }
-
-  let cursor = new Date(start);
-  let minutiDomenicali = 0;
-
-  while (cursor < end) {
-    const prossimo = new Date(cursor);
-    prossimo.setMinutes(prossimo.getMinutes() + 30);
-
-    const limite = prossimo > end ? end : prossimo;
-    const minuti = (limite - cursor) / 60000;
-
-    if (cursor.getDay() === 0) {
-      minutiDomenicali += minuti;
-    }
-
-    cursor = limite;
-  }
-
-  return tot + minutiDomenicali / 60;
-}, 0);
+  const oreDomenicaliMese =
+    calcolaOreDomenicali(giornateStipendioMese);
 
 const oreStipendioMese = giornateStipendioMese.reduce(
     (tot, t) => tot + Number(t.ore || 0),
@@ -4721,7 +4583,7 @@ const oreStipendioMese = giornateStipendioMese.reduce(
 
 // Tutti i servizi effettivamente lavorati, compreso il riposo lavorato
 const serviziPiantonamentoMese = turniStipendioMese.filter(
-  (t) => t.tipo === 'turno'
+  (t) => t.tipo === 'turno' && creaIntervalloTurno(t)
 );
 
 // Turni che attraversano la mezzanotte
@@ -4740,13 +4602,8 @@ const serviziNotturniMese = serviziPiantonamentoMese.filter((t) => {
 const serviziDiurniMese =
   Math.max(0, serviziPiantonamentoMese.length - serviziNotturniMese);
 
-const oreRiposoLavoratoMese = turniStipendioMese.reduce(
-  (tot, t) =>
-    t.riposo_lavorato === true
-      ? tot + Number(t.ore || 0)
-      : tot,
-  0
-);
+const oreRiposoLavoratoMese =
+  calcolaOreRiposoLavorato(turniStipendioMese);
 
 // Tariffe ricavate dal cedolino reale livello 4
 const leggiTariffa = (valore, fallback) => {
@@ -5103,51 +4960,7 @@ const totaleCompetenzeFiduciario =
 
   const adessoMaturato = new Date();
 
-  const creaIntervalloTurnoStipendio = (t) => {
-    if (
-      !t ||
-      t.tipo !== 'turno' ||
-      !t.inizio ||
-      !t.fine
-    ) {
-      return null;
-    }
-
-    const [hi, mi] =
-      String(t.inizio).split(':').map(Number);
-
-    const [hf, mf] =
-      String(t.fine).split(':').map(Number);
-
-    const inizioTurno = new Date(
-      Number(t.anno),
-      Number(t.mese) - 1,
-      Number(t.giorno),
-      hi,
-      mi,
-      0
-    );
-
-    const fineTurno = new Date(
-      Number(t.anno),
-      Number(t.mese) - 1,
-      Number(t.giorno),
-      hf,
-      mf,
-      0
-    );
-
-    if (fineTurno <= inizioTurno) {
-      fineTurno.setDate(
-        fineTurno.getDate() + 1
-      );
-    }
-
-    return {
-      inizio: inizioTurno,
-      fine: fineTurno,
-    };
-  };
+  const creaIntervalloTurnoStipendio = creaIntervalloTurno;
 
 
   // Solo turni realmente terminati
@@ -5461,9 +5274,7 @@ const quotaTempoMese = Math.min(
 
 
   const coefficienteNettoAdOggi =
-    stipendioTipoOperatore === 'fiduciario'
-      ? 0.78
-      : (1860.00 / 2273.30);
+    coefficienteNetto(stipendioTipoOperatore);
 
   const nettoStimatoAdOggi =
     Number(maturatoAdOggi || 0) *
@@ -5499,8 +5310,8 @@ const nettoBaseNumero =
 
 // Netto stimato calibrato sul cedolino reale di luglio 2026:
 // 1992,00 / 2577,16 = circa 0,7729
-const coefficienteNettoStimato = 1992.00 / 2577.16;
-const coefficienteNettoFiduciario = 0.78;
+const coefficienteNettoStimato = coefficienteNetto('gpg');
+const coefficienteNettoFiduciario = coefficienteNetto('fiduciario');
 
   const nettoStimatoMese =
     maturatoMese *
@@ -5518,7 +5329,7 @@ const coefficienteNettoFiduciario = 0.78;
     new Date(anno, mese + 1, 0).getDate();
 
   /*
-   * PREVISIONE FINE MESE
+   * LORDO PROGRAMMATO FINE MESE
    *
    * Se sono già presenti turni futuri nel mese selezionato,
    * il maturato contiene già quelle giornate:
@@ -5550,18 +5361,13 @@ const coefficienteNettoFiduciario = 0.78;
       return dataTurno > oggiPrevisione;
     });
 
-  const previsioneFineMese =
-    giornateStipendioMese.length > 0
-      ? maturatoMese
-      : nettoBaseNumero;
+  const lordoProgrammatoFineMese = maturatoMese;
 
   // ===== NETTO PREVISTO FINE MESE =====
   const nettoPrevistoFineMese =
-    Number(previsioneFineMese || 0) *
+    Number(lordoProgrammatoFineMese || 0) *
     (
-      stipendioTipoOperatore === 'fiduciario'
-        ? 0.78
-        : (1860.00 / 2273.30)
+      coefficienteNetto(stipendioTipoOperatore)
     );
 
 
@@ -6031,40 +5837,7 @@ console.log("🕒 ORA REALE:", new Date().toString());
       return 0;
     }
 
-    const [h1, m1] =
-      start
-        .split(':')
-        .map(Number);
-
-    const [h2, m2] =
-      end
-        .split(':')
-        .map(Number);
-
-    if (
-      [
-        h1,
-        m1,
-        h2,
-        m2,
-      ].some(Number.isNaN)
-    ) {
-      return 0;
-    }
-
-    let a =
-      h1 * 60 + m1;
-
-    let b =
-      h2 * 60 + m2;
-
-    if (b <= a) {
-      b += 1440;
-    }
-
-    return (
-      (b - a) / 60
-    );
+    return calcolaDurataOre(start, end);
   }
 
   function fasciaTurno(
@@ -8461,10 +8234,7 @@ if (screen === 'colleghi') {
     🛌 Riposo lavorato
   </Text>
   <Text style={{ color: '#FFFFFF', fontSize: 15, fontWeight: '900' }}>
-    {giornateStipendioMese
-      .filter((t) => t.riposo_lavorato === true)
-      .reduce((tot, t) => tot + Number(t.ore || 0), 0)
-      .toFixed(1)} h
+    {oreRiposoLavoratoMese.toFixed(1)} h
   </Text>
 </View>
 
@@ -8682,7 +8452,7 @@ if (screen === 'colleghi') {
               marginTop: 5,
             }}
           >
-            € {previsioneFineMese.toFixed(2)}
+            € {lordoProgrammatoFineMese.toFixed(2)}
           </Text>
 
         {/* ===== NETTO PREVISTO UI ===== */}
@@ -9227,13 +8997,7 @@ if (screen === 'colleghi') {
                 tariffa: tariffaDomenicale,
               },
               {
-                app: giornateStipendioMese.reduce(
-                  (tot, t) =>
-                    t.riposo_lavorato === true
-                      ? tot + Math.max(0, Number(t.ore || 0) - Number(t.extra || 0))
-                      : tot,
-                  0
-                ),
+                app: Number(oreRiposoLavoratoMese || 0),
                 ced: cedolinoRiposo,
                 tariffa: tariffaRiposoLavorato,
               },
@@ -9483,13 +9247,7 @@ if (screen === 'colleghi') {
               },
               {
                 label: 'RIPOSO LAVORATO',
-                app: giornateStipendioMese.reduce(
-                  (tot, t) =>
-                    t.riposo_lavorato === true
-                      ? tot + Math.max(0, Number(t.ore || 0) - Number(t.extra || 0))
-                      : tot,
-                  0
-                ),
+                app: Number(oreRiposoLavoratoMese || 0),
                 value: cedolinoRiposo,
                 setValue: setCedolinoRiposo,
                 tariffa: tariffaRiposoLavorato,
