@@ -23,6 +23,7 @@
     "react-native-web": "^0.21.0"
   },
   "scripts": {
+    "test": "node --test test/*.test.js",
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
