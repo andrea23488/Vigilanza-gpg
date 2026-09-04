@@ -55,6 +55,7 @@ import {
 import * as ImagePicker from 'expo-image-picker';
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { updateApplicationContext } from 'react-native-watch-connectivity';
 
 const SUPABASE_URL =
   process.env.EXPO_PUBLIC_SUPABASE_URL;
@@ -5953,6 +5954,44 @@ console.log("🕒 ORA REALE:", new Date().toString());
 
     return () => clearInterval(timerCountdown);
   }, [turnoOggi, turnoInCorso, turni]);
+
+  /* ============================================================
+     APPLE WATCH - SINCRONIZZAZIONE TURNO
+     ============================================================ */
+  useEffect(() => {
+    if (Platform.OS !== 'ios') return;
+
+    const sincronizzaAppleWatch = async () => {
+      try {
+        const turnoWatch = turnoInCorso || turnoOggi || null;
+
+        const payloadWatch = {
+          stato: turnoInCorso ? 'in_servizio' : 'non_in_servizio',
+          tipo: String(turnoWatch?.tipo || ''),
+          inizio: String(turnoWatch?.inizio || ''),
+          fine: String(turnoWatch?.fine || ''),
+          luogo: String(turnoWatch?.luogo || ''),
+          indirizzo: String(turnoWatch?.indirizzo_servizio || ''),
+          countdownLabel: String(countdownLabel || ''),
+          countdown: String(countdownTurno || ''),
+          aggiornatoAlle: String(Date.now()),
+        };
+
+        updateApplicationContext(payloadWatch);
+
+        console.log('⌚ WATCH SYNC OK:', payloadWatch);
+      } catch (error) {
+        console.log('⌚ WATCH SYNC ERROR:', error);
+      }
+    };
+
+    sincronizzaAppleWatch();
+  }, [
+    turnoOggi?.id,
+    turnoInCorso?.id,
+    countdownLabel,
+    countdownTurno,
+  ]);
 
 
   const statistiche =
