@@ -72,9 +72,9 @@ final class WatchSessionManager: NSObject, ObservableObject, WCSessionDelegate {
         if let shared = UserDefaults(suiteName: "group.com.vigilanzagpg.app.watch") {
             shared.set(dati["stato"] as? String ?? "", forKey: "stato")
             shared.set(dati["tipo"] as? String ?? "", forKey: "tipo")
-            shared.set(dati["giorno"] as? Int ?? 0, forKey: "giorno")
-            shared.set(dati["mese"] as? Int ?? 0, forKey: "mese")
-            shared.set(dati["anno"] as? Int ?? 0, forKey: "anno")
+            shared.set(numero(dati["giorno"]), forKey: "giorno")
+            shared.set(numero(dati["mese"]), forKey: "mese")
+            shared.set(numero(dati["anno"]), forKey: "anno")
             shared.set(dati["inizio"] as? String ?? "", forKey: "inizio")
             shared.set(dati["fine"] as? String ?? "", forKey: "fine")
             shared.set(dati["luogo"] as? String ?? "", forKey: "luogo")
