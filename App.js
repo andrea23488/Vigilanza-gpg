@@ -5963,7 +5963,33 @@ console.log("🕒 ORA REALE:", new Date().toString());
 
     const sincronizzaAppleWatch = async () => {
       try {
-        const turnoWatch = turnoInCorso || turnoOggi || null;
+        const adessoWatch = new Date();
+
+      const prossimoTurnoWatch =
+        turni
+          .filter(
+            (t) =>
+              t?.tipo === 'turno' &&
+              t?.anno &&
+              t?.mese &&
+              t?.giorno &&
+              t?.inizio &&
+              t?.fine
+          )
+          .map((t) => {
+            const date = creaDateTurno(t);
+            return {
+              turno: t,
+              data: date.inizio,
+            };
+          })
+          .filter((x) => x.data > adessoWatch)
+          .sort((a, b) => a.data - b.data)[0] || null;
+
+      const turnoWatch =
+        turnoInCorso ||
+        prossimoTurnoWatch?.turno ||
+        null;
 
         const payloadWatch = {
           stato: turnoInCorso ? 'in_servizio' : 'non_in_servizio',
@@ -5978,6 +6004,13 @@ console.log("🕒 ORA REALE:", new Date().toString());
           countdownLabel: String(countdownLabel || ''),
           countdown: String(countdownTurno || ''),
           aggiornatoAlle: String(Date.now()),
+        temperatura: Number(meteoServizio?.current?.temperature_2m ?? 0),
+        codiceMeteo: Number(meteoServizio?.current?.weather_code ?? -1),
+        meteoLocalita: String(
+          meteoServizio?.luogo?.name ||
+          meteoServizio?.luogo?.admin1 ||
+          ''
+        ),
         };
 
         updateApplicationContext(payloadWatch);
@@ -5994,6 +6027,10 @@ console.log("🕒 ORA REALE:", new Date().toString());
     turnoInCorso?.id,
     countdownLabel,
     countdownTurno,
+      meteoServizio?.current?.temperature_2m,
+      meteoServizio?.current?.weather_code,
+      meteoServizio?.luogo?.name,
+      meteoServizio?.luogo?.admin1,
   ]);
 
 

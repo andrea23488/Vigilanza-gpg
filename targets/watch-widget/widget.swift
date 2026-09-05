@@ -12,6 +12,9 @@ struct VigilanzaEntry: TimelineEntry {
     let giorno: Int
     let mese: Int
     let anno: Int
+    let temperatura: Double
+    let codiceMeteo: Int
+    let meteoLocalita: String
 }
 
 struct VigilanzaProvider: TimelineProvider {
@@ -25,7 +28,10 @@ struct VigilanzaProvider: TimelineProvider {
             luogo: "Pianto.",
             giorno: 5,
             mese: 9,
-            anno: 2026
+            anno: 2026,
+            temperatura: 19,
+            codiceMeteo: 1,
+            meteoLocalita: "Roma"
         )
     }
 
@@ -67,7 +73,10 @@ struct VigilanzaProvider: TimelineProvider {
             luogo: shared?.string(forKey: "luogo") ?? "",
             giorno: shared?.integer(forKey: "giorno") ?? 0,
             mese: shared?.integer(forKey: "mese") ?? 0,
-            anno: shared?.integer(forKey: "anno") ?? 0
+            anno: shared?.integer(forKey: "anno") ?? 0,
+            temperatura: shared?.double(forKey: "temperatura") ?? 0,
+            codiceMeteo: shared?.integer(forKey: "codiceMeteo") ?? -1,
+            meteoLocalita: shared?.string(forKey: "meteoLocalita") ?? ""
         )
     }
 }
@@ -129,8 +138,24 @@ struct VigilanzaComplicationView: View {
         return entry.date >= turno.0 && entry.date < turno.1
     }
 
+    private var turnoFuturo: Bool {
+        guard let turno = intervalloTurno else {
+            return false
+        }
+
+        return entry.date < turno.0
+    }
+
     private var countdownFine: String {
         guard let turno = intervalloTurno else {
+            return "--"
+        }
+
+        guard inServizio || turnoFuturo else {
+            return "--"
+        }
+
+        guard inServizio || turnoFuturo else {
             return "--"
         }
 
@@ -161,6 +186,32 @@ struct VigilanzaComplicationView: View {
         return min(1, max(0, trascorso / totale))
     }
 
+    private var simboloMeteo: String {
+        switch entry.codiceMeteo {
+        case 0:
+            return "sun.max.fill"
+        case 1, 2:
+            return "cloud.sun.fill"
+        case 3:
+            return "cloud.fill"
+        case 45, 48:
+            return "cloud.fog.fill"
+        case 51...67, 80...82:
+            return "cloud.rain.fill"
+        case 71...77, 85, 86:
+            return "cloud.snow.fill"
+        case 95...99:
+            return "cloud.bolt.rain.fill"
+        default:
+            return "cloud.fill"
+        }
+    }
+
+    private var temperaturaTesto: String {
+        guard entry.codiceMeteo >= 0 else { return "" }
+        return "\(Int(entry.temperatura.rounded()))°"
+    }
+
     var body: some View {
         switch family {
 
@@ -169,8 +220,12 @@ struct VigilanzaComplicationView: View {
                 Image(systemName: "shield.fill")
             } currentValueLabel: {
                 VStack(spacing: 0) {
-                    Text(inServizio ? "ON" : "NEXT")
-                        .font(.system(size: 8, weight: .black))
+                    Text(
+                        inServizio
+                        ? "ON"
+                        : (turnoFuturo ? "NEXT" : "OFF")
+                    )
+                    .font(.system(size: 8, weight: .black))
 
                     Text(countdownBreve)
                         .font(.system(size: 9, weight: .black, design: .rounded))
@@ -183,7 +238,11 @@ struct VigilanzaComplicationView: View {
             Text(
                 inServizio
                 ? "GPG · fine tra \(countdownFine)"
-                : "GPG · prossimo \(entry.inizio.isEmpty ? "--:--" : entry.inizio)"
+                : (
+                    turnoFuturo
+                    ? "GPG · prossimo \(entry.inizio.isEmpty ? "--:--" : entry.inizio)"
+                    : "GPG · nessun turno"
+                )
             )
 
         case .accessoryRectangular:
@@ -195,7 +254,7 @@ struct VigilanzaComplicationView: View {
                     Text(
                         inServizio
                         ? "ON DUTY"
-                        : "NEXT DUTY"
+                        : (turnoFuturo ? "NEXT DUTY" : "NO DUTY")
                     )
                     .font(.system(size: 11, weight: .black))
 
@@ -211,10 +270,25 @@ struct VigilanzaComplicationView: View {
                 )
                 .font(.system(size: 10, weight: .bold))
 
-                if !entry.luogo.isEmpty {
-                    Text(entry.luogo)
-                        .font(.system(size: 9, weight: .medium))
-                        .lineLimit(1)
+                HStack(spacing: 4) {
+                    if !entry.luogo.isEmpty {
+                        Text(entry.luogo)
+                            .font(.system(size: 9, weight: .medium))
+                            .lineLimit(1)
+                    }
+
+                    Spacer()
+
+                    if !temperaturaTesto.isEmpty {
+                        HStack(spacing: 2) {
+                            Image(systemName: simboloMeteo)
+                                .font(.system(size: 8, weight: .bold))
+
+                            Text(temperaturaTesto)
+                                .font(.system(size: 9, weight: .bold))
+                                .monospacedDigit()
+                        }
+                    }
                 }
 
                 if inServizio {

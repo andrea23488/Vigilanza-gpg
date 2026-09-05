@@ -82,6 +82,9 @@ final class WatchSessionManager: NSObject, ObservableObject, WCSessionDelegate {
             shared.set(dati["countdownLabel"] as? String ?? "", forKey: "countdownLabel")
             shared.set(dati["countdown"] as? String ?? "", forKey: "countdown")
             shared.set(dati["aggiornatoAlle"] as? String ?? "", forKey: "aggiornatoAlle")
+            shared.set((dati["temperatura"] as? NSNumber)?.doubleValue ?? 0, forKey: "temperatura")
+            shared.set((dati["codiceMeteo"] as? NSNumber)?.intValue ?? -1, forKey: "codiceMeteo")
+            shared.set(dati["meteoLocalita"] as? String ?? "", forKey: "meteoLocalita")
             shared.synchronize()
             WidgetCenter.shared.reloadAllTimelines()
         }
