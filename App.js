@@ -5968,6 +5968,9 @@ console.log("🕒 ORA REALE:", new Date().toString());
         const payloadWatch = {
           stato: turnoInCorso ? 'in_servizio' : 'non_in_servizio',
           tipo: String(turnoWatch?.tipo || ''),
+          giorno: Number(turnoWatch?.giorno || 0),
+          mese: Number(turnoWatch?.mese || 0),
+          anno: Number(turnoWatch?.anno || 0),
           inizio: String(turnoWatch?.inizio || ''),
           fine: String(turnoWatch?.fine || ''),
           luogo: String(turnoWatch?.luogo || ''),
