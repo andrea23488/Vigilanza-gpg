@@ -1,4 +1,5 @@
 import SwiftUI
+import WidgetKit
 import WatchConnectivity
 
 final class WatchSessionManager: NSObject, ObservableObject, WCSessionDelegate {
@@ -68,6 +69,23 @@ final class WatchSessionManager: NSObject, ObservableObject, WCSessionDelegate {
     }
 
     private func applica(_ dati: [String: Any]) {
+        if let shared = UserDefaults(suiteName: "group.com.vigilanzagpg.app.watch") {
+            shared.set(dati["stato"] as? String ?? "", forKey: "stato")
+            shared.set(dati["tipo"] as? String ?? "", forKey: "tipo")
+            shared.set(dati["giorno"] as? Int ?? 0, forKey: "giorno")
+            shared.set(dati["mese"] as? Int ?? 0, forKey: "mese")
+            shared.set(dati["anno"] as? Int ?? 0, forKey: "anno")
+            shared.set(dati["inizio"] as? String ?? "", forKey: "inizio")
+            shared.set(dati["fine"] as? String ?? "", forKey: "fine")
+            shared.set(dati["luogo"] as? String ?? "", forKey: "luogo")
+            shared.set(dati["indirizzo"] as? String ?? "", forKey: "indirizzo")
+            shared.set(dati["countdownLabel"] as? String ?? "", forKey: "countdownLabel")
+            shared.set(dati["countdown"] as? String ?? "", forKey: "countdown")
+            shared.set(dati["aggiornatoAlle"] as? String ?? "", forKey: "aggiornatoAlle")
+            shared.synchronize()
+            WidgetCenter.shared.reloadAllTimelines()
+        }
+
         guard !dati.isEmpty else { return }
 
         stato = dati["stato"] as? String ?? "non_in_servizio"
