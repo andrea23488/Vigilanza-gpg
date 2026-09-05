@@ -18,6 +18,7 @@ final class WatchSessionManager: NSObject, ObservableObject, WCSessionDelegate {
 
     @Published var countdownLabel = ""
     @Published var countdown = ""
+    @Published var aggiornatoAlle = ""
 
     private override init() {
         super.init()
@@ -83,6 +84,7 @@ final class WatchSessionManager: NSObject, ObservableObject, WCSessionDelegate {
 
         countdownLabel = dati["countdownLabel"] as? String ?? ""
         countdown = dati["countdown"] as? String ?? ""
+        aggiornatoAlle = dati["aggiornatoAlle"] as? String ?? ""
     }
 }
 
@@ -220,54 +222,82 @@ struct ContentView: View {
                 VStack(spacing: 8) {
 
                     // TOP BAR
-                    HStack(spacing: 6) {
+                    HStack(spacing: 7) {
                         ZStack {
-                            RoundedRectangle(cornerRadius: 8)
-                                .fill(statoColore.opacity(0.14))
-                                .frame(width: 30, height: 30)
+                            RoundedRectangle(cornerRadius: 9, style: .continuous)
+                                .fill(statoColore.opacity(0.16))
+                                .frame(width: 32, height: 32)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 9, style: .continuous)
+                                        .stroke(statoColore.opacity(0.28), lineWidth: 1)
+                                )
 
                             Image(systemName: "shield.lefthalf.filled")
-                                .font(.system(size: 15, weight: .black))
+                                .font(.system(size: 16, weight: .black))
                                 .foregroundStyle(statoColore)
                         }
 
-                        VStack(alignment: .leading, spacing: 0) {
+                        VStack(alignment: .leading, spacing: 1) {
                             Text("VIGILANZA GPG")
                                 .font(.system(size: 11, weight: .black, design: .rounded))
 
-                            Text("TACTICAL UNIT")
-                                .font(.system(size: 7, weight: .bold))
-                                .tracking(1.1)
-                                .foregroundStyle(.secondary)
+                            HStack(spacing: 3) {
+                                Rectangle()
+                                    .fill(statoColore)
+                                    .frame(width: 10, height: 1)
+
+                                Text("CONTROL ROOM")
+                                    .font(.system(size: 6, weight: .black))
+                                    .tracking(1.2)
+                                    .foregroundStyle(.secondary)
+                            }
                         }
 
                         Spacer()
 
-                        Text(adesso, style: .time)
-                            .font(.system(size: 11, weight: .bold, design: .monospaced))
-                            .foregroundStyle(.secondary)
+                        VStack(alignment: .trailing, spacing: 0) {
+                            Text(adesso, style: .time)
+                                .font(.system(size: 12, weight: .black, design: .monospaced))
+                                .foregroundStyle(.primary)
+
+                            Text(servizio ? "LIVE OPS" : "SYSTEM READY")
+                                .font(.system(size: 6, weight: .black))
+                                .tracking(0.8)
+                                .foregroundStyle(statoColore)
+                        }
                     }
 
                     // STATUS STRIP
                     HStack(spacing: 6) {
-                        Circle()
-                            .fill(statoColore)
-                            .frame(width: 7, height: 7)
+                        ZStack {
+                            Circle()
+                                .fill(statoColore.opacity(0.18))
+                                .frame(width: 14, height: 14)
+
+                            Circle()
+                                .fill(statoColore)
+                                .frame(width: 6, height: 6)
+                        }
 
                         Text(testoStato(adesso))
-                            .font(.system(size: 9, weight: .black))
-                            .tracking(0.9)
+                            .font(.system(size: 10, weight: .black))
+                            .tracking(1.0)
                             .foregroundStyle(statoColore)
 
                         Spacer()
 
                         Text(servizio ? "ACTIVE" : "READY")
                             .font(.system(size: 7, weight: .black))
-                            .padding(.horizontal, 6)
+                            .tracking(0.7)
+                            .padding(.horizontal, 7)
                             .padding(.vertical, 3)
                             .background(
                                 Capsule()
                                     .fill(statoColore.opacity(0.13))
+                                    .overlay(
+                                        Capsule()
+                                            .stroke(statoColore.opacity(0.25), lineWidth: 1)
+                                    )
                             )
                             .foregroundStyle(statoColore)
                     }
@@ -275,24 +305,32 @@ struct ContentView: View {
                     // MAIN MISSION CARD
                     VStack(spacing: 8) {
                         HStack {
-                            VStack(alignment: .leading, spacing: 1) {
-                                Text("MISSION WINDOW")
-                                    .font(.system(size: 7, weight: .black))
-                                    .tracking(1.2)
-                                    .foregroundStyle(.secondary)
+                            VStack(alignment: .leading, spacing: 2) {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "scope")
+                                        .font(.system(size: 8, weight: .black))
+                                        .foregroundStyle(statoColore)
+
+                                    Text("MISSION WINDOW")
+                                        .font(.system(size: 7, weight: .black))
+                                        .tracking(1.2)
+                                        .foregroundStyle(.secondary)
+                                }
 
                                 HStack(alignment: .firstTextBaseline, spacing: 5) {
                                     Text(watch.inizio.isEmpty ? "--:--" : watch.inizio)
-                                        .font(.system(size: 27, weight: .black, design: .rounded))
+                                        .font(.system(size: 28, weight: .black, design: .rounded))
                                         .monospacedDigit()
+                                        .foregroundStyle(.primary)
 
                                     Text("→")
-                                        .font(.system(size: 12, weight: .bold))
-                                        .foregroundStyle(.secondary)
+                                        .font(.system(size: 12, weight: .black))
+                                        .foregroundStyle(statoColore)
 
                                     Text(watch.fine.isEmpty ? "--:--" : watch.fine)
-                                        .font(.system(size: 18, weight: .bold, design: .rounded))
+                                        .font(.system(size: 19, weight: .black, design: .rounded))
                                         .monospacedDigit()
+                                        .foregroundStyle(.primary)
                                 }
                             }
 
@@ -368,15 +406,15 @@ struct ContentView: View {
 
                     // COUNTDOWN HUD
                     if let countdown {
-                        VStack(spacing: 2) {
-                            HStack {
+                        VStack(spacing: 5) {
+                            HStack(spacing: 5) {
                                 Rectangle()
                                     .fill(statoColore.opacity(0.45))
                                     .frame(height: 1)
 
                                 Text(countdown.0)
                                     .font(.system(size: 7, weight: .black))
-                                    .tracking(1.4)
+                                    .tracking(1.5)
                                     .foregroundStyle(.secondary)
 
                                 Rectangle()
@@ -384,45 +422,72 @@ struct ContentView: View {
                                     .frame(height: 1)
                             }
 
-                            Text(countdown.1)
-                                .font(.system(size: 24, weight: .black, design: .rounded))
-                                .monospacedDigit()
-                                .foregroundStyle(statoColore)
+                            ZStack {
+                                RoundedRectangle(cornerRadius: 11, style: .continuous)
+                                    .fill(statoColore.opacity(0.07))
 
-                            Text(servizio ? "TEMPO RESIDUO OPERATIVO" : "TEMPO AL PROSSIMO SERVIZIO")
-                                .font(.system(size: 6, weight: .bold))
-                                .tracking(0.8)
-                                .foregroundStyle(.secondary)
+                                HStack(spacing: 6) {
+                                    Image(systemName: servizio ? "hourglass.bottomhalf.filled" : "clock.badge")
+                                        .font(.system(size: 13, weight: .black))
+                                        .foregroundStyle(statoColore)
+
+                                    Text(countdown.1)
+                                        .font(.system(size: 25, weight: .black, design: .rounded))
+                                        .monospacedDigit()
+                                        .foregroundStyle(.primary)
+                                }
+                                .padding(.vertical, 6)
+                            }
+
+                            HStack {
+                                Text(servizio ? "TEMPO RESIDUO OPERATIVO" : "TEMPO AL PROSSIMO SERVIZIO")
+                                    .font(.system(size: 6, weight: .black))
+                                    .tracking(0.9)
+                                    .foregroundStyle(.secondary)
+
+                                Spacer()
+
+                                Text(servizio ? "OPS" : "READY")
+                                    .font(.system(size: 6, weight: .black))
+                                    .tracking(0.7)
+                                    .foregroundStyle(statoColore)
+                            }
                         }
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 7)
+                        .padding(.vertical, 8)
                         .padding(.horizontal, 8)
                         .background(
-                            RoundedRectangle(cornerRadius: 13, style: .continuous)
-                                .fill(statoColore.opacity(0.08))
+                            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                .fill(Color.white.opacity(0.045))
                                 .overlay(
-                                    RoundedRectangle(cornerRadius: 13, style: .continuous)
-                                        .stroke(statoColore.opacity(0.18), lineWidth: 1)
+                                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                        .stroke(statoColore.opacity(0.24), lineWidth: 1)
                                 )
                         )
                     }
 
                     // FOOTER
-                    HStack {
+                    HStack(spacing: 5) {
+                        Circle()
+                            .fill(watch.aggiornatoAlle.isEmpty ? Color.orange : statoColore)
+                            .frame(width: 5, height: 5)
+
                         Image(systemName: "antenna.radiowaves.left.and.right")
                             .font(.system(size: 8))
                             .foregroundStyle(statoColore)
 
-                        Text("SYNC LINK")
+                        Text(watch.aggiornatoAlle.isEmpty ? "SYNC WAIT" : "SYNC OK")
                             .font(.system(size: 6, weight: .black))
                             .tracking(1.0)
                             .foregroundStyle(.secondary)
 
                         Spacer()
 
-                        Text("SECURE")
-                            .font(.system(size: 6, weight: .black))
-                            .foregroundStyle(statoColore)
+                        if !watch.aggiornatoAlle.isEmpty {
+                            Text("LIVE")
+                                .font(.system(size: 6, weight: .black))
+                                .foregroundStyle(statoColore)
+                        }
                     }
                     .padding(.horizontal, 3)
                 }
