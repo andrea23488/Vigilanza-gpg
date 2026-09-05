@@ -4,7 +4,7 @@ module.exports = config => ({
   name: "VigilanzaGPGComplication",
   displayName: "Vigilanza GPG",
   deploymentTarget: "9.4",
-  bundleIdentifier: ".watch.complication",
+  bundleIdentifier: ".watch.gpgcomplication",
   entitlements: {
     "com.apple.security.application-groups": ["group.com.vigilanzagpg.app.watch"],
   },
