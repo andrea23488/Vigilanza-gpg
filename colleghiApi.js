@@ -12,6 +12,16 @@ async function getCurrentUser() {
   return session.user;
 }
 
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function pulisciRicerca(valore) {
+  return String(valore || '')
+    .trim()
+    .replace(/[(),]/g, ' ')
+    .replace(/\s+/g, ' ');
+}
+
 export async function caricaColleghi() {
   const user = await getCurrentUser();
 
@@ -24,71 +34,97 @@ export async function caricaColleghi() {
   if (error) throw error;
 
   const relazioni = data || [];
+  const ids = [
+    ...new Set(
+      relazioni
+        .map((relazione) =>
+          relazione.user_id === user.id
+            ? relazione.collega_id
+            : relazione.user_id
+        )
+        .filter(Boolean)
+    ),
+  ];
 
-  const risultati = await Promise.all(
-    relazioni.map(async (relazione) => {
-      const altroUserId =
-        relazione.user_id === user.id
-          ? relazione.collega_id
-          : relazione.user_id;
+  let profili = [];
 
-      const { data: profilo, error: profiloError } = await supabase
-        .from('profili')
-        .select('user_id, nome, cognome, azienda, sede, foto_url, codice_gpg')
-        .eq('user_id', altroUserId)
-        .maybeSingle();
+  if (ids.length > 0) {
+    const { data: profiliData, error: profiliError } = await supabase
+      .from('profili')
+      .select('id, user_id, nome, cognome, azienda, sede, foto_url, codice_gpg')
+      .in('user_id', ids);
 
-      if (profiloError) throw profiloError;
+    if (profiliError) throw profiliError;
+    profili = profiliData || [];
+  }
 
-      return {
-        ...relazione,
-        altro_user_id: altroUserId,
-        ricevuta: relazione.collega_id === user.id,
-        profilo: profilo || null,
-      };
-    })
+  const profiliPerUtente = new Map(
+    profili.map((profilo) => [profilo.user_id, profilo])
   );
 
-  return risultati;
+  return relazioni.map((relazione) => {
+    const altroUserId =
+      relazione.user_id === user.id
+        ? relazione.collega_id
+        : relazione.user_id;
+
+    return {
+      ...relazione,
+      altro_user_id: altroUserId,
+      ricevuta: relazione.collega_id === user.id,
+      profilo: profiliPerUtente.get(altroUserId) || null,
+    };
+  });
 }
 
 export async function aggiungiCollega(testoRicerca) {
   const user = await getCurrentUser();
-
-  const ricerca = String(testoRicerca || '').trim();
+  const ricerca = pulisciRicerca(testoRicerca);
 
   if (!ricerca) {
     throw new Error(
-      'Inserisci nome, cognome, matricola o codice GPG.'
+      'Inserisci nome, cognome, UUID utente o codice GPG.'
     );
   }
 
+  const selectProfilo =
+    'id, user_id, nome, cognome, codice_gpg, azienda, sede, foto_url';
+
   let profiliTrovati = [];
 
-  // Prima prova il codice GPG esatto
-  const codice = ricerca.toUpperCase();
-
-  const { data: profiloCodice, error: erroreCodice } =
-    await supabase
+  if (UUID_RE.test(ricerca)) {
+    const { data, error } = await supabase
       .from('profili')
-      .select('user_id, nome, cognome, codice_gpg, azienda, sede')
+      .select(selectProfilo)
+      .eq('user_id', ricerca)
+      .limit(1);
+
+    if (error) throw error;
+    profiliTrovati = data || [];
+  }
+
+  if (profiliTrovati.length === 0) {
+    const codice = ricerca.toUpperCase();
+
+    const { data, error } = await supabase
+      .from('profili')
+      .select(selectProfilo)
       .eq('codice_gpg', codice)
-      .maybeSingle();
+      .limit(20);
 
-  if (erroreCodice) throw erroreCodice;
+    if (error) throw error;
+    profiliTrovati = data || [];
+  }
 
-  if (profiloCodice) {
-    profiliTrovati = [profiloCodice];
-  } else {
-    // Ricerca per nome/cognome
+  if (profiliTrovati.length === 0) {
     const parole = ricerca
       .split(/\s+/)
-      .map(x => x.trim())
+      .map((x) => x.trim())
       .filter(Boolean);
 
     let query = supabase
       .from('profili')
-      .select('user_id, nome, cognome, codice_gpg, azienda, sede')
+      .select(selectProfilo)
       .neq('user_id', user.id);
 
     if (parole.length >= 2) {
@@ -96,8 +132,8 @@ export async function aggiungiCollega(testoRicerca) {
       const cognome = parole.slice(1).join(' ');
 
       query = query
-        .ilike('nome', nome)
-        .ilike('cognome', cognome);
+        .ilike('nome', `%${nome}%`)
+        .ilike('cognome', `%${cognome}%`);
     } else {
       const q = parole[0];
 
@@ -109,32 +145,30 @@ export async function aggiungiCollega(testoRicerca) {
     const { data, error } = await query.limit(20);
 
     if (error) throw error;
-
     profiliTrovati = data || [];
   }
 
   profiliTrovati = profiliTrovati.filter(
-    p => p.user_id !== user.id
+    (profilo) => profilo?.user_id && profilo.user_id !== user.id
   );
 
   if (profiliTrovati.length === 0) {
     throw new Error(
-      'Nessun collega trovato. Prova con nome e cognome completi oppure con la matricola.'
+      'Nessun collega trovato. Prova con nome e cognome, codice GPG o UUID.'
     );
   }
 
   if (profiliTrovati.length > 1) {
     const esempi = profiliTrovati
       .slice(0, 3)
-      .map(
-        p =>
-          `${p.nome || ''} ${p.cognome || ''}`.trim()
+      .map((profilo) =>
+        [profilo?.nome, profilo?.cognome].filter(Boolean).join(' ').trim()
       )
       .filter(Boolean)
       .join(', ');
 
     throw new Error(
-      `Ho trovato più colleghi${esempi ? `: ${esempi}` : ''}. Scrivi nome e cognome completi oppure la matricola.`
+      `Ho trovato più colleghi${esempi ? `: ${esempi}` : ''}. Specifica meglio la ricerca.`
     );
   }
 
@@ -180,27 +214,45 @@ export async function aggiungiCollega(testoRicerca) {
 }
 
 export async function rimuoviCollega(idRelazione) {
-  await getCurrentUser();
+  const user = await getCurrentUser();
 
   const { error } = await supabase
     .from('colleghi')
     .delete()
-    .eq('id', idRelazione);
+    .eq('id', idRelazione)
+    .or(`user_id.eq.${user.id},collega_id.eq.${user.id}`);
 
   if (error) throw error;
 
   return true;
 }
+
 export async function accettaCollega(idRelazione) {
   const user = await getCurrentUser();
-  const { data, error } = await supabase.from("colleghi").update({ stato: "accettato" }).eq("id", idRelazione).eq("collega_id", user.id).eq("stato", "in_attesa").select().single();
+
+  const { data, error } = await supabase
+    .from('colleghi')
+    .update({ stato: 'accettato' })
+    .eq('id', idRelazione)
+    .eq('collega_id', user.id)
+    .eq('stato', 'in_attesa')
+    .select()
+    .single();
+
   if (error) throw error;
   return data;
 }
 
 export async function rifiutaCollega(idRelazione) {
   const user = await getCurrentUser();
-  const { error } = await supabase.from("colleghi").delete().eq("id", idRelazione).eq("collega_id", user.id).eq("stato", "in_attesa");
+
+  const { error } = await supabase
+    .from('colleghi')
+    .delete()
+    .eq('id', idRelazione)
+    .eq('collega_id', user.id)
+    .eq('stato', 'in_attesa');
+
   if (error) throw error;
   return true;
 }
