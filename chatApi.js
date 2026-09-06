@@ -218,17 +218,34 @@ export async function colleghiConConversazione() {
 
   if (error) throw error;
 
-  const ids = [...new Set(
-    (data || [])
-      .map(m =>
-        m.mittente_id === user.id
-          ? m.destinatario_id
-          : m.mittente_id
-      )
-      .filter(Boolean)
-  )];
+  return [
+    ...new Set(
+      (data || [])
+        .map((m) =>
+          m.mittente_id === user.id
+            ? m.destinatario_id
+            : m.mittente_id
+        )
+        .filter(Boolean)
+    ),
+  ];
+}
 
-  return ids;
+export async function caricaProfiliConversazioni(userIds = []) {
+  const ids = [...new Set((userIds || []).filter(Boolean))];
+
+  if (ids.length === 0) return {};
+
+  const { data, error } = await supabase
+    .from('profili')
+    .select('id, user_id, nome, cognome, azienda, sede, foto_url, codice_gpg')
+    .in('user_id', ids);
+
+  if (error) throw error;
+
+  return Object.fromEntries(
+    (data || []).map((profilo) => [profilo.user_id, profilo])
+  );
 }
 
 /* ===== RIEPILOGO LISTA CHAT ===== */
