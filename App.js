@@ -28773,6 +28773,8 @@ function RapportoServizioScreen({
 
   const [rapportiArchivio, setRapportiArchivio] =
     React.useState([]);
+  const [rapportiArchivioCaricato, setRapportiArchivioCaricato] =
+    React.useState(false);
 
   const [postazioniRapporto, setPostazioniRapporto] =
     React.useState([]);
@@ -28787,6 +28789,9 @@ function RapportoServizioScreen({
 
   React.useEffect(() => {
     let attivo = true;
+
+    setRapportiArchivio([]);
+    setRapportiArchivioCaricato(false);
 
     (async () => {
       try {
@@ -28803,6 +28808,10 @@ function RapportoServizioScreen({
             setRapportiArchivio(parsed);
           }
         }
+
+        if (attivo) {
+          setRapportiArchivioCaricato(true);
+        }
       } catch (e) {
         console.log(
           'Errore caricamento archivio rapporti:',
@@ -28814,7 +28823,7 @@ function RapportoServizioScreen({
     return () => {
       attivo = false;
     };
-  }, []);
+  }, [storageUserId]);
 
   React.useEffect(() => {
     let attivo = true;
@@ -28861,7 +28870,7 @@ function RapportoServizioScreen({
     return () => {
       attivo = false;
     };
-  }, []);
+  }, [storageUserId]);
 
 
 
@@ -28918,6 +28927,11 @@ function RapportoServizioScreen({
 
 
   const salvaRapportoArchivio = async () => {
+    if (!chiaveRapportiUtente || !rapportiArchivioCaricato) {
+      Alert.alert('Dati non pronti', 'Attendi il caricamento dell’archivio rapporti.');
+      return;
+    }
+
     if (!rapportoEvento.trim()) {
       Alert.alert(
         'Rapporto incompleto',
@@ -30082,6 +30096,8 @@ function ConsegneServizioScreen({
 
   const [archivioConsegne, setArchivioConsegne] =
     React.useState([]);
+  const [archivioConsegneCaricato, setArchivioConsegneCaricato] =
+    React.useState(false);
 
   const [consegnaArchivioId, setConsegnaArchivioId] =
     React.useState(null);
@@ -30103,6 +30119,10 @@ function ConsegneServizioScreen({
   React.useEffect(() => {
     let attivo = true;
 
+    setArchivioConsegne([]);
+    setArchivioConsegneCaricato(false);
+    setConsegnaArchivioId(null);
+
     (async () => {
       try {
         if (!chiaveConsegneUtente) return;
@@ -30121,6 +30141,10 @@ function ConsegneServizioScreen({
         ) {
           setArchivioConsegne(parsed);
         }
+
+        if (attivo) {
+          setArchivioConsegneCaricato(true);
+        }
       } catch (e) {
         console.log(
           'Errore caricamento consegne:',
@@ -30132,7 +30156,7 @@ function ConsegneServizioScreen({
     return () => {
       attivo = false;
     };
-  }, []);
+  }, [storageUserId]);
 
   const testoConsegna = (() => {
     const parti = [];
@@ -30200,9 +30224,15 @@ function ConsegneServizioScreen({
     setConsegnaChiavi('');
     setConsegnaApparati('');
     setConsegnaNote('');
+    setConsegnaArchivioId(null);
   };
 
   const salvaConsegna = async () => {
+    if (!chiaveConsegneUtente || !archivioConsegneCaricato) {
+      Alert.alert('Dati non pronti', 'Attendi il caricamento delle consegne.');
+      return;
+    }
+
     if (
       !consegnaPostazione.trim() &&
       !consegnaAccaduto.trim() &&
