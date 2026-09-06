@@ -55,7 +55,12 @@ import {
 import * as ImagePicker from 'expo-image-picker';
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { updateApplicationContext } from 'react-native-watch-connectivity';
+import {
+  getIsPaired,
+  getIsWatchAppInstalled,
+  updateApplicationContext,
+  watchEvents,
+} from 'react-native-watch-connectivity';
 
 const SUPABASE_URL =
   process.env.EXPO_PUBLIC_SUPABASE_URL;
@@ -5961,38 +5966,76 @@ console.log("🕒 ORA REALE:", new Date().toString());
   useEffect(() => {
     if (Platform.OS !== 'ios') return;
 
+    const rimuoviErroreContesto = watchEvents.addListener(
+      'application-context-error',
+      (error) => console.warn('⌚ WATCH CONTEXT ERROR:', error)
+    );
+    const rimuoviErroreAttivazione = watchEvents.addListener(
+      'activation-error',
+      (error) => console.warn('⌚ WATCH ACTIVATION ERROR:', error)
+    );
+
     const sincronizzaAppleWatch = async () => {
       try {
         const adessoWatch = new Date();
 
-      const prossimoTurnoWatch =
-        turni
-          .filter(
-            (t) =>
-              t?.tipo === 'turno' &&
-              t?.anno &&
-              t?.mese &&
-              t?.giorno &&
-              t?.inizio &&
-              t?.fine
-          )
-          .map((t) => {
-            const date = creaDateTurno(t);
-            return {
-              turno: t,
-              data: date.inizio,
-            };
-          })
-          .filter((x) => x.data > adessoWatch)
-          .sort((a, b) => a.data - b.data)[0] || null;
+        const creaIntervalloWatch = (turno) => {
+          if (
+            turno?.tipo !== 'turno' ||
+            !/^([01]?\d|2[0-3]):[0-5]\d$/.test(String(turno.inizio || '')) ||
+            !/^([01]?\d|2[0-3]):[0-5]\d$/.test(String(turno.fine || ''))
+          ) return null;
 
-      const turnoWatch =
-        turnoInCorso ||
-        prossimoTurnoWatch?.turno ||
-        null;
+          const [oraInizio, minutoInizio] = String(turno.inizio).split(':').map(Number);
+          const [oraFine, minutoFine] = String(turno.fine).split(':').map(Number);
+          const inizio = new Date(
+            Number(turno.anno), Number(turno.mese) - 1, Number(turno.giorno),
+            oraInizio, minutoInizio, 0, 0
+          );
+          const fine = new Date(
+            Number(turno.anno), Number(turno.mese) - 1, Number(turno.giorno),
+            oraFine, minutoFine, 0, 0
+          );
+          if (!Number.isFinite(inizio.getTime()) || !Number.isFinite(fine.getTime())) return null;
+          if (fine <= inizio) fine.setDate(fine.getDate() + 1);
+          return { turno, inizio, fine };
+        };
+
+        const intervalliWatch = turni
+          .map(creaIntervalloWatch)
+          .filter(Boolean)
+          .sort((a, b) => a.inizio - b.inizio);
+        const correnteWatch = intervalliWatch.find(
+          ({ inizio, fine }) => adessoWatch >= inizio && adessoWatch < fine
+        ) || null;
+        const prossimoWatch = intervalliWatch.find(
+          ({ inizio }) => inizio > adessoWatch
+        ) || null;
+        const successivoWatch = correnteWatch
+          ? prossimoWatch
+          : intervalliWatch.find(
+              ({ inizio }) => prossimoWatch && inizio > prossimoWatch.inizio
+            ) || null;
+        const riposoOggiWatch = turni.find(
+          (turno) =>
+            turno?.tipo === 'riposo' &&
+            Number(turno.anno) === adessoWatch.getFullYear() &&
+            Number(turno.mese) === adessoWatch.getMonth() + 1 &&
+            Number(turno.giorno) === adessoWatch.getDate()
+        );
+        const principaleWatch = correnteWatch || prossimoWatch;
+        const turnoWatch = principaleWatch?.turno || null;
+        const statoWatch = correnteWatch
+          ? 'in_servizio'
+          : riposoOggiWatch
+            ? 'riposo'
+            : prossimoWatch
+              ? 'prossimo_turno'
+              : 'nessun_turno';
 
         const payloadWatch = {
-          stato: turnoInCorso ? 'in_servizio' : 'non_in_servizio',
+          versione: 2,
+          stato: statoWatch,
           tipo: String(turnoWatch?.tipo || ''),
           giorno: Number(turnoWatch?.giorno || 0),
           mese: Number(turnoWatch?.mese || 0),
@@ -6001,36 +6044,46 @@ console.log("🕒 ORA REALE:", new Date().toString());
           fine: String(turnoWatch?.fine || ''),
           luogo: String(turnoWatch?.luogo || ''),
           indirizzo: String(turnoWatch?.indirizzo_servizio || ''),
-          countdownLabel: String(countdownLabel || ''),
-          countdown: String(countdownTurno || ''),
-          aggiornatoAlle: String(Date.now()),
-        temperatura: Number(meteoServizio?.current?.temperature_2m ?? 0),
-        codiceMeteo: Number(meteoServizio?.current?.weather_code ?? -1),
-        meteoLocalita: String(
-          meteoServizio?.luogo?.name ||
-          meteoServizio?.luogo?.admin1 ||
-          ''
-        ),
+          inizioTimestamp: Number(principaleWatch?.inizio?.getTime() || 0) / 1000,
+          fineTimestamp: Number(principaleWatch?.fine?.getTime() || 0) / 1000,
+          prossimoInizio: String(successivoWatch?.turno?.inizio || ''),
+          prossimoFine: String(successivoWatch?.turno?.fine || ''),
+          prossimoLuogo: String(successivoWatch?.turno?.luogo || ''),
+          prossimoInizioTimestamp: Number(successivoWatch?.inizio?.getTime() || 0) / 1000,
+          prossimoFineTimestamp: Number(successivoWatch?.fine?.getTime() || 0) / 1000,
+          aggiornatoTimestamp: adessoWatch.getTime() / 1000,
+          temperatura: Number(meteoServizio?.current?.temperature_2m ?? 0),
+          codiceMeteo: Number(meteoServizio?.current?.weather_code ?? -1),
+          meteoLocalita: String(
+            meteoServizio?.luogo?.name ||
+            meteoServizio?.luogo?.admin1 ||
+            ''
+          ),
         };
 
         updateApplicationContext(payloadWatch);
-
-        console.log('⌚ WATCH SYNC OK:', payloadWatch);
+        const [abbinato, installata] = await Promise.all([
+          getIsPaired(),
+          getIsWatchAppInstalled(),
+        ]);
+        console.log('⌚ WATCH CONTEXT UPDATED:', { abbinato, installata, stato: statoWatch });
       } catch (error) {
-        console.log('⌚ WATCH SYNC ERROR:', error);
+        console.warn('⌚ WATCH SYNC ERROR:', error);
       }
     };
 
     sincronizzaAppleWatch();
+
+    return () => {
+      rimuoviErroreContesto();
+      rimuoviErroreAttivazione();
+    };
   }, [
-    turnoOggi?.id,
-    turnoInCorso?.id,
-    countdownLabel,
-    countdownTurno,
-      meteoServizio?.current?.temperature_2m,
-      meteoServizio?.current?.weather_code,
-      meteoServizio?.luogo?.name,
-      meteoServizio?.luogo?.admin1,
+    turni,
+    meteoServizio?.current?.temperature_2m,
+    meteoServizio?.current?.weather_code,
+    meteoServizio?.luogo?.name,
+    meteoServizio?.luogo?.admin1,
   ]);
 
 

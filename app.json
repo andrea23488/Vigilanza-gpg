@@ -9,6 +9,11 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.vigilanzagpg.app",
+      "entitlements": {
+        "com.apple.security.application-groups": [
+          "group.com.vigilanzagpg.app.watch"
+        ]
+      },
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       },

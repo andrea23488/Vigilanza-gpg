@@ -4,8 +4,8 @@ module.exports = config => ({
   name: "VigilanzaGPG",
   displayName: "Vigilanza GPG",
   icon: "./icon.png",
-  colors: { $accent: "darkcyan" },
-  deploymentTarget: "9.4",
+  colors: { $accent: "green" },
+  deploymentTarget: "10.0",
   bundleIdentifier: ".watch",
   entitlements: {
     "com.apple.security.application-groups": ["group.com.vigilanzagpg.app.watch"],
