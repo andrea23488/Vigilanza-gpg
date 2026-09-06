@@ -18,6 +18,7 @@ import {
   eliminaMessaggio,
   eliminaConversazione,
   colleghiConConversazione,
+  caricaProfiliConversazioni,
   caricaRiepilogoConversazioni,
   segnaMessaggiComeLetti,
   contaMessaggiNonLetti,
@@ -353,6 +354,7 @@ export default function App() {
   const [consegnaSelezionata, setConsegnaSelezionata] = useState(null);
   const [consegneRicevute, setConsegneRicevute] = useState([]);
   const [notificheNascoste, setNotificheNascoste] = useState([]);
+  const [storageUserId, setStorageUserId] = useState(null);
   const tornaSuRef = useRef(null);
   const [mostraTornaSu, setMostraTornaSu] = useState(false);
 
@@ -566,6 +568,9 @@ export default function App() {
   const [chatMessaggi, setChatMessaggi] = useState([]);
   const [chatMioId, setChatMioId] = useState(null);
   const [chatLoading, setChatLoading] = useState(false);
+  const [chatInvioInCorso, setChatInvioInCorso] = useState(false);
+  const [chatErrore, setChatErrore] = useState('');
+  const [chatProfiliStorici, setChatProfiliStorici] = useState({});
   const chatScrollRef = useRef(null);
 
   
@@ -1888,10 +1893,13 @@ export default function App() {
           colleghiConConversazione(),
         ]);
 
+        const profiliStorici = await caricaProfiliConversazioni(idsConversazioni || []);
+
         if (!attivo) return;
 
         setRiepilogoChat(riepilogo || {});
         setChatColleghiIds(idsConversazioni || []);
+        setChatProfiliStorici(profiliStorici || {});
       } catch (error) {
         console.log('Errore aggiornamento live chat:', error);
       }
@@ -1917,26 +1925,28 @@ useEffect(() => {
     }, 120);
 
     return () => clearTimeout(timer);
-  }, [screen, chatMessaggi.length]);
+  }, [screen]);
 
   useEffect(() => {
     if (screen !== 'chatCollega') return;
 
     const destinatarioId = collegaSelezionato?.altro_user_id;
-
     if (!destinatarioId) return;
 
-    segnaMessaggiComeLetti(destinatarioId)
-      .catch((error) => {
-        console.log('Errore lettura messaggi:', error);
-      });
-
-
     let attivo = true;
+    let canale = null;
+
+    const ordina = (lista) =>
+      [...lista].sort(
+        (a, b) =>
+          new Date(a?.created_at || 0).getTime() -
+          new Date(b?.created_at || 0).getTime()
+      );
 
     const caricaChat = async () => {
       try {
         setChatLoading(true);
+        setChatErrore('');
 
         const [id, messaggi] = await Promise.all([
           mioUserId(),
@@ -1946,16 +1956,53 @@ useEffect(() => {
         if (!attivo) return;
 
         setChatMioId(id);
-        setChatMessaggi(messaggi);
+        setChatMessaggi(ordina(messaggi || []));
+
+        segnaMessaggiComeLetti(destinatarioId).catch(() => {});
+
+        canale = supabase
+          .channel(`chat-live-${id}-${destinatarioId}`)
+          .on(
+            'postgres_changes',
+            { event: '*', schema: 'public', table: 'messaggi' },
+            (payload) => {
+              if (!attivo) return;
+              const record = payload?.new?.id ? payload.new : payload?.old;
+              if (!record?.id) return;
+
+              const coinvolge =
+                (record.mittente_id === id && record.destinatario_id === destinatarioId) ||
+                (record.mittente_id === destinatarioId && record.destinatario_id === id);
+
+              if (!coinvolge) return;
+
+              setChatMessaggi((precedenti) => {
+                if (payload.eventType === 'DELETE') {
+                  return precedenti.filter((m) => m.id !== record.id);
+                }
+
+                const esiste = precedenti.some((m) => m.id === record.id);
+                const aggiornati = esiste
+                  ? precedenti.map((m) => (m.id === record.id ? { ...m, ...record } : m))
+                  : [...precedenti, record];
+
+                return ordina(aggiornati);
+              });
+
+              if (payload.eventType === 'INSERT' && record.mittente_id === destinatarioId) {
+                segnaMessaggiComeLetti(destinatarioId).catch(() => {});
+              }
+            }
+          )
+          .subscribe((stato) => {
+            if (stato === 'CHANNEL_ERROR' && attivo) {
+              setChatErrore('Aggiornamento live temporaneamente non disponibile.');
+            }
+          });
       } catch (error) {
-        Alert.alert(
-          'Errore chat',
-          error.message || 'Impossibile caricare i messaggi.'
-        );
+        if (attivo) setChatErrore(error?.message || 'Impossibile caricare i messaggi.');
       } finally {
-        if (attivo) {
-          setChatLoading(false);
-        }
+        if (attivo) setChatLoading(false);
       }
     };
 
@@ -1963,6 +2010,7 @@ useEffect(() => {
 
     return () => {
       attivo = false;
+      if (canale) supabase.removeChannel(canale);
     };
   }, [screen, collegaSelezionato?.altro_user_id]);
 
@@ -2092,6 +2140,7 @@ if (dati.tariffaStraordinario != null) {
     caricaConfigurazioneStipendio();
   }, []);
   const [colleghi, setColleghi] = useState([]);
+  const [colleghiErrore, setColleghiErrore] = useState('');
   const [chatColleghiIds, setChatColleghiIds] = useState([]);
   const [riepilogoChat, setRiepilogoChat] = useState({});
   const [numeroNotifiche, setNumeroNotifiche] = useState(0);
@@ -2151,6 +2200,7 @@ if (dati.tariffaStraordinario != null) {
 
   /* ===== POSTAZIONI / CONSEGNE SITO ===== */
   const [postazioniSalvate, setPostazioniSalvate] = useState([]);
+  const [postazioniCaricate, setPostazioniCaricate] = useState(false);
   const [postazioneSelezionata, setPostazioneSelezionata] = useState(null);
 
   const [postazioneNomeDraft, setPostazioneNomeDraft] = useState('');
@@ -2225,9 +2275,10 @@ if (dati.tariffaStraordinario != null) {
     }
 
     const nuova = {
-      id: `attivita_${Date.now()}`,
+      id: `attivita_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
       ora,
       testo,
+      creatoIl: new Date().toISOString(),
     };
 
     setPostazioneTimelineDraft(
@@ -2442,32 +2493,32 @@ if (dati.tariffaStraordinario != null) {
 
   useEffect(() => {
     let attivo = true;
+    const chiave = chiaveStorageUtente('vigilanza_postazioni');
+
+    if (!chiave) return () => { attivo = false; };
 
     (async () => {
       try {
-        const dati = await AsyncStorage.getItem(
-          'vigilanza_postazioni'
-        );
+        const dati = await AsyncStorage.getItem(chiave);
+        if (!attivo) return;
 
-        if (attivo && dati) {
+        if (dati) {
           const parsed = JSON.parse(dati);
-
-          if (Array.isArray(parsed)) {
-            setPostazioniSalvate(parsed);
-          }
+          setPostazioniSalvate(Array.isArray(parsed) ? parsed : []);
+        } else {
+          setPostazioniSalvate([]);
         }
+
+        setPostazioniCaricate(true);
       } catch (e) {
-        console.log(
-          'Errore caricamento postazioni:',
-          e
-        );
+        console.log('Errore caricamento postazioni:', e);
       }
     })();
 
     return () => {
       attivo = false;
     };
-  }, []);
+  }, [storageUserId]);
 
   const nuovaPostazione = () => {
     setPostazioneSelezionata(null);
@@ -2545,6 +2596,12 @@ if (dati.tariffaStraordinario != null) {
   };
 
   const salvaPostazione = async () => {
+    const chiave = chiaveStorageUtente('vigilanza_postazioni');
+    if (!chiave || !postazioniCaricate) {
+      Alert.alert('Dati non pronti', 'Attendi il caricamento delle postazioni e riprova.');
+      return;
+    }
+
     const nome =
       postazioneNomeDraft.trim();
 
@@ -2594,7 +2651,7 @@ if (dati.tariffaStraordinario != null) {
 
     try {
       await AsyncStorage.setItem(
-        'vigilanza_postazioni',
+        chiave,
         JSON.stringify(nuove)
       );
 
@@ -2644,7 +2701,7 @@ if (dati.tariffaStraordinario != null) {
 
             try {
               await AsyncStorage.setItem(
-                'vigilanza_postazioni',
+                chiaveStorageUtente('vigilanza_postazioni'),
                 JSON.stringify(nuove)
               );
             } catch (e) {
@@ -2672,6 +2729,7 @@ if (dati.tariffaStraordinario != null) {
 
   /* ===== DOCUMENTI PERSONALI ===== */
   const [documentiPersonali, setDocumentiPersonali] = useState({});
+  const [documentiCaricati, setDocumentiCaricati] = useState(false);
   const [documentoSelezionato, setDocumentoSelezionato] = useState(null);
 
   const [documentoNomeDraft, setDocumentoNomeDraft] = useState('');
@@ -2956,36 +3014,36 @@ if (dati.tariffaStraordinario != null) {
 
   useEffect(() => {
     let attivo = true;
+    const chiave = chiaveStorageUtente('vigilanza_documenti_personali');
+
+    if (!chiave) return () => { attivo = false; };
 
     (async () => {
       try {
-        const dati = await AsyncStorage.getItem(
-          'vigilanza_documenti_personali'
-        );
+        const dati = await AsyncStorage.getItem(chiave);
+        if (!attivo) return;
 
-        if (attivo && dati) {
+        if (dati) {
           const parsed = JSON.parse(dati);
-
-          if (
-            parsed &&
-            typeof parsed === 'object' &&
-            !Array.isArray(parsed)
-          ) {
-            setDocumentiPersonali(parsed);
-          }
+          setDocumentiPersonali(
+            parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+              ? parsed
+              : {}
+          );
+        } else {
+          setDocumentiPersonali({});
         }
+
+        setDocumentiCaricati(true);
       } catch (e) {
-        console.log(
-          'Errore caricamento documenti personali:',
-          e
-        );
+        console.log('Errore caricamento documenti personali:', e);
       }
     })();
 
     return () => {
       attivo = false;
     };
-  }, []);
+  }, [storageUserId]);
 
   const apriDocumentoPersonale = (doc) => {
     const salvato =
@@ -3025,6 +3083,12 @@ if (dati.tariffaStraordinario != null) {
   const salvaDocumentoPersonale = async () => {
     if (!documentoSelezionato?.id) return;
 
+    const chiave = chiaveStorageUtente('vigilanza_documenti_personali');
+    if (!chiave || !documentiCaricati) {
+      Alert.alert('Dati non pronti', 'Attendi il caricamento dei documenti e riprova.');
+      return;
+    }
+
     const nuovoDocumento = {
       nome:
         documentoNomeDraft.trim() ||
@@ -3049,7 +3113,7 @@ if (dati.tariffaStraordinario != null) {
 
     try {
       await AsyncStorage.setItem(
-        'vigilanza_documenti_personali',
+        chiave,
         JSON.stringify(nuovi)
       );
 
@@ -3091,20 +3155,12 @@ if (dati.tariffaStraordinario != null) {
       return null;
     }
 
-    const data = new Date(
-      anno,
-      mese - 1,
-      giorno,
-      23,
-      59,
-      59,
-      999
-    );
+    const data = new Date(Date.UTC(anno, mese - 1, giorno));
 
     if (
-      data.getFullYear() !== anno ||
-      data.getMonth() !== mese - 1 ||
-      data.getDate() !== giorno
+      data.getUTCFullYear() !== anno ||
+      data.getUTCMonth() !== mese - 1 ||
+      data.getUTCDate() !== giorno
     ) {
       return null;
     }
@@ -3137,13 +3193,15 @@ if (dati.tariffaStraordinario != null) {
       };
     }
 
-    const oggi = new Date();
+    const adesso = new Date();
+    const oggiUtc = Date.UTC(
+      adesso.getFullYear(),
+      adesso.getMonth(),
+      adesso.getDate()
+    );
 
-    oggi.setHours(0, 0, 0, 0);
-
-    const giorni = Math.ceil(
-      (scadenza.getTime() - oggi.getTime()) /
-      86400000
+    const giorni = Math.round(
+      (scadenza.getTime() - oggiUtc) / 86400000
     );
 
     if (giorni < 0) {
@@ -3181,9 +3239,9 @@ if (dati.tariffaStraordinario != null) {
 
     (async () => {
       try {
-        const dati = await AsyncStorage.getItem(
-          'vigilanza_luoghi_turni_meteo'
-        );
+        const chiave = chiaveStorageUtente('vigilanza_luoghi_turni_meteo');
+        if (!chiave) return;
+        const dati = await AsyncStorage.getItem(chiave);
 
         if (attivo && dati) {
           const parsed = JSON.parse(dati);
@@ -3207,7 +3265,7 @@ if (dati.tariffaStraordinario != null) {
     return () => {
       attivo = false;
     };
-  }, []);
+  }, [storageUserId]);
 
   const salvaLuogoTurnoMeteo = async (chiave, luogo) => {
     const pulito = String(luogo || '').trim();
@@ -3229,10 +3287,9 @@ if (dati.tariffaStraordinario != null) {
     setLocalitaMeteo(pulito);
 
     try {
-      await AsyncStorage.setItem(
-        'vigilanza_luoghi_turni_meteo',
-        JSON.stringify(nuovi)
-      );
+      const storageKey = chiaveStorageUtente('vigilanza_luoghi_turni_meteo');
+      if (!storageKey) throw new Error('Utente non autenticato.');
+      await AsyncStorage.setItem(storageKey, JSON.stringify(nuovi));
 
       Alert.alert(
         'Località associata',
@@ -3286,7 +3343,9 @@ if (dati.tariffaStraordinario != null) {
 
     (async () => {
       try {
-        const raw = await AsyncStorage.getItem('vigilanza_dotazione_personale');
+        const chiave = chiaveStorageUtente('vigilanza_dotazione_personale');
+        if (!chiave) return;
+        const raw = await AsyncStorage.getItem(chiave);
 
         if (!attivo) return;
 
@@ -3296,30 +3355,28 @@ if (dati.tariffaStraordinario != null) {
             Array.isArray(parsed) ? parsed : []
           );
         }
+        if (attivo) setDotazioneCaricata(true);
       } catch (e) {
         console.log('Errore caricamento dotazione personale:', e);
-      } finally {
-        if (attivo) {
-          setDotazioneCaricata(true);
-        }
       }
     })();
 
     return () => {
       attivo = false;
     };
-  }, []);
+  }, [storageUserId]);
 
   useEffect(() => {
-    if (!dotazioneCaricata) return;
+    const chiave = chiaveStorageUtente('vigilanza_dotazione_personale');
+    if (!chiave || !dotazioneCaricata) return;
 
     AsyncStorage.setItem(
-      'vigilanza_dotazione_personale',
+      chiave,
       JSON.stringify(dotazionePersonale)
     ).catch((e) =>
       console.log('Errore salvataggio dotazione personale:', e)
     );
-  }, [dotazionePersonale, dotazioneCaricata]);
+  }, [dotazionePersonale, dotazioneCaricata, storageUserId]);
 
   const aggiungiDotazionePersonale = () => {
     const nome = String(dotazioneNome || '').trim();
@@ -3718,9 +3775,9 @@ const cambiaStatoDotazione = (id, stato) => {
 
     const caricaPreferenzeMeteo = async () => {
       try {
-        const dati = await AsyncStorage.getItem(
-          'vigilanza_meteo_localita'
-        );
+        const chiave = chiaveStorageUtente('vigilanza_meteo_localita');
+        if (!chiave) return;
+        const dati = await AsyncStorage.getItem(chiave);
 
         if (attivo && dati) {
           const parsed = JSON.parse(dati);
@@ -3736,15 +3793,12 @@ const cambiaStatoDotazione = (id, stato) => {
             setLocalitaMeteo(parsed.ultima.trim());
           }
         }
+        if (attivo) setMeteoPreferenzeCaricate(true);
       } catch (e) {
         console.log(
           'Errore caricamento località meteo:',
           e
         );
-      } finally {
-        if (attivo) {
-          setMeteoPreferenzeCaricate(true);
-        }
       }
     };
 
@@ -3753,7 +3807,7 @@ const cambiaStatoDotazione = (id, stato) => {
     return () => {
       attivo = false;
     };
-  }, []);
+  }, [storageUserId]);
 
   const salvaLocalitaMeteo = async (localita) => {
     const pulita = String(localita || '').trim();
@@ -3773,8 +3827,10 @@ const cambiaStatoDotazione = (id, stato) => {
     setLocalitaMeteo(pulita);
 
     try {
+      const chiave = chiaveStorageUtente('vigilanza_meteo_localita');
+      if (!chiave) return;
       await AsyncStorage.setItem(
-        'vigilanza_meteo_localita',
+        chiave,
         JSON.stringify({
           ultima: pulita,
           recenti: nuoveRecenti,
@@ -3938,14 +3994,67 @@ const cambiaStatoDotazione = (id, stato) => {
 
   const [numeriUtiliPronti, setNumeriUtiliPronti] = useState(false);
 
+  const chiaveStorageUtente = (base) =>
+    storageUserId ? `${base}:user:${storageUserId}` : null;
+
+  useEffect(() => {
+    let attivo = true;
+
+    const aggiornaStorageUser = (sessione) => {
+      if (!attivo) return;
+      const uid = sessione?.user?.id || null;
+      setStorageUserId((precedente) =>
+        precedente === uid ? precedente : uid
+      );
+    };
+
+    supabase.auth.getSession()
+      .then(({ data, error }) => {
+        if (error) throw error;
+        aggiornaStorageUser(data?.session || null);
+      })
+      .catch((error) =>
+        console.log('Errore sessione storage locale:', error)
+      );
+
+    const { data: listener } = supabase.auth.onAuthStateChange(
+      (_evento, sessione) => aggiornaStorageUser(sessione)
+    );
+
+    return () => {
+      attivo = false;
+      listener?.subscription?.unsubscribe?.();
+    };
+  }, []);
+
+  useEffect(() => {
+    setPostazioniSalvate([]);
+    setPostazioniCaricate(false);
+    setDocumentiPersonali({});
+    setDocumentiCaricati(false);
+    setDotazionePersonale([]);
+    setDotazioneCaricata(false);
+    setLuoghiTurniMeteo({});
+    setRecentiMeteo([]);
+    setLocalitaMeteo('');
+    setMeteoPreferenzeCaricate(false);
+    setNumeriUtiliPersonali({
+      salaOperativa: '',
+      responsabile: '',
+      referenteSito: '',
+      altro: '',
+    });
+    setNumeriUtiliPronti(false);
+  }, [storageUserId]);
+
   useEffect(() => {
     let attivo = true;
 
     const caricaNumeriUtili = async () => {
       try {
-        const dati = await AsyncStorage.getItem(
-          'vigilanza_contatti_lavoro'
-        );
+        const chiave = chiaveStorageUtente('vigilanza_contatti_lavoro');
+        if (!chiave) return;
+        const dati = await AsyncStorage.getItem(chiave);
 
         if (attivo && dati) {
           const parsed = JSON.parse(dati);
@@ -3955,12 +4064,9 @@ const cambiaStatoDotazione = (id, stato) => {
             ...parsed,
           }));
         }
+        if (attivo) setNumeriUtiliPronti(true);
       } catch (e) {
         console.log('Errore caricamento contatti lavoro:', e);
-      } finally {
-        if (attivo) {
-          setNumeriUtiliPronti(true);
-        }
       }
     };
 
@@ -3969,18 +4075,19 @@ const cambiaStatoDotazione = (id, stato) => {
     return () => {
       attivo = false;
     };
-  }, []);
+  }, [storageUserId]);
 
   useEffect(() => {
-    if (!numeriUtiliPronti) return;
+    const chiave = chiaveStorageUtente('vigilanza_contatti_lavoro');
+    if (!chiave || !numeriUtiliPronti) return;
 
     AsyncStorage.setItem(
-      'vigilanza_contatti_lavoro',
+      chiave,
       JSON.stringify(numeriUtiliPersonali)
     ).catch((e) => {
       console.log('Errore salvataggio contatti lavoro:', e);
     });
-  }, [numeriUtiliPersonali, numeriUtiliPronti]);
+  }, [numeriUtiliPersonali, numeriUtiliPronti, storageUserId]);
 
   const chiamaNumeroUtile = async (numero) => {
     const pulito = String(numero || '')
@@ -4103,10 +4210,12 @@ const cambiaStatoDotazione = (id, stato) => {
   async function aggiornaColleghi() {
     try {
       setLoadingColleghi(true);
+      setColleghiErrore('');
       const lista = await caricaColleghi();
       setColleghi(lista);
     } catch (error) {
-      console.log("ERRORE COLLEGHI:", error);
+      console.log('ERRORE COLLEGHI:', error);
+      setColleghiErrore(error?.message || 'Non è stato possibile caricare i colleghi.');
     } finally {
       setLoadingColleghi(false);
     }
@@ -4117,6 +4226,38 @@ const cambiaStatoDotazione = (id, stato) => {
     aggiornaColleghi();
   }, [screen]);
 
+  useEffect(() => {
+    if (!accessoTest) return;
+
+    let attivo = true;
+    const refresh = async () => {
+      if (!attivo) return;
+      try {
+        const lista = await caricaColleghi();
+        if (attivo) {
+          setColleghi(lista || []);
+          setColleghiErrore('');
+        }
+      } catch (error) {
+        if (attivo) setColleghiErrore(error?.message || 'Aggiornamento live non disponibile.');
+      }
+    };
+
+    const canale = supabase
+      .channel('vigilanza-colleghi-profili-live')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'colleghi' }, refresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'profili' }, refresh)
+      .subscribe((stato) => {
+        if (stato === 'CHANNEL_ERROR' && attivo) {
+          setColleghiErrore('Aggiornamento live temporaneamente non disponibile.');
+        }
+      });
+
+    return () => {
+      attivo = false;
+      supabase.removeChannel(canale);
+    };
+  }, [accessoTest]);
 
   const [giorno, setGiorno] =
     useState(1);
@@ -6864,7 +7005,12 @@ console.log("🕒 ORA REALE:", new Date().toString());
 
                       await supabase.auth.signOut();
 
+                      setStorageUserId(null);
                       setTurni([]);
+                      setColleghi([]);
+                      setChatMessaggi([]);
+                      setChatColleghiIds([]);
+                      setRiepilogoChat({});
                       setAccessoTest(false);
                       setScreen('home');
 
@@ -6890,13 +7036,19 @@ console.log("🕒 ORA REALE:", new Date().toString());
 
 async function logout() {
     const { error } = await supabase.auth.signOut();
-    if (error) {
-      Alert.alert("Errore", error.message);
-      return;
-    }
+
+    setStorageUserId(null);
     setTurni([]);
+    setColleghi([]);
+    setChatMessaggi([]);
+    setChatColleghiIds([]);
+    setRiepilogoChat({});
     setAccessoTest(false);
-    setScreen("home");
+    setScreen('home');
+
+    if (error) {
+      Alert.alert('Errore', error.message);
+    }
   }
 
   async function salvaProfilo() {
@@ -7985,7 +8137,7 @@ if (screen === 'colleghi') {
             <TextInput
               value={collegaIdDraft}
               onChangeText={setCollegaIdDraft}
-              placeholder="ID collega"
+              placeholder="Nome, cognome, codice GPG o UUID"
               placeholderTextColor="#7184aa"
               autoCapitalize="none"
               style={{
@@ -8065,7 +8217,25 @@ if (screen === 'colleghi') {
             </Text>
           </TouchableOpacity>
 
-          {loadingColleghi ? (
+          {colleghiErrore ? (
+            <View style={{ marginBottom: 16 }}>
+              <Text style={{ color: '#FF9AA8', fontWeight: '800', marginBottom: 10 }}>
+                {colleghiErrore}
+              </Text>
+              <TouchableOpacity
+                onPress={aggiornaColleghi}
+                style={{
+                  alignSelf: 'flex-start',
+                  paddingHorizontal: 14,
+                  paddingVertical: 9,
+                  borderRadius: 12,
+                  backgroundColor: '#17385B',
+                }}
+              >
+                <Text style={{ color: '#FFFFFF', fontWeight: '900' }}>Riprova</Text>
+              </TouchableOpacity>
+            </View>
+          ) : loadingColleghi ? (
             <ActivityIndicator size="large" />
           ) : (
             <>
@@ -11276,8 +11446,17 @@ if (screen === 'configuraStipendio') {
               Nessun collega disponibile.
             </Text>
           ) : (
-            colleghi
-              .filter((c) => chatColleghiIds.includes(c.altro_user_id))
+            [
+              ...colleghi.filter((c) => chatColleghiIds.includes(c.altro_user_id)),
+              ...chatColleghiIds
+                .filter((id) => !colleghi.some((c) => c.altro_user_id === id))
+                .map((id) => ({
+                  id: `storico:${id}`,
+                  altro_user_id: id,
+                  stato: 'storico',
+                  profilo: chatProfiliStorici[id] || null,
+                })),
+            ]
     .sort((a, b) => {
       const dataA = riepilogoChat[a.altro_user_id]?.created_at
         ? new Date(riepilogoChat[a.altro_user_id].created_at).getTime()
@@ -11999,30 +12178,34 @@ if (screen === 'configuraStipendio') {
           />
 
           <TouchableOpacity
+            disabled={chatInvioInCorso || !chatMessaggio.trim()}
             onPress={async () => {
               const testo = chatMessaggio.trim();
               const destinatarioId =
                 collegaSelezionato?.altro_user_id;
 
-              if (!testo || !destinatarioId) return;
+              if (!testo || !destinatarioId || chatInvioInCorso) return;
 
               try {
-                const nuovo = await inviaMessaggio(
-                  destinatarioId,
-                  testo
-                );
+                setChatInvioInCorso(true);
+                setChatErrore('');
 
-                setChatMessaggi((precedenti) => [
-                  ...precedenti,
-                  nuovo,
-                ]);
+                const nuovo = await inviaMessaggio(destinatarioId, testo);
+
+                setChatMessaggi((precedenti) =>
+                  precedenti.some((m) => m.id === nuovo.id)
+                    ? precedenti
+                    : [...precedenti, nuovo]
+                );
 
                 setChatMessaggio('');
+                setTimeout(() => {
+                  chatScrollRef.current?.scrollToEnd({ animated: true });
+                }, 80);
               } catch (error) {
-                Alert.alert(
-                  'Messaggio non inviato',
-                  error.message || 'Errore durante l’invio.'
-                );
+                setChatErrore(error?.message || 'Errore durante l’invio.');
+              } finally {
+                setChatInvioInCorso(false);
               }
             }}
             style={{
@@ -12061,6 +12244,7 @@ if (screen === 'configuraStipendio') {
       <RapportoServizioScreen
         onBack={() => setScreen('strumenti')}
         postazioni={postazioniSalvate}
+        storageUserId={storageUserId}
       />
     );
   }
@@ -12071,6 +12255,7 @@ if (screen === 'configuraStipendio') {
         onBack={() => setScreen('strumenti')}
         postazioni={postazioniSalvate}
         colleghi={colleghi}
+        storageUserId={storageUserId}
       />
     );
   }
@@ -18996,11 +19181,10 @@ if (screen === 'strumenti') {
      ===================================================== */
   if (screen === 'meteoServizio') {
 
-    const zonaMeteo =
+    const zonaMeteoBase =
     String(
       turnoInCorso?.localita_meteo ||
       turnoOggi?.localita_meteo ||
-      prossimoServizioMeteo?.turno?.localita_meteo ||
       localitaMeteo ||
       profilo?.sede ||
       sedeDraft ||
@@ -19041,7 +19225,7 @@ if (screen === 'strumenti') {
 
     const adessoServizio = new Date();
 
-    const prossimiServiziMeteo = (turniMese || [])
+    const prossimiServiziMeteo = (turni || [])
       .filter((r) =>
         r?.tipo === 'turno' &&
         r?.inizio &&
@@ -19118,6 +19302,14 @@ if (screen === 'strumenti') {
         ? prossimiServiziMeteo[0]
         : null;
 
+    const zonaMeteo =
+      String(
+        turnoInCorso?.localita_meteo ||
+        turnoOggi?.localita_meteo ||
+        prossimoServizioMeteo?.turno?.localita_meteo ||
+        localitaMeteo ||
+        zonaMeteoBase
+      ).trim();
 
     const operativitaProssimoTurno =
       String(
@@ -28534,7 +28726,15 @@ function Calendar({
 function RapportoServizioScreen({
   onBack,
   postazioni = [],
+  storageUserId = null,
 }) {
+  const chiaveRapportiUtente = storageUserId
+    ? `vigilanza_rapporti_servizio:user:${storageUserId}`
+    : null;
+
+  const chiavePostazioniUtente = storageUserId
+    ? `vigilanza_postazioni:user:${storageUserId}`
+    : null;
   const adesso = new Date();
 
   const dataIniziale = [
@@ -28590,8 +28790,10 @@ function RapportoServizioScreen({
 
     (async () => {
       try {
+        if (!chiaveRapportiUtente) return;
+
         const dati = await AsyncStorage.getItem(
-          'vigilanza_rapporti_servizio'
+          chiaveRapportiUtente
         );
 
         if (attivo && dati) {
@@ -28620,8 +28822,8 @@ function RapportoServizioScreen({
     (async () => {
       try {
         const chiaviPossibili = [
-          'vigilanza_postazioni',
-        ];
+          chiavePostazioniUtente,
+        ].filter(Boolean);
 
         let lista = null;
 
@@ -28744,8 +28946,12 @@ function RapportoServizioScreen({
     ];
 
     try {
+      if (!chiaveRapportiUtente) {
+        throw new Error('Utente non autenticato.');
+      }
+
       await AsyncStorage.setItem(
-        'vigilanza_rapporti_servizio',
+        chiaveRapportiUtente,
         JSON.stringify(nuovi)
       );
 
@@ -28821,8 +29027,10 @@ function RapportoServizioScreen({
               );
 
             try {
+              if (!chiaveRapportiUtente) return;
+
               await AsyncStorage.setItem(
-                'vigilanza_rapporti_servizio',
+                chiaveRapportiUtente,
                 JSON.stringify(nuovi)
               );
 
@@ -29826,7 +30034,11 @@ function ConsegneServizioScreen({
   onBack,
   postazioni = [],
   colleghi = [],
+  storageUserId = null,
 }) {
+  const chiaveConsegneUtente = storageUserId
+    ? `vigilanza_consegne_servizio:user:${storageUserId}`
+    : null;
   const oraCorrente = new Date();
 
   const formattaData = (d) =>
@@ -29871,6 +30083,9 @@ function ConsegneServizioScreen({
   const [archivioConsegne, setArchivioConsegne] =
     React.useState([]);
 
+  const [consegnaArchivioId, setConsegnaArchivioId] =
+    React.useState(null);
+
   const [mostraColleghiConsegna, setMostraColleghiConsegna] =
     React.useState(false);
 
@@ -29890,8 +30105,10 @@ function ConsegneServizioScreen({
 
     (async () => {
       try {
+        if (!chiaveConsegneUtente) return;
+
         const raw = await AsyncStorage.getItem(
-          'vigilanza_consegne_servizio'
+          chiaveConsegneUtente
         );
 
         if (!raw) return;
@@ -30000,7 +30217,7 @@ function ConsegneServizioScreen({
     }
 
     const nuova = {
-      id: `consegna_${Date.now()}`,
+      id: `consegna_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
       data: consegnaData,
       ora: consegnaOra,
       postazione: consegnaPostazione.trim(),
@@ -30020,12 +30237,17 @@ function ConsegneServizioScreen({
     ];
 
     try {
+      if (!chiaveConsegneUtente) {
+        throw new Error('Utente non autenticato.');
+      }
+
       await AsyncStorage.setItem(
-        'vigilanza_consegne_servizio',
+        chiaveConsegneUtente,
         JSON.stringify(nuove)
       );
 
       setArchivioConsegne(nuove);
+      setConsegnaArchivioId(nuova.id);
 
       Alert.alert(
         'Consegna salvata',
@@ -30040,6 +30262,7 @@ function ConsegneServizioScreen({
   };
 
   const apriConsegna = (c) => {
+    setConsegnaArchivioId(c?.id || null);
     setConsegnaData(c?.data || '');
     setConsegnaOra(c?.ora || '');
     setConsegnaPostazione(c?.postazione || '');
@@ -30069,12 +30292,18 @@ function ConsegneServizioScreen({
                 (c) => c.id !== id
               );
 
+            if (!chiaveConsegneUtente) return;
+
             await AsyncStorage.setItem(
-              'vigilanza_consegne_servizio',
+              chiaveConsegneUtente,
               JSON.stringify(nuove)
             );
 
             setArchivioConsegne(nuove);
+
+            if (consegnaArchivioId === id) {
+              setConsegnaArchivioId(null);
+            }
           },
         },
       ]
@@ -30151,8 +30380,19 @@ function ConsegneServizioScreen({
         return prev;
       }
 
-      return prev.map((item, index) =>
-        index === 0
+      const idDaAggiornare =
+        consegnaArchivioId ||
+        prev.find((item) =>
+          item?.data === consegnaData &&
+          item?.ora === consegnaOra &&
+          item?.postazione === consegnaPostazione.trim()
+        )?.id ||
+        null;
+
+      if (!idDaAggiornare) return prev;
+
+      const aggiornate = prev.map((item) =>
+        item.id === idDaAggiornare
           ? {
               ...item,
               statoInvio: 'inviata',
@@ -30163,6 +30403,17 @@ function ConsegneServizioScreen({
             }
           : item
       );
+
+      if (chiaveConsegneUtente) {
+        AsyncStorage.setItem(
+          chiaveConsegneUtente,
+          JSON.stringify(aggiornate)
+        ).catch((errore) =>
+          console.log('Errore aggiornamento archivio consegne:', errore)
+        );
+      }
+
+      return aggiornate;
     });
 
     Alert.alert(
