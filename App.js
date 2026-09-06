@@ -361,10 +361,14 @@ export default function App() {
   useEffect(() => {
     let attivo = true;
 
+    setNotificheNascoste([]);
+
     (async () => {
       try {
+        if (!storageUserId) return;
+
         const raw = await AsyncStorage.getItem(
-          'vigilanza_notifiche_nascoste'
+          `vigilanza_notifiche_nascoste:user:${storageUserId}`
         );
 
         if (!attivo || !raw) return;
@@ -385,14 +389,16 @@ export default function App() {
     return () => {
       attivo = false;
     };
-  }, []);
+  }, [storageUserId]);
 
   const salvaNotificheNascoste = async (nuove) => {
     setNotificheNascoste(nuove);
 
     try {
+      if (!storageUserId) return;
+
       await AsyncStorage.setItem(
-        'vigilanza_notifiche_nascoste',
+        `vigilanza_notifiche_nascoste:user:${storageUserId}`,
         JSON.stringify(nuove)
       );
     } catch (error) {
@@ -2017,8 +2023,10 @@ useEffect(() => {
   useEffect(() => {
     const caricaConfigurazioneStipendio = async () => {
       try {
+        if (!storageUserId) return;
+
         const salvata = await AsyncStorage.getItem(
-          '@vigilanza_gpg_stipendio'
+          `@vigilanza_gpg_stipendio:user:${storageUserId}`
         );
 
         if (!salvata) return;
@@ -2138,7 +2146,7 @@ if (dati.tariffaStraordinario != null) {
     };
 
     caricaConfigurazioneStipendio();
-  }, []);
+  }, [storageUserId]);
   const [colleghi, setColleghi] = useState([]);
   const [colleghiErrore, setColleghiErrore] = useState('');
   const [chatColleghiIds, setChatColleghiIds] = useState([]);
@@ -4284,8 +4292,12 @@ useEffect(() => {
     const caricaRecentiNascosti = async () => {
       try {
         const [opSalvate, sediSalvate] = await Promise.all([
-          AsyncStorage.getItem('@vigilanza_operativita_nascoste'),
-          AsyncStorage.getItem('@vigilanza_sedi_nascoste'),
+          storageUserId
+            ? AsyncStorage.getItem(`@vigilanza_operativita_nascoste:user:${storageUserId}`)
+            : Promise.resolve(null),
+          storageUserId
+            ? AsyncStorage.getItem(`@vigilanza_sedi_nascoste:user:${storageUserId}`)
+            : Promise.resolve(null),
         ]);
 
         setOperativitaNascoste(
@@ -4300,8 +4312,13 @@ useEffect(() => {
       }
     };
 
-    caricaRecentiNascosti();
-  }, []);
+    if (storageUserId) {
+      caricaRecentiNascosti();
+    } else {
+      setOperativitaNascoste([]);
+      setSediNascoste([]);
+    }
+  }, [storageUserId]);
 
 
   const [indirizzoServizio, setIndirizzoServizio] =
@@ -10998,8 +11015,13 @@ if (screen === 'configuraStipendio') {
         <TouchableOpacity
           onPress={async () => {
             try {
+              if (!storageUserId) {
+                Alert.alert('Sessione non pronta', 'Riprova tra un momento.');
+                return;
+              }
+
               await AsyncStorage.setItem(
-                '@vigilanza_gpg_stipendio',
+                `@vigilanza_gpg_stipendio:user:${storageUserId}`,
                 JSON.stringify({
                   ccnl: stipendioCCNL,
                   tipoOperatore: stipendioTipoOperatore,
@@ -11764,6 +11786,24 @@ if (screen === 'configuraStipendio') {
         </TouchableOpacity>
       </View>
 
+        {chatErrore ? (
+          <View
+            style={{
+              marginBottom: 8,
+              paddingHorizontal: 12,
+              paddingVertical: 9,
+              borderRadius: 12,
+              backgroundColor: 'rgba(130,35,54,0.22)',
+              borderWidth: 1,
+              borderColor: 'rgba(255,112,137,0.45)',
+            }}
+          >
+            <Text style={{ color: '#FFB2BF', fontSize: 11.5, fontWeight: '700' }}>
+              {chatErrore}
+            </Text>
+          </View>
+        ) : null}
+
         <View style={{
           flexDirection: 'row',
           alignItems: 'center',
@@ -11964,9 +12004,6 @@ if (screen === 'configuraStipendio') {
         }}
         
         ref={chatScrollRef}
-        onContentSizeChange={() => {
-          chatScrollRef.current?.scrollToEnd({ animated: true });
-        }}
       >
           {chatLoading ? (
             <ActivityIndicator />
@@ -24357,8 +24394,10 @@ if (screen === 'profiloCollega') {
 
     setOperativitaNascoste(nuovaLista);
 
+    if (!storageUserId) return;
+
     await AsyncStorage.setItem(
-      '@vigilanza_operativita_nascoste',
+      `@vigilanza_operativita_nascoste:user:${storageUserId}`,
       JSON.stringify(nuovaLista)
     );
   };
@@ -24370,8 +24409,10 @@ if (screen === 'profiloCollega') {
 
     setSediNascoste(nuovaLista);
 
+    if (!storageUserId) return;
+
     await AsyncStorage.setItem(
-      '@vigilanza_sedi_nascoste',
+      `@vigilanza_sedi_nascoste:user:${storageUserId}`,
       JSON.stringify(nuovaLista)
     );
   };
@@ -30131,15 +30172,15 @@ function ConsegneServizioScreen({
           chiaveConsegneUtente
         );
 
-        if (!raw) return;
+        if (raw) {
+          const parsed = JSON.parse(raw);
 
-        const parsed = JSON.parse(raw);
-
-        if (
-          attivo &&
-          Array.isArray(parsed)
-        ) {
-          setArchivioConsegne(parsed);
+          if (
+            attivo &&
+            Array.isArray(parsed)
+          ) {
+            setArchivioConsegne(parsed);
+          }
         }
 
         if (attivo) {
