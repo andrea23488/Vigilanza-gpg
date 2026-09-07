@@ -15,7 +15,9 @@
         ]
       },
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSCameraUsageDescription": "Vigilanza GPG utilizza la fotocamera per consentirti di aggiungere foto al profilo, ai documenti e alle funzioni dell’app.",
+        "NSPhotoLibraryUsageDescription": "Vigilanza GPG accede alla libreria foto per consentirti di scegliere immagini da utilizzare nell’app."
       },
       "appleTeamId": "CAA4U7J8QJ"
     },
@@ -38,6 +40,14 @@
     },
     "plugins": [
       "expo-font",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Vigilanza GPG accede alla libreria foto per consentirti di scegliere immagini da utilizzare nell’app.",
+          "cameraPermission": "Vigilanza GPG utilizza la fotocamera per consentirti di aggiungere foto al profilo, ai documenti e alle funzioni dell’app.",
+          "microphonePermission": false
+        }
+      ],
       "@bacons/apple-targets"
     ],
     "scheme": "vigilanzagpg"
