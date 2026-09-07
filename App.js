@@ -24640,6 +24640,142 @@ if (screen === 'profiloCollega') {
             </Text>
           </TouchableOpacity>
 
+
+          {/* ===== LEGALE E ASSISTENZA ===== */}
+          <View
+            style={{
+              marginTop: 18,
+              marginBottom: 4,
+              padding: 14,
+              borderRadius: 20,
+              backgroundColor: 'rgba(15, 31, 58, 0.72)',
+              borderWidth: 1,
+              borderColor: 'rgba(100, 145, 205, 0.22)',
+            }}
+          >
+            <Text
+              style={{
+                color: '#8FA5CC',
+                fontSize: 10,
+                fontWeight: '900',
+                letterSpacing: 1,
+                marginBottom: 10,
+              }}
+            >
+              LEGALE E ASSISTENZA
+            </Text>
+
+            <TouchableOpacity
+              activeOpacity={0.82}
+              onPress={() =>
+                Linking.openURL(
+                  'https://andrea23488.github.io/Vigilanza-gpg/privacy.html'
+                )
+              }
+              style={{
+                minHeight: 46,
+                borderRadius: 15,
+                paddingHorizontal: 13,
+                flexDirection: 'row',
+                alignItems: 'center',
+                backgroundColor: 'rgba(70, 110, 175, 0.14)',
+                borderWidth: 1,
+                borderColor: 'rgba(95, 150, 220, 0.24)',
+                marginBottom: 8,
+              }}
+            >
+              <Text style={{ fontSize: 17, marginRight: 10 }}>🔒</Text>
+              <Text
+                style={{
+                  color: '#FFFFFF',
+                  fontSize: 13,
+                  fontWeight: '800',
+                  flex: 1,
+                }}
+              >
+                Privacy Policy
+              </Text>
+              <Ionicons
+                name="open-outline"
+                size={16}
+                color="#8FA5CC"
+              />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              activeOpacity={0.82}
+              onPress={() =>
+                Linking.openURL(
+                  'https://andrea23488.github.io/Vigilanza-gpg/terms.html'
+                )
+              }
+              style={{
+                minHeight: 46,
+                borderRadius: 15,
+                paddingHorizontal: 13,
+                flexDirection: 'row',
+                alignItems: 'center',
+                backgroundColor: 'rgba(70, 110, 175, 0.14)',
+                borderWidth: 1,
+                borderColor: 'rgba(95, 150, 220, 0.24)',
+                marginBottom: 8,
+              }}
+            >
+              <Text style={{ fontSize: 17, marginRight: 10 }}>📄</Text>
+              <Text
+                style={{
+                  color: '#FFFFFF',
+                  fontSize: 13,
+                  fontWeight: '800',
+                  flex: 1,
+                }}
+              >
+                Termini d'uso
+              </Text>
+              <Ionicons
+                name="open-outline"
+                size={16}
+                color="#8FA5CC"
+              />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              activeOpacity={0.82}
+              onPress={() =>
+                Linking.openURL(
+                  'mailto:vigilanzagpg.app@gmail.com?subject=Assistenza%20Vigilanza%20GPG'
+                )
+              }
+              style={{
+                minHeight: 46,
+                borderRadius: 15,
+                paddingHorizontal: 13,
+                flexDirection: 'row',
+                alignItems: 'center',
+                backgroundColor: 'rgba(70, 110, 175, 0.14)',
+                borderWidth: 1,
+                borderColor: 'rgba(95, 150, 220, 0.24)',
+              }}
+            >
+              <Text style={{ fontSize: 17, marginRight: 10 }}>✉️</Text>
+              <Text
+                style={{
+                  color: '#FFFFFF',
+                  fontSize: 13,
+                  fontWeight: '800',
+                  flex: 1,
+                }}
+              >
+                Assistenza
+              </Text>
+              <Ionicons
+                name="mail-outline"
+                size={16}
+                color="#8FA5CC"
+              />
+            </TouchableOpacity>
+          </View>
+
           <TouchableOpacity
             activeOpacity={0.82}
             onPress={eliminaAccount}
