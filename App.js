@@ -581,6 +581,10 @@ export default function App() {
   const [stipendioSuperminimoFiduciario, setStipendioSuperminimoFiduciario] =
     useState('');
 
+  // Scatti di anzianità mensili - Fiduciario
+  const [stipendioScattiAnzianitaFiduciario, setStipendioScattiAnzianitaFiduciario] =
+    useState('');
+
 
 
 
@@ -2099,6 +2103,15 @@ if (dati.tariffaStraordinario != null) {
       ) {
         setStipendioSuperminimoFiduciario(
           String(dati.superminimoFiduciario)
+        );
+      }
+
+      if (
+        dati.scattiAnzianitaFiduciario !== undefined &&
+        dati.scattiAnzianitaFiduciario !== null
+      ) {
+        setStipendioScattiAnzianitaFiduciario(
+          String(dati.scattiAnzianitaFiduciario)
         );
       }
     }
@@ -4923,13 +4936,52 @@ const totaleCompetenzeStimate =
    * Il ramo GPG sopra resta completamente invariato.
    */
 
-  const tabellaPagaFiduciari2026 = {
-    A: 1701.42,
-    B: 1548.57,
-    C: 1304.00,
-    D: 1090.00,
-    E: 1028.86,
-  };
+  // Tabelle paga conglobata - Servizi di Sicurezza.
+  // La tabella viene scelta in base al mese visualizzato,
+  // così lo storico stipendio usa la paga realmente vigente in quel periodo.
+  const tabellePagaFiduciari = [
+    {
+      dal: 202401,
+      paga: { A: 1740.40, B: 1583.88, C: 1333.43, D: 1114.29, E: 1021.43 },
+    },
+    {
+      dal: 202407,
+      paga: { A: 1762.29, B: 1603.77, C: 1350.14, D: 1128.21, E: 1035.36 },
+    },
+    {
+      dal: 202410,
+      paga: { A: 1813.36, B: 1650.20, C: 1389.14, D: 1160.71, E: 1067.86 },
+    },
+    {
+      dal: 202501,
+      paga: { A: 1886.32, B: 1716.53, C: 1444.86, D: 1207.14, E: 1114.29 },
+    },
+    {
+      dal: 202507,
+      paga: { A: 1930.09, B: 1756.33, C: 1478.29, D: 1235.00, E: 1142.14 },
+    },
+    {
+      dal: 202512,
+      paga: { A: 1973.87, B: 1796.12, C: 1511.71, D: 1262.86, E: 1170.00 },
+    },
+    {
+      dal: 202604,
+      paga: { A: 2003.05, B: 1822.65, C: 1534.00, D: 1281.43, E: 1188.57 },
+    },
+    {
+      dal: 202612,
+      paga: { A: 2032.24, B: 1849.18, C: 1556.29, D: 1300.00, E: 1207.14 },
+    },
+  ];
+
+  const chiaveMeseStipendio =
+    Number(anno) * 100 + Number(mese + 1);
+
+  const tabellaPagaFiduciariApplicabile =
+    [...tabellePagaFiduciari]
+      .reverse()
+      .find((tabella) => chiaveMeseStipendio >= tabella.dal)?.paga ||
+    tabellePagaFiduciari[0].paga;
 
   const livelloFiduciarioCorrente =
     ['A', 'B', 'C', 'D', 'E'].includes(
@@ -4953,7 +5005,7 @@ const totaleCompetenzeStimate =
   const pagaConglobataFiduciario =
     usaLordoBaseFiduciarioPersonalizzato
       ? lordoBaseFiduciarioPersonalizzatoNumero
-      : tabellaPagaFiduciari2026[
+      : tabellaPagaFiduciariApplicabile[
           livelloFiduciarioCorrente
         ];
 
@@ -5078,22 +5130,18 @@ const totaleCompetenzeStimate =
     );
 
   /*
-   * Maggiorazione notturna ordinaria.
-   * Per non attribuire al fiduciario le indennità GPG,
-   * questa voce è calcolata esclusivamente sulla sua
-   * paga oraria.
+   * ATTENZIONE:
+   * il 35% riguarda lo straordinario notturno e non deve
+   * essere applicato automaticamente a tutte le ore
+   * notturne ordinarie.
    *
-   * 35% viene utilizzato per lo straordinario notturno.
-   * Sulle ore ordinarie notturne manteniamo questo valore
-   * come stima prudenziale finché non distinguiamo nel
-   * calendario ordinario/straordinario ora per ora.
+   * Finché il calendario non distingue esattamente
+   * ordinario/straordinario per fascia oraria, non
+   * attribuiamo una maggiorazione notturna generica.
    */
-  const maggiorazioneNotturnaFiduciario =
-    pagaOrariaFiduciario * 0.35;
+  const maggiorazioneNotturnaFiduciario = 0;
 
-  const importoNotturnoFiduciario =
-    oreNotturneFiduciario *
-    maggiorazioneNotturnaFiduciario;
+  const importoNotturnoFiduciario = 0;
 
 
   /*
@@ -5116,9 +5164,20 @@ const totaleCompetenzeStimate =
         )
       : 0;
 
+  const importoScattiAnzianitaFiduciario =
+    Math.max(
+      0,
+      Number(
+        String(stipendioScattiAnzianitaFiduciario || '0')
+          .trim()
+          .replace(',', '.')
+      ) || 0
+    );
+
 const totaleCompetenzeFiduciario =
     lordoBaseFiduciario +
     importoSuperminimoFiduciario +
+    importoScattiAnzianitaFiduciario +
     importoStraordinarioFiduciario +
     importoDomenicaleFiduciario +
     importoNotturnoFiduciario;
@@ -5456,6 +5515,11 @@ const quotaTempoMese = Math.min(
 
     (
       Number(importoSuperminimoFiduciario || 0) *
+      quotaTempoMese
+    ) +
+
+    (
+      Number(importoScattiAnzianitaFiduciario || 0) *
       quotaTempoMese
     ) +
 
@@ -10810,6 +10874,47 @@ if (screen === 'configuraStipendio') {
           >
             Inserisci l'importo mensile effettivamente riconosciuto.
           </Text>
+
+          <Text
+            style={{
+              color: '#dfe6ff',
+              fontWeight: '800',
+              marginTop: 18,
+            }}
+          >
+            SCATTI ANZIANITÀ · €/MESE
+          </Text>
+
+          <Text
+            style={{
+              color: '#8FA5CC',
+              fontSize: 9,
+              lineHeight: 13,
+              marginBottom: 9,
+              marginTop: 5,
+            }}
+          >
+            Importo lordo mensile degli scatti di anzianità.
+            Se non presenti, lascia 0.
+          </Text>
+
+          <TextInput
+            value={stipendioScattiAnzianitaFiduciario}
+            onChangeText={setStipendioScattiAnzianitaFiduciario}
+            keyboardType="decimal-pad"
+            placeholder="Es. 15,00"
+            placeholderTextColor="#7184aa"
+            style={{
+              backgroundColor: '#091936',
+              color: 'white',
+              borderRadius: 12,
+              borderWidth: 1,
+              borderColor: 'rgba(255,214,107,0.30)',
+              padding: 13,
+              fontSize: 16,
+              fontWeight: '800',
+            }}
+          />
         </View>
       ) : null}
 
@@ -10989,6 +11094,7 @@ if (screen === 'configuraStipendio') {
                   nettoBase: stipendioNettoBase,
                   lordoBaseFiduciario: stipendioLordoBaseFiduciario,
                   superminimoFiduciario: stipendioSuperminimoFiduciario,
+                  scattiAnzianitaFiduciario: stipendioScattiAnzianitaFiduciario,
                 })
               );
 
