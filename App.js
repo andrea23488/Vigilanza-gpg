@@ -25,7 +25,18 @@ import {
 import { caricaTurniUtente, creaTurnoUtente, aggiornaTurnoUtente, eliminaTurnoUtente } from './turniApi';
 import { supabase } from './supabase';
 import { caricaProfiloUtente, salvaProfiloUtente, caricaFotoProfilo, eliminaFotoProfiloCloud } from './profiliApi';
-import { caricaColleghi, aggiungiCollega, rimuoviCollega, accettaCollega, rifiutaCollega } from './colleghiApi';
+import {
+  caricaColleghi,
+  aggiungiCollega,
+  rimuoviCollega,
+  accettaCollega,
+  rifiutaCollega,
+  bloccaUtente,
+  sbloccaUtente,
+  utenteBloccato,
+  caricaUtentiBloccati,
+  segnalaUtente,
+} from './colleghiApi';
 import { caricaColleghiInServizio } from './servizioApi';
 import React, { useRef, useEffect, useMemo, useState } from 'react';
 import SchedaPostoScreen from './SchedaPostoScreen';
@@ -23133,6 +23144,11 @@ if (screen === 'profiloCollega') {
     const c = collegaSelezionato;
     const p = c?.profilo || {};
 
+    const collegaIdModerazione =
+      c?.altro_user_id ||
+      p?.user_id ||
+      null;
+
     return (
       <Screen>
         <Back
@@ -23701,6 +23717,233 @@ if (screen === 'profiloCollega') {
         </TouchableOpacity>
 
       ) : null}
+
+
+
+      {/* ===== SICUREZZA E MODERAZIONE ===== */}
+      <View
+        style={{
+          marginTop: 26,
+          paddingTop: 18,
+          borderTopWidth: 1,
+          borderTopColor: 'rgba(143,165,204,0.18)',
+        }}
+      >
+        <Text
+          style={{
+            color: '#7184AA',
+            fontSize: 9,
+            fontWeight: '900',
+            letterSpacing: 1,
+            marginBottom: 10,
+          }}
+        >
+          SICUREZZA E MODERAZIONE
+        </Text>
+
+        <View
+          style={{
+            flexDirection: 'row',
+            gap: 10,
+          }}
+        >
+          {/* SEGNALA */}
+          <TouchableOpacity
+            activeOpacity={0.82}
+            onPress={() => {
+              if (!collegaIdModerazione) {
+                Alert.alert(
+                  'Errore',
+                  'Impossibile identificare questo utente.'
+                );
+                return;
+              }
+
+              const inviaSegnalazione = async (motivo) => {
+                try {
+                  await segnalaUtente({
+                    collegaId: collegaIdModerazione,
+                    motivo,
+                    dettaglio:
+                      `Segnalazione dal profilo di ${[
+                        p.nome,
+                        p.cognome,
+                      ].filter(Boolean).join(' ') || 'un collega'}`,
+                  });
+
+                  Alert.alert(
+                    'Segnalazione inviata',
+                    'Grazie. La segnalazione è stata registrata e potrà essere verificata.'
+                  );
+                } catch (error) {
+                  Alert.alert(
+                    'Errore',
+                    error?.message ||
+                      'Non è stato possibile inviare la segnalazione.'
+                  );
+                }
+              };
+
+              Alert.alert(
+                'Segnala collega',
+                'Per quale motivo vuoi effettuare la segnalazione?',
+                [
+                  {
+                    text: 'Spam',
+                    onPress: () =>
+                      inviaSegnalazione('Spam'),
+                  },
+                  {
+                    text: 'Molestie o offese',
+                    onPress: () =>
+                      inviaSegnalazione(
+                        'Molestie o comportamento offensivo'
+                      ),
+                  },
+                  {
+                    text: 'Contenuto inappropriato',
+                    onPress: () =>
+                      inviaSegnalazione(
+                        'Contenuto inappropriato'
+                      ),
+                  },
+                  {
+                    text: 'Altro',
+                    onPress: () =>
+                      inviaSegnalazione('Altro'),
+                  },
+                  {
+                    text: 'Annulla',
+                    style: 'cancel',
+                  },
+                ]
+              );
+            }}
+            style={{
+              flex: 1,
+              minHeight: 50,
+              borderRadius: 17,
+              alignItems: 'center',
+              justifyContent: 'center',
+
+              backgroundColor:
+                'rgba(160,108,22,0.16)',
+
+              borderWidth: 1,
+              borderColor:
+                'rgba(255,190,72,0.48)',
+            }}
+          >
+            <Text
+              style={{
+                color: '#FFD174',
+                fontSize: 12,
+                fontWeight: '900',
+              }}
+            >
+              ⚠️ SEGNALA
+            </Text>
+          </TouchableOpacity>
+
+          {/* BLOCCA */}
+          <TouchableOpacity
+            activeOpacity={0.82}
+            onPress={() => {
+              if (!collegaIdModerazione) {
+                Alert.alert(
+                  'Errore',
+                  'Impossibile identificare questo utente.'
+                );
+                return;
+              }
+
+              Alert.alert(
+                'Blocca collega',
+                `Vuoi bloccare ${
+                  p.nome || 'questo collega'
+                }? Non potrà più essere utilizzato normalmente nei tuoi collegamenti.`,
+                [
+                  {
+                    text: 'Annulla',
+                    style: 'cancel',
+                  },
+                  {
+                    text: 'Blocca',
+                    style: 'destructive',
+                    onPress: async () => {
+                      try {
+                        await bloccaUtente(
+                          collegaIdModerazione
+                        );
+
+                        // Se esiste una relazione colleghi,
+                        // la rimuoviamo anche dalla lista.
+                        if (c?.id) {
+                          try {
+                            await rimuoviCollega(c.id);
+                          } catch (_) {}
+                        }
+
+                        await aggiornaColleghi();
+
+                        setCollegaSelezionato(null);
+                        setScreen('home');
+
+                        Alert.alert(
+                          'Utente bloccato',
+                          'Il collega è stato bloccato.'
+                        );
+                      } catch (error) {
+                        Alert.alert(
+                          'Errore',
+                          error?.message ||
+                            'Non è stato possibile bloccare il collega.'
+                        );
+                      }
+                    },
+                  },
+                ]
+              );
+            }}
+            style={{
+              flex: 1,
+              minHeight: 50,
+              borderRadius: 17,
+              alignItems: 'center',
+              justifyContent: 'center',
+
+              backgroundColor:
+                'rgba(140,25,45,0.18)',
+
+              borderWidth: 1,
+              borderColor:
+                'rgba(255,83,105,0.48)',
+            }}
+          >
+            <Text
+              style={{
+                color: '#FF7A8D',
+                fontSize: 12,
+                fontWeight: '900',
+              }}
+            >
+              🚫 BLOCCA
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        <Text
+          style={{
+            color: '#657B99',
+            fontSize: 8.5,
+            lineHeight: 13,
+            marginTop: 9,
+          }}
+        >
+          Usa questi strumenti in caso di spam, molestie,
+          contenuti inappropriati o comportamenti abusivi.
+        </Text>
+      </View>
 
 
       {fotoCollegaAperta && p.foto_url ? (

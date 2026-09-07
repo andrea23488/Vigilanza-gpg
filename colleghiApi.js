@@ -34,9 +34,35 @@ export async function caricaColleghi() {
   if (error) throw error;
 
   const relazioni = data || [];
+
+  const { data: blocchi, error: erroreBlocchi } =
+    await supabase
+      .from('utenti_bloccati')
+      .select('bloccante_id, bloccato_id')
+      .or(`bloccante_id.eq.${user.id},bloccato_id.eq.${user.id}`);
+
+  if (erroreBlocchi) throw erroreBlocchi;
+
+  const utentiBloccati = new Set(
+    (blocchi || []).map((b) =>
+      b.bloccante_id === user.id
+        ? b.bloccato_id
+        : b.bloccante_id
+    )
+  );
+
+  const relazioniFiltrate = relazioni.filter((relazione) => {
+    const altroUserId =
+      relazione.user_id === user.id
+        ? relazione.collega_id
+        : relazione.user_id;
+
+    return !utentiBloccati.has(altroUserId);
+  });
+
   const ids = [
     ...new Set(
-      relazioni
+      relazioniFiltrate
         .map((relazione) =>
           relazione.user_id === user.id
             ? relazione.collega_id
@@ -62,7 +88,7 @@ export async function caricaColleghi() {
     profili.map((profilo) => [profilo.user_id, profilo])
   );
 
-  return relazioni.map((relazione) => {
+  return relazioniFiltrate.map((relazione) => {
     const altroUserId =
       relazione.user_id === user.id
         ? relazione.collega_id
@@ -175,6 +201,25 @@ export async function aggiungiCollega(testoRicerca) {
   const profiloCollega = profiliTrovati[0];
   const collegaId = profiloCollega.user_id;
 
+  // Se esiste un blocco in una delle due direzioni,
+  // la relazione non può essere ricreata.
+  const { data: blocchi, error: erroreBlocchi } =
+    await supabase
+      .from('utenti_bloccati')
+      .select('id')
+      .or(
+        `and(bloccante_id.eq.${user.id},bloccato_id.eq.${collegaId}),and(bloccante_id.eq.${collegaId},bloccato_id.eq.${user.id})`
+      )
+      .limit(1);
+
+  if (erroreBlocchi) throw erroreBlocchi;
+
+  if ((blocchi || []).length > 0) {
+    throw new Error(
+      'Non è possibile aggiungere questo utente perché tra i due account esiste un blocco.'
+    );
+  }
+
   const { data: esistenti, error: erroreEsistenti } =
     await supabase
       .from('colleghi')
@@ -255,4 +300,114 @@ export async function rifiutaCollega(idRelazione) {
 
   if (error) throw error;
   return true;
+}
+
+
+// ===== SICUREZZA / MODERAZIONE UTENTI =====
+
+export async function bloccaUtente(collegaId) {
+  const user = await getCurrentUser();
+
+  if (!collegaId || collegaId === user.id) {
+    throw new Error('Utente non valido.');
+  }
+
+  const { error } = await supabase
+    .from('utenti_bloccati')
+    .upsert(
+      {
+        bloccante_id: user.id,
+        bloccato_id: collegaId,
+      },
+      {
+        onConflict: 'bloccante_id,bloccato_id',
+      }
+    );
+
+  if (error) throw error;
+
+  return true;
+}
+
+
+export async function sbloccaUtente(collegaId) {
+  const user = await getCurrentUser();
+
+  const { error } = await supabase
+    .from('utenti_bloccati')
+    .delete()
+    .eq('bloccante_id', user.id)
+    .eq('bloccato_id', collegaId);
+
+  if (error) throw error;
+
+  return true;
+}
+
+
+export async function utenteBloccato(collegaId) {
+  const user = await getCurrentUser();
+
+  const { data, error } = await supabase
+    .from('utenti_bloccati')
+    .select('id')
+    .eq('bloccante_id', user.id)
+    .eq('bloccato_id', collegaId)
+    .maybeSingle();
+
+  if (error) throw error;
+
+  return Boolean(data);
+}
+
+
+export async function caricaUtentiBloccati() {
+  const user = await getCurrentUser();
+
+  const { data, error } = await supabase
+    .from('utenti_bloccati')
+    .select('bloccato_id')
+    .eq('bloccante_id', user.id);
+
+  if (error) throw error;
+
+  return (data || [])
+    .map((riga) => riga.bloccato_id)
+    .filter(Boolean);
+}
+
+
+export async function segnalaUtente({
+  collegaId,
+  motivo,
+  dettaglio = '',
+  messaggioId = null,
+}) {
+  const user = await getCurrentUser();
+
+  if (!collegaId || collegaId === user.id) {
+    throw new Error('Utente non valido.');
+  }
+
+  const motivoPulito = String(motivo || '').trim();
+
+  if (!motivoPulito) {
+    throw new Error('Indica il motivo della segnalazione.');
+  }
+
+  const { data, error } = await supabase
+    .from('segnalazioni_utenti')
+    .insert({
+      segnalante_id: user.id,
+      segnalato_id: collegaId,
+      motivo: motivoPulito,
+      dettaglio: String(dettaglio || '').trim() || null,
+      messaggio_id: messaggioId || null,
+    })
+    .select()
+    .single();
+
+  if (error) throw error;
+
+  return data;
 }
