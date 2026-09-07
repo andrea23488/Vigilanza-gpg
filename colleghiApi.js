@@ -51,7 +51,7 @@ export async function caricaColleghi() {
   if (ids.length > 0) {
     const { data: profiliData, error: profiliError } = await supabase
       .from('profili')
-      .select('id, user_id, nome, cognome, azienda, sede, foto_url, codice_gpg')
+      .select('user_id, nome, cognome, azienda, sede, foto_url, codice_gpg')
       .in('user_id', ids);
 
     if (profiliError) throw profiliError;
@@ -88,7 +88,7 @@ export async function aggiungiCollega(testoRicerca) {
   }
 
   const selectProfilo =
-    'id, user_id, nome, cognome, codice_gpg, azienda, sede, foto_url';
+    'user_id, nome, cognome, codice_gpg, azienda, sede, foto_url';
 
   let profiliTrovati = [];
 
