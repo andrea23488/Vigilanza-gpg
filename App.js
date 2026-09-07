@@ -364,6 +364,244 @@ function calcolaStraordinariConfigurati({
   return extraMese;
 }
 
+
+/*
+ * Dettaglio straordinari Fiduciario / Servizi di Sicurezza.
+ *
+ * NON sostituisce calcolaStraordinariConfigurati():
+ * serve solo a classificare le ore extra settimanali
+ * per fascia e natura, senza modificare il motore GPG.
+ */
+function calcolaDettaglioStraordinariFiduciario({
+  tuttiTurni,
+  sogliaSettimanale,
+  meseTarget,
+  annoTarget,
+  isFestivo,
+}) {
+  const limite =
+    Number(sogliaSettimanale) > 0
+      ? Number(sogliaSettimanale)
+      : 40;
+
+  const risultato = {
+    ferialeDiurno25: 0,
+    ferialeDiurno30: 0,
+    ferialeNotturno35: 0,
+    festivoDiurno50: 0,
+    festivoNotturno60: 0,
+    totale: 0,
+  };
+
+  const turniUtili = (tuttiTurni || [])
+    .filter(
+      (t) =>
+        t &&
+        t.tipo === 'turno' &&
+        t.riposo_lavorato !== true &&
+        Number(t.ore || 0) > 0 &&
+        Number(t.giorno) > 0 &&
+        Number(t.mese) > 0 &&
+        Number(t.anno) > 0
+    )
+    .map((t) => {
+      const data = new Date(
+        Number(t.anno),
+        Number(t.mese) - 1,
+        Number(t.giorno),
+        12, 0, 0
+      );
+
+      const giornoSettimana = data.getDay();
+      const distanzaLunedi =
+        giornoSettimana === 0
+          ? -6
+          : 1 - giornoSettimana;
+
+      const lunedi = new Date(data);
+      lunedi.setDate(data.getDate() + distanzaLunedi);
+      lunedi.setHours(0, 0, 0, 0);
+
+      return {
+        ...t,
+        data,
+        chiaveSettimana: [
+          lunedi.getFullYear(),
+          String(lunedi.getMonth() + 1).padStart(2, '0'),
+          String(lunedi.getDate()).padStart(2, '0'),
+        ].join('-'),
+      };
+    })
+    .sort((a, b) => a.data - b.data);
+
+  const settimane = {};
+
+  turniUtili.forEach((t) => {
+    if (!settimane[t.chiaveSettimana]) {
+      settimane[t.chiaveSettimana] = [];
+    }
+
+    settimane[t.chiaveSettimana].push(t);
+  });
+
+  const isMinutoNotturno = (minutoAssoluto) => {
+    const minutoGiorno =
+      ((minutoAssoluto % 1440) + 1440) % 1440;
+
+    return minutoGiorno >= 22 * 60 ||
+      minutoGiorno < 6 * 60;
+  };
+
+  Object.values(settimane).forEach((turniSettimana) => {
+    let cumulato = 0;
+
+    turniSettimana.forEach((t) => {
+      const oreTurno = Number(t.ore || 0);
+
+      const extraPrima =
+        Math.max(0, cumulato - limite);
+
+      const cumulatoPrima = cumulato;
+      cumulato += oreTurno;
+
+      const extraDopo =
+        Math.max(0, cumulato - limite);
+
+      const extraTurno =
+        Math.max(0, extraDopo - extraPrima);
+
+      if (
+        extraTurno <= 0 ||
+        Number(t.mese) !== Number(meseTarget) ||
+        Number(t.anno) !== Number(annoTarget)
+      ) {
+        return;
+      }
+
+      const [hi, mi] =
+        String(t.inizio || '00:00')
+          .split(':')
+          .map(Number);
+
+      const [hf, mf] =
+        String(t.fine || '00:00')
+          .split(':')
+          .map(Number);
+
+      const inizioMinuti =
+        (Number(hi) || 0) * 60 +
+        (Number(mi) || 0);
+
+      let fineMinuti =
+        (Number(hf) || 0) * 60 +
+        (Number(mf) || 0);
+
+      if (fineMinuti <= inizioMinuti) {
+        fineMinuti += 1440;
+      }
+
+      /*
+       * Le ore extra sono la parte finale del turno che
+       * porta oltre la soglia settimanale.
+       */
+      const minutiExtra = extraTurno * 60;
+
+      const inizioExtra =
+        Math.max(
+          inizioMinuti,
+          fineMinuti - minutiExtra
+        );
+
+      const dataBaseTurno = new Date(
+        Number(t.anno),
+        Number(t.mese) - 1,
+        Number(t.giorno),
+        0, 0, 0
+      );
+
+      /*
+       * Classifichiamo a blocchi da 15 minuti.
+       * Consente di gestire anche turni che attraversano
+       * le 22:00 o le 06:00 senza attribuire tutta l'ora
+       * alla fascia sbagliata.
+       */
+      const passo = 15;
+
+      for (
+        let minuto = inizioExtra;
+        minuto < fineMinuti;
+        minuto += passo
+      ) {
+        const fineBlocco =
+          Math.min(minuto + passo, fineMinuti);
+
+        const oreBlocco =
+          (fineBlocco - minuto) / 60;
+
+        const notturno =
+          isMinutoNotturno(minuto);
+
+        // Data reale del blocco, anche se il turno supera mezzanotte.
+        const dataBlocco = new Date(
+          dataBaseTurno.getTime() + minuto * 60 * 1000
+        );
+
+        const domenica =
+          dataBlocco.getDay() === 0;
+
+        const festivo =
+          typeof isFestivo === 'function'
+            ? Boolean(
+                isFestivo(
+                  dataBlocco.getFullYear(),
+                  dataBlocco.getMonth() + 1,
+                  dataBlocco.getDate()
+                )
+              )
+            : false;
+
+        const domenicaleOFestivo =
+          domenica || festivo;
+
+        if (domenicaleOFestivo) {
+          if (notturno) {
+            risultato.festivoNotturno60 += oreBlocco;
+          } else {
+            risultato.festivoDiurno50 += oreBlocco;
+          }
+        } else if (notturno) {
+          risultato.ferialeNotturno35 += oreBlocco;
+        } else {
+          /*
+           * 41ª-48ª ora settimanale: +25%
+           * dalla 49ª ora: +30%
+           */
+          const oreSettimanaAlBlocco =
+            cumulatoPrima +
+            (
+              (minuto - inizioMinuti) / 60
+            );
+
+          if (oreSettimanaAlBlocco >= 48) {
+            risultato.ferialeDiurno30 += oreBlocco;
+          } else {
+            risultato.ferialeDiurno25 += oreBlocco;
+          }
+        }
+
+        risultato.totale += oreBlocco;
+      }
+    });
+  });
+
+  Object.keys(risultato).forEach((chiave) => {
+    risultato[chiave] =
+      Math.round(risultato[chiave] * 100) / 100;
+  });
+
+  return risultato;
+}
+
 export default function App() {
   const giorniSettimana = ["Dom", "Lun", "Mar", "Mer", "Gio", "Ven", "Sab"];
  const [accessoTest, setAccessoTest] = useState(false);
@@ -372,6 +610,9 @@ export default function App() {
   const passatempoScrollRef = React.useRef(null);
   const editScreenScrollRef = React.useRef(null);
   const snakeDirezioneRealeRef = React.useRef({ x: 1, y: 0 });
+
+  // Memorizza fino a 2 curve rapide senza resettare il timer di gioco.
+  const snakeCodaDirezioniRef = React.useRef([]);
   const [consegnaSelezionata, setConsegnaSelezionata] = useState(null);
   const [consegneRicevute, setConsegneRicevute] = useState([]);
   const [notificheNascoste, setNotificheNascoste] = useState([]);
@@ -1665,12 +1906,33 @@ export default function App() {
       setSnakeCorpo((corpoAttuale) => {
         const testa = corpoAttuale[0];
 
-        const nuovaTesta = {
-          x: testa.x + snakeDirezione.x,
-          y: testa.y + snakeDirezione.y,
-        };
+        let direzioneTick =
+          snakeDirezioneRealeRef.current;
 
-        snakeDirezioneRealeRef.current = snakeDirezione;
+        // Esegue al massimo una curva accodata per ogni passo.
+        while (snakeCodaDirezioniRef.current.length > 0) {
+          const candidata =
+            snakeCodaDirezioniRef.current.shift();
+
+          const inversione =
+            direzioneTick.x + candidata.x === 0 &&
+            direzioneTick.y + candidata.y === 0;
+
+          if (!inversione) {
+            direzioneTick = candidata;
+            break;
+          }
+        }
+
+        snakeDirezioneRealeRef.current =
+          direzioneTick;
+
+        setSnakeDirezione(direzioneTick);
+
+        const nuovaTesta = {
+          x: testa.x + direzioneTick.x,
+          y: testa.y + direzioneTick.y,
+        };
 
         const muro =
           nuovaTesta.x < 0 ||
@@ -1738,7 +2000,6 @@ export default function App() {
     screen,
     snakeRunning,
     snakeGameOver,
-    snakeDirezione,
     snakeCibo,
   ]);
 
@@ -4557,6 +4818,31 @@ const oreStipendioMese = giornateStipendioMese.reduce(
       meseTarget: mese + 1,
       annoTarget: anno,
     });
+
+  const dettaglioStraordinariFiduciarioTest =
+    stipendioTipoOperatore === 'fiduciario' &&
+    stipendioCalcoloStraordinari === 'settimanale'
+      ? calcolaDettaglioStraordinariFiduciario({
+          tuttiTurni: turni,
+          sogliaSettimanale: Number(
+            String(stipendioOreSettimanali || '40')
+              .replace(',', '.')
+          ),
+          meseTarget: mese + 1,
+          annoTarget: anno,
+          isFestivo: isFestivoNazionaleItaliano,
+        })
+      : null;
+
+  if (dettaglioStraordinariFiduciarioTest) {
+    console.log(
+      '🧮 TEST STRAORDINARI FIDUCIARIO',
+      {
+        vecchioTotale: Number(extraStipendioMese || 0),
+        nuovoDettaglio: dettaglioStraordinariFiduciarioTest,
+      }
+    );
+  }
 
   const dettaglioStraordinariMese = (() => {
     // GIORNALIERO
@@ -12435,6 +12721,7 @@ if (screen === 'configuraStipendio') {
   if (screen === 'snakeGame') {
     const nuovaPartitaSnake = () => {
       snakeDirezioneRealeRef.current = { x: 1, y: 0 };
+      snakeCodaDirezioniRef.current = [];
       const corpo = [
         { x: 8, y: 9 },
         { x: 7, y: 9 },
@@ -12450,22 +12737,40 @@ if (screen === 'configuraStipendio') {
     };
 
     const cambiaDirezioneSnake = (x, y) => {
-      const reale = snakeDirezioneRealeRef.current;
+      if (snakeGameOver) return;
 
-      // Blocca solo l'inversione rispetto al movimento
-      // realmente eseguito dal serpente.
+      const nuova = { x, y };
+
+      const coda =
+        snakeCodaDirezioniRef.current;
+
+      const riferimento =
+        coda.length > 0
+          ? coda[coda.length - 1]
+          : snakeDirezioneRealeRef.current;
+
+      // Impedisce inversioni di 180°.
       if (
-        reale.x + x === 0 &&
-        reale.y + y === 0
+        riferimento.x + nuova.x === 0 &&
+        riferimento.y + nuova.y === 0
       ) {
         return;
       }
 
-      setSnakeDirezione({ x, y });
-
-      if (!snakeGameOver) {
-        setSnakeRunning(true);
+      // Evita di accodare due volte la stessa direzione.
+      if (
+        riferimento.x === nuova.x &&
+        riferimento.y === nuova.y
+      ) {
+        return;
       }
+
+      // Due input sono sufficienti per curve rapide tipo ↑ poi ←.
+      if (coda.length < 2) {
+        coda.push(nuova);
+      }
+
+      setSnakeRunning(true);
     };
 
     const celle = [];
