@@ -5,10 +5,7 @@
     <key>CFBundleIconName</key>
     <string>AppIcon</string>
 
-    <key>WKWatchKitApp</key>
-    <true/>
-
-    <key>WKCompanionAppBundleIdentifier</key>
+<key>WKCompanionAppBundleIdentifier</key>
     <string>com.vigilanzagpg.app</string>
 
     <key>WKRunsIndependentlyOfCompanionApp</key>
