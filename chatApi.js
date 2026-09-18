@@ -60,6 +60,50 @@ export async function mioUserId() {
   return user.id;
 }
 
+export function sottoscriviMessaggiConversazione({
+  userId,
+  collegaId,
+  onMessaggio,
+  onErrore,
+}) {
+  if (!userId || !collegaId) {
+    throw new Error('Conversazione non valida.');
+  }
+
+  const canale = supabase
+    .channel(`chat-${userId}-${collegaId}-${Date.now()}`)
+    .on(
+      'postgres_changes',
+      {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'messaggi',
+        filter: `destinatario_id=eq.${userId}`,
+      },
+      (payload) => {
+        const messaggio = payload.new;
+
+        if (
+          String(messaggio?.mittente_id) !== String(collegaId) ||
+          String(messaggio?.destinatario_id) !== String(userId)
+        ) {
+          return;
+        }
+
+        onMessaggio?.(messaggio);
+      }
+    )
+    .subscribe((stato, errore) => {
+      if (stato === 'CHANNEL_ERROR' || stato === 'TIMED_OUT') {
+        onErrore?.(errore || new Error(`Realtime non disponibile: ${stato}`));
+      }
+    });
+
+  return () => {
+    supabase.removeChannel(canale);
+  };
+}
+
 export async function contaMessaggiNonLetti() {
   const user = await getCurrentUser();
 

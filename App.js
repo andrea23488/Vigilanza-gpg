@@ -21,6 +21,7 @@ import {
   caricaRiepilogoConversazioni,
   segnaMessaggiComeLetti,
   contaMessaggiNonLetti,
+  sottoscriviMessaggiConversazione,
 } from './chatApi';
 import { caricaTurniUtente, creaTurnoUtente, aggiornaTurnoUtente, eliminaTurnoUtente } from './turniApi';
 import {
@@ -120,6 +121,21 @@ const PROFILE_STORAGE_KEY =
 
 const PHOTO_STORAGE_KEY =
   '@vigilanza_gpg_profile_photo';
+
+const unisciMessaggiChat = (...raccolte) => {
+  const perId = new Map();
+
+  raccolte.flat().filter(Boolean).forEach((messaggio) => {
+    const chiave = messaggio.id
+      ? String(messaggio.id)
+      : `${messaggio.mittente_id}:${messaggio.created_at}:${messaggio.testo}`;
+    perId.set(chiave, messaggio);
+  });
+
+  return [...perId.values()].sort((a, b) =>
+    String(a.created_at || '').localeCompare(String(b.created_at || ''))
+  );
+};
 
 const COLORS = {
   bg: '#07111F',
@@ -2405,32 +2421,87 @@ useEffect(() => {
 
     if (!destinatarioId) return;
 
-    segnaMessaggiComeLetti(destinatarioId)
-      .catch((error) => {
-        console.log('Errore lettura messaggi:', error);
-      });
-
-
     let attivo = true;
+    let rimuoviRealtime = null;
+    setChatMessaggi([]);
 
     const caricaChat = async () => {
       try {
         setChatLoading(true);
 
-        const [id, messaggi] = await Promise.all([
-          mioUserId(),
-          caricaMessaggi(destinatarioId),
-        ]);
+        const id = await mioUserId();
 
         if (!attivo) return;
 
         setChatMioId(id);
-        setChatMessaggi(messaggi);
-      } catch (error) {
-        Alert.alert(
-          'Errore chat',
-          error.message || 'Impossibile caricare i messaggi.'
+
+        rimuoviRealtime = sottoscriviMessaggiConversazione({
+          userId: id,
+          collegaId: destinatarioId,
+          onMessaggio: (nuovoMessaggio) => {
+            if (!attivo) return;
+
+            setChatMessaggi((precedenti) =>
+              unisciMessaggiChat(precedenti, [nuovoMessaggio])
+            );
+
+            segnaMessaggiComeLetti(destinatarioId)
+              .then(() => {
+                if (!attivo) return;
+
+                const lettoAt = new Date().toISOString();
+                setChatMessaggi((precedenti) =>
+                  precedenti.map((messaggio) =>
+                    String(messaggio.id) === String(nuovoMessaggio.id)
+                      ? { ...messaggio, letto_at: lettoAt }
+                      : messaggio
+                  )
+                );
+              })
+              .catch((error) => {
+                console.log('Errore lettura messaggio realtime:', error);
+              });
+          },
+          onErrore: (error) => {
+            console.log('Errore subscription chat realtime:', error);
+          },
+        });
+
+        const messaggi = await caricaMessaggi(destinatarioId);
+
+        if (!attivo) return;
+
+        setChatMessaggi((precedenti) =>
+          unisciMessaggiChat(messaggi, precedenti)
         );
+
+        let letturaAggiornata = false;
+        try {
+          await segnaMessaggiComeLetti(destinatarioId);
+          letturaAggiornata = true;
+        } catch (error) {
+          console.log('Errore lettura messaggi:', error);
+        }
+
+        if (attivo && letturaAggiornata) {
+          const lettoAt = new Date().toISOString();
+          setChatMessaggi((precedenti) =>
+            precedenti.map((messaggio) =>
+              String(messaggio.destinatario_id) === String(id) &&
+              String(messaggio.mittente_id) === String(destinatarioId) &&
+              !messaggio.letto_at
+                ? { ...messaggio, letto_at: lettoAt }
+                : messaggio
+            )
+          );
+        }
+      } catch (error) {
+        if (attivo) {
+          Alert.alert(
+            'Errore chat',
+            error.message || 'Impossibile caricare i messaggi.'
+          );
+        }
       } finally {
         if (attivo) {
           setChatLoading(false);
@@ -2442,6 +2513,7 @@ useEffect(() => {
 
     return () => {
       attivo = false;
+      rimuoviRealtime?.();
     };
   }, [screen, collegaSelezionato?.altro_user_id]);
 
@@ -12905,10 +12977,9 @@ if (screen === 'configuraStipendio') {
                   testo
                 );
 
-                setChatMessaggi((precedenti) => [
-                  ...precedenti,
-                  nuovo,
-                ]);
+                setChatMessaggi((precedenti) =>
+                  unisciMessaggiChat(precedenti, [nuovo])
+                );
 
                 setChatMessaggio('');
               } catch (error) {
