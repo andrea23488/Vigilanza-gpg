@@ -30,6 +30,11 @@ import {
   oreRetribuiteTurno,
   rilevaSovrapposizioniGiornaliere,
 } from './turniCalcoli';
+import {
+  calcolaVociGpg,
+  numeroEconomico,
+  tariffaStraordinario30DaBase,
+} from './stipendioCalcoli';
 import { supabase } from './supabase';
 import { caricaProfiloUtente, salvaProfiloUtente, caricaFotoProfilo, eliminaFotoProfiloCloud } from './profiliApi';
 import {
@@ -771,7 +776,7 @@ export default function App() {
   const [stipendioOreGiornaliere, setStipendioOreGiornaliere] = useState('7:00');
 
   const [stipendioTariffaStraordinario, setStipendioTariffaStraordinario] =
-    useState('10.47417');
+    useState('11.03783');
 
   const [stipendioTariffaDomenicale, setStipendioTariffaDomenicale] =
     useState('0.71');
@@ -848,6 +853,8 @@ export default function App() {
 
 
   const [stipendioIndennita20724, setStipendioIndennita20724] = useState('0');
+  const [stipendioFestivitaNonGoduta, setStipendioFestivitaNonGoduta] = useState('0');
+  const [stipendioAntirapina, setStipendioAntirapina] = useState('0');
   const [chatMessaggio, setChatMessaggio] = useState('');
   const [chatMessaggi, setChatMessaggi] = useState([]);
   const [chatMioId, setChatMioId] = useState(null);
@@ -2360,6 +2367,18 @@ if (dati.tariffaStraordinario != null) {
       setStipendioTariffaRiposo(
         String(dati.tariffaRiposo)
       );
+    }
+
+    if (dati.indennita20724 != null) {
+      setStipendioIndennita20724(String(dati.indennita20724));
+    }
+
+    if (dati.festivitaNonGoduta != null) {
+      setStipendioFestivitaNonGoduta(String(dati.festivitaNonGoduta));
+    }
+
+    if (dati.antirapina != null) {
+      setStipendioAntirapina(String(dati.antirapina));
     }
 
     if (dati.nettoBase) {
@@ -5085,7 +5104,8 @@ const oreRiposoLavoratoMese = turniStipendioMese.reduce(
   0
 );
 
-// Tariffe ricavate dal cedolino reale livello 4
+// Tariffe contrattuali/configurabili. Lo straordinario automatico deriva
+// dalla paga del livello, senza legarlo a una singola azienda o persona.
 const leggiTariffa = (valore, fallback) => {
   const numero = Number(
     String(valore ?? '')
@@ -5100,8 +5120,8 @@ const leggiTariffa = (valore, fallback) => {
 
 const tariffaStraordinario30 =
   stipendioProfiloCalcolo === 'automatico'
-    ? 10.47417
-    : leggiTariffa(stipendioTariffaStraordinario, 10.47417);
+    ? tariffaStraordinario30DaBase(lordoBaseLivello)
+    : leggiTariffa(stipendioTariffaStraordinario, tariffaStraordinario30DaBase(lordoBaseLivello));
 
 const tariffaDomenicale =
   stipendioProfiloCalcolo === 'automatico'
@@ -5158,7 +5178,10 @@ const importoRiposoLavoratoMese =
   oreRiposoLavoratoMese * tariffaRiposoLavorato;
 
 const indennita20724Numero =
-  Number(String(stipendioIndennita20724 || '0').replace(',', '.')) || 0;
+  numeroEconomico(stipendioIndennita20724);
+const festivitaNonGodutaNumero =
+  numeroEconomico(stipendioFestivitaNonGoduta);
+const antirapinaNumero = numeroEconomico(stipendioAntirapina);
 
 // ===== CONGEDI E PERMESSI RETRIBUITI =====
 // La paga base mensile parte intera.
@@ -5215,16 +5238,25 @@ const decurtazioneCongediMese =
   decurtazioneCongedo80Mese +
   decurtazioneCongedo30Mese;
 
-const totaleCompetenzeStimate =
-  lordoBaseLivello +
-  importoStraordinarioMese +
-  importoDomenicaleMese +
-  importoPiantonamentoDiurnoMese +
-  importoIndennitaCompensativaMese +
-  importoPiantonamentoNotturnoMese +
-  importoRiposoLavoratoMese +
-  indennita20724Numero -
-  decurtazioneCongediMese;
+const vociCompetenzeGpg = calcolaVociGpg({
+  lordoBase: lordoBaseLivello,
+  oreStraordinario: extraStipendioMese,
+  tariffaStraordinario: tariffaStraordinario30,
+  oreDomenicali: oreDomenicaliMese,
+  tariffaDomenicale,
+  serviziDiurni: serviziDiurniMese,
+  tariffaDiurno: tariffaPiantonamentoDiurno,
+  tariffaCompensativa: tariffaIndennitaCompensativa,
+  serviziNotturni: serviziNotturniMese,
+  tariffaNotturno: tariffaPiantonamentoNotturno,
+  oreRiposoLavorato: oreRiposoLavoratoMese,
+  tariffaRiposo: tariffaRiposoLavorato,
+  festivitaNonGoduta: festivitaNonGodutaNumero,
+  antirapina: antirapinaNumero,
+  indennita20724: indennita20724Numero,
+  decurtazioni: decurtazioneCongediMese,
+});
+const totaleCompetenzeStimate = vociCompetenzeGpg.totale;
 
   // ===== MOTORE ECONOMICO FIDUCIARIO =====
 
@@ -5802,7 +5834,9 @@ const quotaTempoMese = Math.min(
     (
       Number(indennita20724Numero || 0) *
       quotaTempoMese
-    );
+    ) +
+    (Number(festivitaNonGodutaNumero || 0) * quotaTempoMese) +
+    (Number(antirapinaNumero || 0) * quotaTempoMese);
 
 
   // ===== FIDUCIARIO: componenti realmente maturate =====
@@ -5885,8 +5919,8 @@ const nettoBaseNumero =
       ? totaleCompetenzeFiduciario
       : totaleCompetenzeStimate;
 
-// Netto stimato calibrato sul cedolino reale di luglio 2026:
-// 1992,00 / 2577,16 = circa 0,7729
+// Il netto resta una stima: senza imponibili, detrazioni e conguagli del
+// singolo cedolino non è possibile ricostruire una fiscalità completa.
 const coefficienteNettoStimato = 1992.00 / 2577.16;
 const coefficienteNettoFiduciario = 0.78;
 
@@ -11381,6 +11415,53 @@ if (screen === 'configuraStipendio') {
                     }}
                   />
 
+                  {stipendioTipoOperatore === 'gpg' ? (
+                    <View style={{ marginTop: 18 }}>
+                      <Text style={{ color: '#dfe6ff', fontWeight: '800' }}>
+                        Voci mensili aggiuntive · €
+                      </Text>
+                      <Text style={{ color: '#8fa5cc', fontSize: 11, lineHeight: 16, marginTop: 5, marginBottom: 10 }}>
+                        Inserisci solo gli importi lordi effettivamente previsti dal tuo contratto o cedolino. Non vengono dedotti dai turni.
+                      </Text>
+
+                      <Text style={{ color: '#dfe6ff', fontWeight: '700' }}>
+                        Indennità L.207/24
+                      </Text>
+                      <TextInput
+                        value={stipendioIndennita20724}
+                        onChangeText={setStipendioIndennita20724}
+                        keyboardType="decimal-pad"
+                        placeholder="0,00"
+                        placeholderTextColor="#7184aa"
+                        style={{ backgroundColor: '#091936', color: 'white', borderRadius: 12, padding: 13, marginTop: 7, marginBottom: 14 }}
+                      />
+
+                      <Text style={{ color: '#dfe6ff', fontWeight: '700' }}>
+                        Festività non goduta
+                      </Text>
+                      <TextInput
+                        value={stipendioFestivitaNonGoduta}
+                        onChangeText={setStipendioFestivitaNonGoduta}
+                        keyboardType="decimal-pad"
+                        placeholder="0,00"
+                        placeholderTextColor="#7184aa"
+                        style={{ backgroundColor: '#091936', color: 'white', borderRadius: 12, padding: 13, marginTop: 7, marginBottom: 14 }}
+                      />
+
+                      <Text style={{ color: '#dfe6ff', fontWeight: '700' }}>
+                        Indennità antirapina
+                      </Text>
+                      <TextInput
+                        value={stipendioAntirapina}
+                        onChangeText={setStipendioAntirapina}
+                        keyboardType="decimal-pad"
+                        placeholder="0,00"
+                        placeholderTextColor="#7184aa"
+                        style={{ backgroundColor: '#091936', color: 'white', borderRadius: 12, padding: 13, marginTop: 7 }}
+                      />
+                    </View>
+                  ) : null}
+
                 </View>
               )}
             </View>
@@ -11438,6 +11519,9 @@ if (screen === 'configuraStipendio') {
                 stipendioTariffaIndennitaCompensativa,
               tariffaNotturno: stipendioTariffaNotturno,
               tariffaRiposo: stipendioTariffaRiposo,
+              indennita20724: stipendioIndennita20724,
+              festivitaNonGoduta: stipendioFestivitaNonGoduta,
+              antirapina: stipendioAntirapina,
                   nettoBase: stipendioNettoBase,
                   lordoBaseFiduciario: stipendioLordoBaseFiduciario,
                   superminimoFiduciario: stipendioSuperminimoFiduciario,
