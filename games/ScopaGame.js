@@ -6,29 +6,16 @@ import {
   ScrollView,
   Alert,
   Modal,
-  Platform,
 } from 'react-native';
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from 'react-native-safe-area-context';
 import NapoletanaCard from './NapoletanaCard';
-
-const SEMI = [
-  { key: 'denari', nome: 'Denari' },
-  { key: 'coppe', nome: 'Coppe' },
-  { key: 'spade', nome: 'Spade' },
-  { key: 'bastoni', nome: 'Bastoni' },
-];
-
-const NOMI = {
-  1: 'Asso',
-  2: 'Due',
-  3: 'Tre',
-  4: 'Quattro',
-  5: 'Cinque',
-  6: 'Sei',
-  7: 'Sette',
-  8: 'Fante',
-  9: 'Cavallo',
-  10: 'Re',
-};
+import {
+  creaMazzoItaliano,
+  SEMI_ITALIANI,
+} from './mazzoItaliano';
 
 const PRIMIERA = {
   7: 21,
@@ -44,22 +31,10 @@ const PRIMIERA = {
 };
 
 function creaMazzo() {
-  return SEMI.flatMap((seme) =>
-    Array.from({ length: 10 }, (_, i) => {
-      const valore = i + 1;
-
-      return {
-        id: `${seme.key}-${valore}`,
-        seme: seme.key,
-        semeNome: seme.nome,
-        valore,
-        numero: valore,
-        nome: NOMI[valore],
-        forza: valore,
-        punti: 0,
-      };
-    })
-  );
+  return creaMazzoItaliano((carta) => ({
+    forza: carta.valore,
+    punti: 0,
+  }));
 }
 
 function mescola(array) {
@@ -150,8 +125,8 @@ function scegliMigliorePresaCpu(carta, tavolo) {
 function valorePrimiera(carte) {
   let totale = 0;
 
-  for (const seme of SEMI) {
-    const delSeme = carte.filter((c) => c.seme === seme.key);
+  for (const seme of SEMI_ITALIANI) {
+    const delSeme = carte.filter((c) => c.seme === seme.id);
 
     // Senza almeno una carta di ogni seme
     // la primiera non è valida.
@@ -259,6 +234,7 @@ function calcolaPunti(preseGiocatore, preseCpu, scopeGiocatore, scopeCpu) {
 }
 
 export default function ScopaGame({ onBack }) {
+  const insets = useSafeAreaInsets();
   const [manoGiocatore, setManoGiocatore] = useState([]);
   const [manoCpu, setManoCpu] = useState([]);
   const [tavolo, setTavolo] = useState([]);
@@ -744,11 +720,11 @@ export default function ScopaGame({ onBack }) {
   }
 
   return (
-    <View
+    <SafeAreaView
+      edges={['top', 'left', 'right']}
       style={{
         flex: 1,
         backgroundColor: '#071A12',
-        paddingTop: Platform.OS === 'android' ? 24 : 42,
       }}
     >
       <Modal
@@ -763,8 +739,15 @@ export default function ScopaGame({ onBack }) {
             backgroundColor: 'rgba(0,0,0,0.72)',
             justifyContent: 'center',
             paddingHorizontal: 22,
+            paddingTop: Math.max(insets.top, 16),
+            paddingBottom: Math.max(insets.bottom, 16),
           }}
         >
+          <ScrollView
+            bounces={false}
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={{ flexGrow: 1, justifyContent: 'center' }}
+          >
           <View
             style={{
               backgroundColor: '#103C2A',
@@ -772,6 +755,7 @@ export default function ScopaGame({ onBack }) {
               padding: 18,
               borderWidth: 2,
               borderColor: 'rgba(255,255,255,0.30)',
+              maxHeight: '100%',
             }}
           >
             <Text
@@ -825,6 +809,7 @@ export default function ScopaGame({ onBack }) {
               </TouchableOpacity>
             ))}
           </View>
+          </ScrollView>
         </View>
       </Modal>
 
@@ -873,7 +858,7 @@ export default function ScopaGame({ onBack }) {
       <ScrollView
         contentContainerStyle={{
           paddingHorizontal: 14,
-          paddingBottom: Platform.OS === 'android' ? 80 : 30,
+          paddingBottom: Math.max(insets.bottom, 20) + 24,
         }}
       >
         <View
@@ -1494,6 +1479,6 @@ export default function ScopaGame({ onBack }) {
 
 
       </ScrollView>
-    </View>
+    </SafeAreaView>
   );
 }

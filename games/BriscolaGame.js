@@ -1,53 +1,37 @@
 import React from 'react';
 import {
-  SafeAreaView,
-  Platform,
   View,
   Text,
   TouchableOpacity,
   ScrollView,
   Alert,
 } from 'react-native';
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import NapoletanaCard from './NapoletanaCard';
+import { creaMazzoItaliano } from './mazzoItaliano';
 
-
-const SEMI = [
-  { id: 'denari', nome: 'Denari' },
-  { id: 'coppe', nome: 'Coppe' },
-  { id: 'spade', nome: 'Spade' },
-  { id: 'bastoni', nome: 'Bastoni' },
-];
-
-const VALORI = [
-  { valore: 1, nome: 'Asso', punti: 11, forza: 10 },
-  { valore: 2, nome: 'Due', punti: 0, forza: 1 },
-  { valore: 3, nome: 'Tre', punti: 10, forza: 9 },
-  { valore: 4, nome: 'Quattro', punti: 0, forza: 2 },
-  { valore: 5, nome: 'Cinque', punti: 0, forza: 3 },
-  { valore: 6, nome: 'Sei', punti: 0, forza: 4 },
-  { valore: 7, nome: 'Sette', punti: 0, forza: 5 },
-  { valore: 8, nome: 'Fante', punti: 2, forza: 6 },
-  { valore: 9, nome: 'Cavallo', punti: 3, forza: 7 },
-  { valore: 10, nome: 'Re', punti: 4, forza: 8 },
-];
+const REGOLE_BRISCOLA = {
+  1: { punti: 11, forza: 10 },
+  2: { punti: 0, forza: 1 },
+  3: { punti: 10, forza: 9 },
+  4: { punti: 0, forza: 2 },
+  5: { punti: 0, forza: 3 },
+  6: { punti: 0, forza: 4 },
+  7: { punti: 0, forza: 5 },
+  8: { punti: 2, forza: 6 },
+  9: { punti: 3, forza: 7 },
+  10: { punti: 4, forza: 8 },
+};
 
 
 function creaMazzo() {
-  const mazzo = [];
-
-  SEMI.forEach((seme) => {
-    VALORI.forEach((valore) => {
-      mazzo.push({
-        ...valore,
-        seme: seme.id,
-        semeNome: seme.nome,
-        id: `${seme.id}-${valore.valore}`,
-      });
-    });
-  });
-
-  return mazzo;
+  return creaMazzoItaliano((carta) =>
+    REGOLE_BRISCOLA[carta.valore]
+  );
 }
 
 
@@ -91,6 +75,7 @@ function cartaVincente(prima, seconda, semeBriscola) {
 
 
 export default function BriscolaGame({ onBack }) {
+  const insets = useSafeAreaInsets();
   const [mazzo, setMazzo] = React.useState([]);
   const [manoGiocatore, setManoGiocatore] = React.useState([]);
   const [manoCpu, setManoCpu] = React.useState([]);
@@ -575,6 +560,7 @@ export default function BriscolaGame({ onBack }) {
 
   return (
     <SafeAreaView
+      edges={['top', 'left', 'right']}
       style={{
         flex: 1,
         backgroundColor: '#07142F',
@@ -583,7 +569,7 @@ export default function BriscolaGame({ onBack }) {
       <ScrollView
         contentContainerStyle={{
           padding: 18,
-          paddingBottom: Platform.OS === 'android' ? 90 : 60,
+          paddingBottom: Math.max(insets.bottom, 20) + 40,
         }}
       >
 

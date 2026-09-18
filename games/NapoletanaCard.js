@@ -1,10 +1,11 @@
 import React from 'react';
-import { Image } from 'react-native';
 import { CARTE_PIACENTINE } from './cartePiacentine';
 import {
+  Image,
   View,
   Text,
   TouchableOpacity,
+  useWindowDimensions,
 } from 'react-native';
 
 import Svg, {
@@ -812,8 +813,10 @@ export default function NapoletanaCard({
   disabled = false,
   piccola = false,
 }) {
-  const width = piccola ? 68 : 86;
-  const height = piccola ? 104 : 132;
+  const { width: viewportWidth } = useWindowDimensions();
+  const larghezzaMassima = Math.max(58, (viewportWidth - 72) / 3);
+  const width = Math.min(piccola ? 68 : 86, larghezzaMassima);
+  const height = Math.round(width * (piccola ? 104 / 68 : 132 / 86));
 
   const content = coperta ? (
     <View
