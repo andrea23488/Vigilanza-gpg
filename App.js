@@ -628,6 +628,7 @@ function calcolaDettaglioStraordinariFiduciario({
 export default function App() {
   const giorniSettimana = ["Dom", "Lun", "Mar", "Mer", "Gio", "Ven", "Sab"];
  const [accessoTest, setAccessoTest] = useState(false);
+  const [authInizializzata, setAuthInizializzata] = useState(false);
   const [screen, setScreen] = useState("home");
   const [schedaPostoLuogo, setSchedaPostoLuogo] = useState('');
   const passatempoScrollRef = React.useRef(null);
@@ -642,6 +643,53 @@ export default function App() {
   const tornaSuRef = useRef(null);
   const watchUserIdRef = useRef(null);
   const [mostraTornaSu, setMostraTornaSu] = useState(false);
+
+  useEffect(() => {
+    let attivo = true;
+
+    const applicaSessione = (sessione) => {
+      if (!attivo) return;
+      setAccessoTest(Boolean(sessione?.user));
+      setAuthInizializzata(true);
+    };
+
+    supabase.auth.getSession()
+      .then(({ data, error }) => {
+        if (error) {
+          console.log('Errore ripristino sessione:', error);
+        }
+        applicaSessione(data?.session || null);
+      })
+      .catch((error) => {
+        console.log('Errore inizializzazione autenticazione:', error);
+        applicaSessione(null);
+      });
+
+    const { data: authListener } = supabase.auth.onAuthStateChange(
+      (_evento, sessione) => applicaSessione(sessione)
+    );
+
+    const gestisciStatoApp = (stato) => {
+      if (stato === 'active') {
+        supabase.auth.startAutoRefresh();
+      } else {
+        supabase.auth.stopAutoRefresh();
+      }
+    };
+
+    supabase.auth.startAutoRefresh();
+    const appStateSubscription = AppState.addEventListener(
+      'change',
+      gestisciStatoApp
+    );
+
+    return () => {
+      attivo = false;
+      appStateSubscription.remove();
+      authListener.subscription.unsubscribe();
+      supabase.auth.stopAutoRefresh();
+    };
+  }, []);
 
   useEffect(() => {
     let attivo = true;
@@ -7640,6 +7688,15 @@ async function logout() {
             },
         },
       ]
+    );
+  }
+
+  if (!authInizializzata) {
+    return (
+      <SafeAreaView style={styles.loading}>
+        <ActivityIndicator size="large" color={COLORS.blue} />
+        <Text style={styles.loadingText}>Ripristino sessione...</Text>
+      </SafeAreaView>
     );
   }
 
