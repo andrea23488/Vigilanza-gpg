@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Ionicons } from '@expo/vector-icons';
 
 import {
   SafeAreaView,
@@ -581,28 +582,55 @@ function Field({
   secureTextEntry,
   onFocus,
 }) {
+  const [passwordVisibile, setPasswordVisibile] = useState(false);
+  const ePassword = Boolean(secureTextEntry);
+
   return (
     <View style={styles.fieldWrap}>
       <Text style={styles.label}>
         {label}
       </Text>
 
-      <TextInput
-        style={styles.input}
-        value={value}
-        onChangeText={onChange}
-        onFocus={onFocus}
-        placeholder={placeholder}
-        placeholderTextColor="#667A91"
-        keyboardType={keyboardType}
-        secureTextEntry={secureTextEntry}
-        autoCapitalize={
-          keyboardType === 'email-address'
-            ? 'none'
-            : 'sentences'
-        }
-        autoCorrect={false}
-      />
+      <View style={ePassword ? styles.passwordInputWrap : null}>
+        <TextInput
+          style={[
+            styles.input,
+            ePassword && styles.passwordInput,
+          ]}
+          value={value}
+          onChangeText={onChange}
+          onFocus={onFocus}
+          placeholder={placeholder}
+          placeholderTextColor="#667A91"
+          keyboardType={keyboardType}
+          secureTextEntry={ePassword && !passwordVisibile}
+          autoCapitalize={
+            keyboardType === 'email-address'
+              ? 'none'
+              : ePassword
+              ? 'none'
+              : 'sentences'
+          }
+          autoCorrect={false}
+        />
+
+        {ePassword ? (
+          <TouchableOpacity
+            onPress={() => setPasswordVisibile((visibile) => !visibile)}
+            accessibilityRole="button"
+            accessibilityLabel={passwordVisibile ? 'Nascondi password' : 'Mostra password'}
+            accessibilityHint="Modifica la visibilità del contenuto del campo password"
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            style={styles.passwordToggle}
+          >
+            <Ionicons
+              name={passwordVisibile ? 'eye-off-outline' : 'eye-outline'}
+              size={22}
+              color="#91A3BA"
+            />
+          </TouchableOpacity>
+        ) : null}
+      </View>
     </View>
   );
 }
@@ -814,6 +842,24 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.08,
     shadowRadius: 7,
     shadowOffset: { width: 0, height: 3 },
+  },
+
+  passwordInputWrap: {
+    position: 'relative',
+    justifyContent: 'center',
+  },
+
+  passwordInput: {
+    paddingRight: 54,
+  },
+
+  passwordToggle: {
+    position: 'absolute',
+    right: 10,
+    width: 42,
+    height: 42,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 
   primaryButton: {
