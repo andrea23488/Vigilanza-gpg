@@ -60,8 +60,12 @@ export default function PostiSalvatiScreen({
             chiave,
             nome,
             aggiornatoIl: dati?.aggiornatoIl || null,
-            foto: media.filter(x => x?.tipo === 'foto').length,
-            video: media.filter(x => x?.tipo === 'video').length,
+            foto: media.filter(
+              x => x?.tipo === 'foto' && x?.nonDisponibile !== true
+            ).length,
+            video: media.filter(
+              x => x?.tipo === 'video' && x?.nonDisponibile !== true
+            ).length,
             segnalazioni: String(
               dati?.segnalazioni || ''
             ).trim(),

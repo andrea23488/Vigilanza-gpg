@@ -12,6 +12,11 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
+import {
+  copiaMediaPostoPermanente,
+  eliminaMediaPostoPermanente,
+  normalizzaMediaPosto,
+} from './mediaPostiStorage';
 
 const CHIAVE_BASE = 'vigilanza_scheda_posto_';
 
@@ -165,15 +170,29 @@ export default function SchedaPostoScreen({ luogo, onBack }) {
 
         if (raw) {
           const datiSalvati = JSON.parse(raw);
+          const risultatoMedia = await normalizzaMediaPosto(
+            datiSalvati?.media
+          );
+
+          const datiNormalizzati = {
+            ...datiSalvati,
+            media: risultatoMedia.media,
+          };
 
           setData({
             ...DEFAULT_DATA,
-            ...datiSalvati,
+            ...datiNormalizzati,
           });
 
           // Salva automaticamente nella nuova chiave unica
-          if (chiaveTrovata !== chiave) {
-            await AsyncStorage.setItem(chiave, raw);
+          if (
+            chiaveTrovata !== chiave ||
+            risultatoMedia.cambiato
+          ) {
+            await AsyncStorage.setItem(
+              chiave,
+              JSON.stringify(datiNormalizzati)
+            );
 
             console.log(
               'Scheda Posto migrata:',
@@ -253,10 +272,18 @@ export default function SchedaPostoScreen({ luogo, onBack }) {
       const asset = risultato.assets?.[0];
       if (!asset?.uri) return;
 
+      const uriPersistente = await copiaMediaPostoPermanente({
+        uri: asset.uri,
+        nomeOriginale: asset.fileName,
+        tipo,
+      });
+
       const nuovoMedia = {
         id: `${Date.now()}_${Math.random().toString(36).slice(2)}`,
         tipo,
-        uri: asset.uri,
+        uri: uriPersistente,
+        nomeOriginale: asset.fileName || null,
+        nonDisponibile: false,
         data: new Date().toISOString(),
         descrizione: '',
       };
@@ -301,10 +328,18 @@ export default function SchedaPostoScreen({ luogo, onBack }) {
       const asset = risultato.assets?.[0];
       if (!asset?.uri) return;
 
+      const uriPersistente = await copiaMediaPostoPermanente({
+        uri: asset.uri,
+        nomeOriginale: asset.fileName,
+        tipo: 'foto',
+      });
+
       const nuovoMedia = {
         id: `${Date.now()}_${Math.random().toString(36).slice(2)}`,
         tipo: 'foto',
-        uri: asset.uri,
+        uri: uriPersistente,
+        nomeOriginale: asset.fileName || null,
+        nonDisponibile: false,
         data: new Date().toISOString(),
         descrizione: '',
       };
@@ -334,6 +369,12 @@ export default function SchedaPostoScreen({ luogo, onBack }) {
           text: 'Elimina',
           style: 'destructive',
           onPress: async () => {
+            try {
+              await eliminaMediaPostoPermanente(media);
+            } catch (e) {
+              console.log('Errore eliminazione file media posto:', e);
+            }
+
             const nuovo = {
               ...data,
               media: (data.media || []).filter(x => x.id !== media.id),
@@ -708,7 +749,12 @@ export default function SchedaPostoScreen({ luogo, onBack }) {
               <TouchableOpacity
                 key={media.id}
                 onPress={() => {
-                  if (media.tipo === 'video') {
+                  if (media.nonDisponibile) {
+                    Alert.alert(
+                      'File non disponibile',
+                      'Il file originale non è più presente. Tieni premuto per rimuovere questo elemento.'
+                    );
+                  } else if (media.tipo === 'video') {
                     Linking.openURL(media.uri).catch(() =>
                       Alert.alert(
                         'Video',
@@ -730,7 +776,27 @@ export default function SchedaPostoScreen({ luogo, onBack }) {
                   justifyContent: 'center',
                 }}
               >
-                {media.tipo === 'foto' ? (
+                {media.nonDisponibile ? (
+                  <>
+                    <Ionicons
+                      name="cloud-offline-outline"
+                      size={30}
+                      color="#FF9C9C"
+                    />
+                    <Text
+                      style={{
+                        color: '#FFB2B2',
+                        fontSize: 9,
+                        fontWeight: '800',
+                        marginTop: 5,
+                        textAlign: 'center',
+                        paddingHorizontal: 5,
+                      }}
+                    >
+                      FILE NON DISPONIBILE
+                    </Text>
+                  </>
+                ) : media.tipo === 'foto' ? (
                   <Image
                     source={{ uri: media.uri }}
                     style={{
