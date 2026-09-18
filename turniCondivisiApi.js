@@ -167,7 +167,9 @@ export async function caricaTurniCondivisiRicevuti() {
   const { data: turni, error: errorTurni } =
     await supabase
       .from('turni')
-      .select('*')
+      .select(
+        'id, giorno, mese, anno, tipo, inizio, fine, luogo, indirizzo_servizio'
+      )
       .in('id', turnoIds);
 
   if (errorTurni) throw errorTurni;
@@ -194,14 +196,22 @@ export async function caricaTurniCondivisiRicevuti() {
         ) || null;
 
       const turnoVisibile = {
-        ...turno,
+        id: turno.id,
+        giorno: turno.giorno,
+        mese: turno.mese,
+        anno: turno.anno,
+        tipo: turno.tipo,
+        inizio: turno.inizio,
+        fine: turno.fine,
       };
 
-      if (
-        condivisione.livello ===
-        'solo_orari'
-      ) {
-        turnoVisibile.luogo = null;
+      if (condivisione.livello === 'orari_luogo') {
+        const postazione = String(
+          turno.indirizzo_servizio || turno.luogo || ''
+        ).trim();
+
+        turnoVisibile.postazione = postazione || null;
+        turnoVisibile.indirizzo_servizio = postazione || null;
       }
 
       return {

@@ -107,6 +107,15 @@ function orarioTurno(turno) {
   return 'Orario non indicato';
 }
 
+function postazioneTurno(turno) {
+  return String(
+    turno?.indirizzo_servizio ||
+    turno?.postazione ||
+    turno?.luogo ||
+    ''
+  ).trim();
+}
+
 function turnoInCorsoAdesso(turno) {
   if (!turno?.inizio || !turno?.fine) return false;
 
@@ -686,9 +695,7 @@ export default function CalendarioColleghiScreen({ onBack }) {
             </View>
 
             {personeInServizioAdesso.map((persona, index) => {
-              const luogoAdesso = String(
-                persona?.turno?.luogo || ''
-              ).trim();
+              const luogoAdesso = postazioneTurno(persona?.turno);
 
               return (
                 <View
@@ -872,10 +879,7 @@ export default function CalendarioColleghiScreen({ onBack }) {
                   </View>
                 ) : (
                   elementi.map(elemento => {
-                    const luogo =
-                      String(
-                        elemento?.turno?.luogo || ''
-                      ).trim();
+                    const luogo = postazioneTurno(elemento?.turno);
 
                     const azienda =
                       String(
