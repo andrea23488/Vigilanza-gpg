@@ -36,6 +36,13 @@ import {
   tariffaStraordinario30DaBase,
 } from './stipendioCalcoli';
 import { supabase } from './supabase';
+import {
+  autenticaConBiometria,
+  leggiBiometriaAbilitata,
+  messaggioErroreBiometria,
+  salvaBiometriaAbilitata,
+  statoBiometriaDispositivo,
+} from './biometria';
 import { caricaProfiloUtente, salvaProfiloUtente, caricaFotoProfilo, eliminaFotoProfiloCloud } from './profiliApi';
 import {
   caricaColleghi,
@@ -629,6 +636,12 @@ export default function App() {
   const giorniSettimana = ["Dom", "Lun", "Mar", "Mer", "Gio", "Ven", "Sab"];
  const [accessoTest, setAccessoTest] = useState(false);
   const [authInizializzata, setAuthInizializzata] = useState(false);
+  const [biometriaInizializzata, setBiometriaInizializzata] = useState(false);
+  const [biometriaAbilitata, setBiometriaAbilitata] = useState(false);
+  const [biometriaSbloccata, setBiometriaSbloccata] = useState(false);
+  const [biometriaInCorso, setBiometriaInCorso] = useState(false);
+  const [erroreBiometria, setErroreBiometria] = useState('');
+  const richiestaBiometriaRef = useRef(false);
   const [screen, setScreen] = useState("home");
   const [schedaPostoLuogo, setSchedaPostoLuogo] = useState('');
   const passatempoScrollRef = React.useRef(null);
@@ -690,6 +703,111 @@ export default function App() {
       supabase.auth.stopAutoRefresh();
     };
   }, []);
+
+  useEffect(() => {
+    let attivo = true;
+
+    leggiBiometriaAbilitata()
+      .then((abilitata) => {
+        if (!attivo) return;
+        setBiometriaAbilitata(abilitata);
+        setBiometriaSbloccata(!abilitata);
+      })
+      .catch((error) => {
+        console.log('Errore lettura preferenza biometrica:', error);
+        if (attivo) setBiometriaSbloccata(true);
+      })
+      .finally(() => {
+        if (attivo) setBiometriaInizializzata(true);
+      });
+
+    return () => {
+      attivo = false;
+    };
+  }, []);
+
+  const richiediSbloccoBiometrico = async () => {
+    if (biometriaInCorso) return;
+
+    try {
+      setBiometriaInCorso(true);
+      setErroreBiometria('');
+      const risultato = await autenticaConBiometria();
+
+      if (risultato.success) {
+        setBiometriaSbloccata(true);
+      } else {
+        setErroreBiometria(messaggioErroreBiometria(risultato.error));
+      }
+    } catch (error) {
+      console.log('Errore autenticazione biometrica:', error);
+      setErroreBiometria('Biometria non disponibile. Puoi accedere con email e password.');
+    } finally {
+      setBiometriaInCorso(false);
+    }
+  };
+
+  useEffect(() => {
+    if (
+      !authInizializzata ||
+      !biometriaInizializzata ||
+      !accessoTest ||
+      !biometriaAbilitata ||
+      biometriaSbloccata ||
+      richiestaBiometriaRef.current
+    ) return;
+
+    richiestaBiometriaRef.current = true;
+    richiediSbloccoBiometrico();
+  }, [
+    authInizializzata,
+    biometriaInizializzata,
+    accessoTest,
+    biometriaAbilitata,
+    biometriaSbloccata,
+  ]);
+
+  const cambiaBiometria = async () => {
+    if (biometriaAbilitata) {
+      await salvaBiometriaAbilitata(false);
+      setBiometriaAbilitata(false);
+      setBiometriaSbloccata(true);
+      Alert.alert('Accesso biometrico disattivato');
+      return;
+    }
+
+    try {
+      const stato = await statoBiometriaDispositivo();
+      if (!stato.disponibile) {
+        Alert.alert(
+          'Biometria non disponibile',
+          messaggioErroreBiometria(stato.hardware ? 'not_enrolled' : 'not_available')
+        );
+        return;
+      }
+
+      const risultato = await autenticaConBiometria();
+      if (!risultato.success) {
+        Alert.alert('Attivazione non completata', messaggioErroreBiometria(risultato.error));
+        return;
+      }
+
+      await salvaBiometriaAbilitata(true);
+      setBiometriaAbilitata(true);
+      setBiometriaSbloccata(true);
+      Alert.alert('Accesso biometrico attivato', `${stato.nome} proteggerà l’accesso alle sessioni già valide.`);
+    } catch (error) {
+      console.log('Errore attivazione biometria:', error);
+      Alert.alert('Errore', 'Non è stato possibile attivare l’accesso biometrico.');
+    }
+  };
+
+  const usaAccessoNormale = async () => {
+    await supabase.auth.signOut();
+    richiestaBiometriaRef.current = false;
+    setBiometriaSbloccata(false);
+    setErroreBiometria('');
+  };
 
   useEffect(() => {
     let attivo = true;
@@ -7529,6 +7647,8 @@ async function logout() {
     }
     invalidaContestoAppleWatch();
     setTurni([]);
+    richiestaBiometriaRef.current = false;
+    setBiometriaSbloccata(!biometriaAbilitata);
     setAccessoTest(false);
     setScreen("home");
   }
@@ -7691,7 +7811,7 @@ async function logout() {
     );
   }
 
-  if (!authInizializzata) {
+  if (!authInizializzata || !biometriaInizializzata) {
     return (
       <SafeAreaView style={styles.loading}>
         <ActivityIndicator size="large" color={COLORS.blue} />
@@ -7700,7 +7820,45 @@ async function logout() {
     );
   }
 
- if (!accessoTest) return<LoginScreen onEnterTest={() => setAccessoTest(true)} />;
+ if (!accessoTest) return<LoginScreen
+   onEnterTest={() => {
+     setBiometriaSbloccata(true);
+     setAccessoTest(true);
+   }}
+   onAuthenticated={() => setBiometriaSbloccata(true)}
+ />;
+
+  if (biometriaAbilitata && !biometriaSbloccata) {
+    return (
+      <SafeAreaView style={[styles.loading, { paddingHorizontal: 28 }]}>
+        <Ionicons name="finger-print-outline" size={54} color={COLORS.blue} />
+        <Text style={[styles.loadingText, { fontSize: 20, marginTop: 18 }]}>Accesso protetto</Text>
+        <Text style={{ color: '#91A3BA', textAlign: 'center', marginTop: 10, lineHeight: 20 }}>
+          Conferma la tua identità per entrare in Vigilanza GPG.
+        </Text>
+        {erroreBiometria ? (
+          <Text style={{ color: '#FF9BAD', textAlign: 'center', marginTop: 14, lineHeight: 19 }}>
+            {erroreBiometria}
+          </Text>
+        ) : null}
+        <TouchableOpacity
+          onPress={() => {
+            richiestaBiometriaRef.current = true;
+            richiediSbloccoBiometrico();
+          }}
+          disabled={biometriaInCorso}
+          style={{ backgroundColor: '#284cff', borderRadius: 14, paddingVertical: 14, paddingHorizontal: 28, marginTop: 22 }}
+        >
+          {biometriaInCorso ? <ActivityIndicator color="#FFFFFF" /> : (
+            <Text style={{ color: '#FFFFFF', fontWeight: '900' }}>RIPROVA</Text>
+          )}
+        </TouchableOpacity>
+        <TouchableOpacity onPress={usaAccessoNormale} style={{ padding: 14, marginTop: 8 }}>
+          <Text style={{ color: '#8FB8FF', fontWeight: '800' }}>ACCEDI CON EMAIL E PASSWORD</Text>
+        </TouchableOpacity>
+      </SafeAreaView>
+    );
+  }
   if (loading) {
     return (
       <SafeAreaView
@@ -24780,6 +24938,52 @@ if (screen === 'profiloCollega') {
             </Text>
           </View>
         </View>
+      </View>
+
+      <View
+        style={{
+          marginTop: 12,
+          marginBottom: 8,
+          padding: 16,
+          borderRadius: 22,
+          backgroundColor: 'rgba(15, 38, 68, 0.86)',
+          borderWidth: 1,
+          borderColor: 'rgba(83, 216, 255, 0.32)',
+        }}
+      >
+        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          <Ionicons name="finger-print-outline" size={27} color="#69E7FF" />
+          <View style={{ flex: 1, marginLeft: 12 }}>
+            <Text style={{ color: '#FFFFFF', fontSize: 15, fontWeight: '900' }}>
+              Accesso biometrico
+            </Text>
+            <Text style={{ color: '#8FA5CC', fontSize: 10.5, lineHeight: 15, marginTop: 3 }}>
+              Protegge la sessione salvata con Face ID, Touch ID o biometria Android. La password non viene memorizzata.
+            </Text>
+          </View>
+        </View>
+
+        <TouchableOpacity
+          onPress={cambiaBiometria}
+          style={{
+            marginTop: 13,
+            minHeight: 44,
+            borderRadius: 14,
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: biometriaAbilitata
+              ? 'rgba(255, 100, 126, 0.18)'
+              : 'rgba(40, 76, 255, 0.82)',
+            borderWidth: 1,
+            borderColor: biometriaAbilitata
+              ? 'rgba(255, 100, 126, 0.42)'
+              : 'rgba(111, 134, 255, 0.72)',
+          }}
+        >
+          <Text style={{ color: '#FFFFFF', fontWeight: '900' }}>
+            {biometriaAbilitata ? 'DISATTIVA' : 'ATTIVA'}
+          </Text>
+        </TouchableOpacity>
       </View>
 
 <TouchableOpacity

@@ -49,6 +49,13 @@
         }
       ],
       "@bacons/apple-targets"
+      ,
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "Vigilanza GPG usa Face ID per proteggere l’accesso alla tua sessione quando scegli di abilitarlo."
+        }
+      ]
     ],
     "scheme": "vigilanzagpg"
   }

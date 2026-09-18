@@ -28,7 +28,7 @@ const COLORS = {
   green: '#50D89F',
 };
 
-export default function LoginScreen({ onEnterTest }) {
+export default function LoginScreen({ onEnterTest, onAuthenticated }) {
   const [mode, setMode] = useState('login');
 
   const [email, setEmail] = useState('');
@@ -280,6 +280,7 @@ export default function LoginScreen({ onEnterTest }) {
       }
 
       if (data.session) {
+        onAuthenticated?.();
         Alert.alert(
           'Account creato ✅',
           'Registrazione completata. Il tuo account è già attivo.',
@@ -333,6 +334,8 @@ export default function LoginScreen({ onEnterTest }) {
           'Accesso non completato. Controlla di aver confermato la tua email.'
         );
       }
+
+      onAuthenticated?.();
 
       Alert.alert(
         'Accesso riuscito ✅',
