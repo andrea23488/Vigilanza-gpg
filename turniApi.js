@@ -41,7 +41,7 @@ export async function caricaTurniUtente() {
     `/rest/v1/turni` +
     `?select=*` +
     `&user_id=eq.${user.id}` +
-    `&order=anno.asc,mese.asc,giorno.asc`;
+    `&order=anno.asc,mese.asc,giorno.asc,inizio.asc.nullslast`;
 
   const response = await fetch(url, {
     method: 'GET',

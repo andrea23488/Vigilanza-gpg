@@ -23,6 +23,13 @@ import {
   contaMessaggiNonLetti,
 } from './chatApi';
 import { caricaTurniUtente, creaTurnoUtente, aggiornaTurnoUtente, eliminaTurnoUtente } from './turniApi';
+import {
+  aggregaTurniPerGiorno,
+  calcolaOreIntervallo,
+  chiaveDataTurno,
+  oreRetribuiteTurno,
+  rilevaSovrapposizioniGiornaliere,
+} from './turniCalcoli';
 import { supabase } from './supabase';
 import { caricaProfiloUtente, salvaProfiloUtente, caricaFotoProfilo, eliminaFotoProfiloCloud } from './profiliApi';
 import {
@@ -271,19 +278,17 @@ function calcolaStraordinariConfigurati({
 }) {
   // MODALITÀ GIORNALIERA
   if (modalita !== 'settimanale') {
-    return giornateMese.reduce((tot, t) => {
-      if (t.riposo_lavorato === true) return tot;
+    const turniOrdinari = giornateMese.filter(
+      (t) => t.riposo_lavorato !== true
+    );
 
-      const oreTurno = Number(t.ore || 0);
-
-      return (
-        tot +
-        Math.max(
-          0,
-          oreTurno - Number(sogliaGiornaliera || 0)
-        )
-      );
-    }, 0);
+    return aggregaTurniPerGiorno(
+      turniOrdinari,
+      sogliaGiornaliera
+    ).reduce(
+      (tot, giorno) => tot + giorno.oreStraordinarie,
+      0
+    );
   }
 
   // MODALITÀ SETTIMANALE
@@ -350,7 +355,9 @@ function calcolaStraordinariConfigurati({
     let cumulato = 0;
 
     turniSettimana.forEach((t) => {
-      const oreTurno = Number(t.ore || 0);
+      const oreTurno =
+        Number(t.ore || 0) +
+        Number(t.minuti_aggiuntivi_retribuiti || 0) / 60;
 
       const extraPrima =
         Math.max(0, cumulato - limiteSettimanale);
@@ -4367,7 +4374,7 @@ const cambiaStatoDotazione = (id, stato) => {
   );
 
   const oreStipendioMese = giornateStipendioMese.reduce(
-    (tot, t) => tot + Number(t.ore || 0),
+    (tot, t) => tot + oreRetribuiteTurno(t),
     0
   );
 
@@ -4476,6 +4483,9 @@ useEffect(() => {
 
   const [extra, setExtra] =
     useState('1');
+
+  const [minutiAggiuntiviRetribuiti, setMinutiAggiuntiviRetribuiti] =
+    useState('0');
 
   const [
     riposoLavorato,
@@ -4813,7 +4823,7 @@ const debugLuglio = lista
 }, 0);
 
 const oreStipendioMese = giornateStipendioMese.reduce(
-    (tot, t) => tot + Number(t.ore || 0),
+    (tot, t) => tot + oreRetribuiteTurno(t),
     0
   );
 
@@ -4858,27 +4868,20 @@ const oreStipendioMese = giornateStipendioMese.reduce(
   const dettaglioStraordinariMese = (() => {
     // GIORNALIERO
     if (stipendioCalcoloStraordinari !== 'settimanale') {
-      return giornateStipendioMese
-        .filter(
-          (t) =>
-            t.tipo === 'turno' &&
-            t.riposo_lavorato !== true
-        )
-        .map((t) => {
-          const oreTurno = Number(t.ore || 0);
-
-          return {
-            tipo: 'giorno',
-            etichetta:
-              `${String(t.giorno).padStart(2, '0')}/` +
-              `${String(t.mese).padStart(2, '0')}`,
-            ore: oreTurno,
-            extra: Math.max(
-              0,
-              oreTurno - oreOrdinarieGiornaliereNumero
-            ),
-          };
-        })
+      return aggregaTurniPerGiorno(
+        giornateStipendioMese.filter(
+          (t) => t.riposo_lavorato !== true
+        ),
+        oreOrdinarieGiornaliereNumero
+      )
+        .map((gruppo) => ({
+          tipo: 'giorno',
+          etichetta:
+            `${String(gruppo.turni[0]?.giorno).padStart(2, '0')}/` +
+            `${String(gruppo.turni[0]?.mese).padStart(2, '0')}`,
+          ore: gruppo.oreRetribuite,
+          extra: gruppo.oreStraordinarie,
+        }))
         .filter((riga) => riga.extra > 0);
     }
 
@@ -5077,7 +5080,7 @@ const serviziDiurniMese =
 const oreRiposoLavoratoMese = turniStipendioMese.reduce(
   (tot, t) =>
     t.riposo_lavorato === true
-      ? tot + Number(t.ore || 0)
+      ? tot + oreRetribuiteTurno(t)
       : tot,
   0
 );
@@ -5558,13 +5561,13 @@ const totaleCompetenzeFiduciario =
 
   const oreCompletateStipendio =
     giornateStipendioCompletate.reduce(
-      (tot, t) => tot + Number(t.ore || 0),
+      (tot, t) => tot + oreRetribuiteTurno(t),
       0
     );
 
   const oreFutureStipendio =
     giornateStipendioFuture.reduce(
-      (tot, t) => tot + Number(t.ore || 0),
+      (tot, t) => tot + oreRetribuiteTurno(t),
       0
     );
 
@@ -5680,7 +5683,7 @@ const totaleCompetenzeFiduciario =
     giornateStipendioCompletate.reduce(
       (tot, t) =>
         t.riposo_lavorato === true
-          ? tot + Number(t.ore || 0)
+          ? tot + oreRetribuiteTurno(t)
           : tot,
       0
     );
@@ -6535,42 +6538,28 @@ console.log("🕒 ORA REALE:", new Date().toString());
 
   const statistiche =
     useMemo(() => {
-      let ore = 0;
-      let extraOre = 0;
-      let notti = 0;
-      let giorni = 0;
-
-      turniMese.forEach(
-        (t) => {
-          if (
-            t.tipo ===
-            'turno'
-          ) {
-            ore += Number(
-              t.ore || 0
-            );
-
-            extraOre +=
-              Number(
-                t.extra || 0
-              );
-
-            giorni += 1;
-
-            if (t.inizio && t.fine) {
-  const [hi, mi] = t.inizio.split(':').map(Number);
-  const [hf, mf] = t.fine.split(':').map(Number);
-
-  const inizioMinuti = hi * 60 + mi;
-  const fineMinuti = hf * 60 + mf;
-
-  if (fineMinuti <= inizioMinuti) {
-    notti += 1;
-  }
-}
-          }
-        }
+      const lavorati = turniMese.filter((t) => t.tipo === 'turno');
+      const giorniAggregati = aggregaTurniPerGiorno(
+        lavorati.filter((t) => t.riposo_lavorato !== true),
+        oreOrdinarieGiornaliereNumero
       );
+      const ore = lavorati.reduce(
+        (tot, t) => tot + oreRetribuiteTurno(t),
+        0
+      );
+      const extraOre = giorniAggregati.reduce(
+        (tot, gruppo) => tot + gruppo.oreStraordinarie,
+        0
+      );
+      const notti = lavorati.filter((t) => {
+        if (!t.inizio || !t.fine) return false;
+        const [hi, mi] = t.inizio.split(':').map(Number);
+        const [hf, mf] = t.fine.split(':').map(Number);
+        return hf * 60 + mf <= hi * 60 + mi;
+      }).length;
+      const giorni = new Set(
+        lavorati.map(chiaveDataTurno).filter(Boolean)
+      ).size;
 
       return {
         ore,
@@ -6578,7 +6567,7 @@ console.log("🕒 ORA REALE:", new Date().toString());
         notti,
         giorni,
       };
-    }, [turniMese]);
+    }, [turniMese, oreOrdinarieGiornaliereNumero]);
 
   const iniziali =
     useMemo(() => {
@@ -6885,12 +6874,28 @@ console.log("🕒 ORA REALE:", new Date().toString());
     setIndirizzoServizio('');
 
     setExtra('1');
+    setMinutiAggiuntiviRetribuiti('0');
 
     setRiposoLavorato(
       false
     );
 
     setScreen('edit');
+  }
+
+  function apriGiornoCalendario(g, recordsGiorno = []) {
+    const presenti = Array.isArray(recordsGiorno)
+      ? recordsGiorno
+      : [];
+
+    if (presenti.length === 0) {
+      nuovoGiorno(g);
+      return;
+    }
+
+    setGiorno(Number(g));
+    setEditingId(null);
+    setScreen('giornoTurni');
   }
 
   function modificaGiorno(
@@ -6949,6 +6954,10 @@ console.log("🕒 ORA REALE:", new Date().toString());
       )
     );
 
+    setMinutiAggiuntiviRetribuiti(
+      String(record.minuti_aggiuntivi_retribuiti || 0)
+    );
+
     setRiposoLavorato(
       record.riposo_lavorato ===
         true
@@ -6960,11 +6969,21 @@ console.log("🕒 ORA REALE:", new Date().toString());
   function creaPayload() {
     const ore =
       tipo === 'turno'
-        ? calcolaOre(
-            inizio,
-            fine
-          )
+        ? calcolaOreIntervallo(inizio, fine)
         : 0;
+
+    const minutiAggiuntivi = Math.max(
+      0,
+      Math.min(
+        1440,
+        Math.round(
+          Number(
+            String(minutiAggiuntiviRetribuiti || '0')
+              .replace(',', '.')
+          ) || 0
+        )
+      )
+    );
 
     const extraNumero =
       Number(
@@ -7015,9 +7034,16 @@ console.log("🕒 ORA REALE:", new Date().toString());
 
       ore,
 
+      minuti_aggiuntivi_retribuiti:
+        tipo === 'turno' ? minutiAggiuntivi : 0,
+
       extra:
       tipo === 'turno'
-        ? Math.max(0, Number(ore || 0) - oreOrdinarieGiornaliereNumero)
+        ? Math.max(
+            0,
+            Number(ore || 0) + minutiAggiuntivi / 60 -
+              oreOrdinarieGiornaliereNumero
+          )
         : 0,
 
     fascia:
@@ -7064,6 +7090,30 @@ console.log("🕒 ORA REALE:", new Date().toString());
         );
 
         return;
+      }
+
+      if (tipo === 'turno') {
+        const altriTurniGiorno = turni.filter(
+          (t) =>
+            t.tipo === 'turno' &&
+            Number(t.giorno) === Number(giorno) &&
+            Number(t.mese) === Number(mese + 1) &&
+            Number(t.anno) === Number(anno) &&
+            String(t.id) !== String(editingId)
+        );
+
+        const conflitti = rilevaSovrapposizioniGiornaliere([
+          ...altriTurniGiorno,
+          { ...payload, id: editingId || 'nuovo' },
+        ]);
+
+        if (conflitti.length > 0) {
+          Alert.alert(
+            'Turni sovrapposti',
+            'Questo turno si sovrappone a un altro servizio della stessa giornata. Correggi gli orari prima di salvare.'
+          );
+          return;
+        }
       }
 
       let salvato =
@@ -7136,7 +7186,7 @@ console.log("🕒 ORA REALE:", new Date().toString());
             onPress:
               () => {
                 setScreen(
-                  'calendar'
+                  'giornoTurni'
                 );
               },
           },
@@ -7213,7 +7263,7 @@ console.log("🕒 ORA REALE:", new Date().toString());
 
       setEditingId(null);
       await caricaTurni(false);
-      setScreen("calendar");
+      setScreen('giornoTurni');
     } catch (error) {
       console.log("ERRORE ELIMINAZIONE TURNO UTENTE:", error);
       Alert.alert(
@@ -24938,23 +24988,9 @@ if (screen === 'profiloCollega') {
           }
           onPress={(
             g,
-            record
+            recordsGiorno
           ) => {
-            if (
-              record &&
-              record.id !==
-                undefined &&
-              record.id !==
-                null
-            ) {
-              modificaGiorno(
-                record
-              );
-            } else {
-              nuovoGiorno(
-                g
-              );
-            }
+            apriGiornoCalendario(g, recordsGiorno);
           }}
         />
 
@@ -25079,6 +25115,136 @@ if (screen === 'profiloCollega') {
     );
   }
 
+  if (screen === 'giornoTurni') {
+    const recordsGiorno = turniMese
+      .filter((t) => Number(t.giorno) === Number(giorno))
+      .sort((a, b) =>
+        String(a?.inizio || '99:99').localeCompare(
+          String(b?.inizio || '99:99')
+        )
+      );
+
+    const riepilogo = aggregaTurniPerGiorno(
+      recordsGiorno,
+      oreOrdinarieGiornaliereNumero
+    )[0] || {
+      oreRetribuite: 0,
+      oreOrdinarie: 0,
+      oreStraordinarie: 0,
+      minutiAggiuntivi: 0,
+    };
+
+    return (
+      <Screen>
+        <Back onPress={() => setScreen('calendar')} />
+
+        <Text style={styles.title}>Turni del giorno</Text>
+        <Text style={styles.subtitle}>
+          {giorno} {MESI[mese]} {anno}
+        </Text>
+
+        <View
+          style={{
+            flexDirection: 'row',
+            backgroundColor: '#0B1930',
+            borderRadius: 20,
+            borderWidth: 1,
+            borderColor: '#315A8C',
+            padding: 14,
+            marginBottom: 18,
+          }}
+        >
+          {[
+            ['RETRIBUITE', riepilogo.oreRetribuite],
+            ['ORDINARIE', riepilogo.oreOrdinarie],
+            ['STRAORD.', riepilogo.oreStraordinarie],
+          ].map(([label, value]) => (
+            <View key={label} style={{ flex: 1, alignItems: 'center' }}>
+              <Text style={{ color: '#FFFFFF', fontSize: 19, fontWeight: '900' }}>
+                {Number(value || 0).toFixed(2).replace(/\.00$/, '')}h
+              </Text>
+              <Text
+                style={{
+                  color: '#8FAFCC',
+                  fontSize: 9,
+                  fontWeight: '900',
+                  marginTop: 4,
+                }}
+              >
+                {label}
+              </Text>
+            </View>
+          ))}
+        </View>
+
+        {riepilogo.minutiAggiuntivi > 0 && (
+          <Text
+            style={{
+              color: '#7BE7FF',
+              fontSize: 11,
+              fontWeight: '800',
+              marginBottom: 12,
+            }}
+          >
+            Inclusi {riepilogo.minutiAggiuntivi} minuti aggiuntivi retribuiti inseriti manualmente.
+          </Text>
+        )}
+
+        {recordsGiorno.map((record, index) => (
+          <TouchableOpacity
+            key={String(record.id)}
+            activeOpacity={0.82}
+            onPress={() => modificaGiorno(record)}
+            style={{
+              backgroundColor: '#101F39',
+              borderRadius: 18,
+              borderWidth: 1,
+              borderColor: 'rgba(105,223,255,0.28)',
+              padding: 15,
+              marginBottom: 10,
+            }}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <View style={{ flex: 1 }}>
+                <Text style={{ color: '#79DFFF', fontSize: 10, fontWeight: '900' }}>
+                  {record.tipo === 'turno' ? `TURNO ${index + 1}` : nomeTipo(record.tipo).toUpperCase()}
+                </Text>
+                <Text
+                  style={{
+                    color: '#FFFFFF',
+                    fontSize: 21,
+                    fontWeight: '900',
+                    marginTop: 4,
+                  }}
+                >
+                  {record.tipo === 'turno'
+                    ? `${formattaOra(record.inizio)} – ${formattaOra(record.fine)}`
+                    : nomeTipo(record.tipo)}
+                </Text>
+                {record.tipo === 'turno' && (
+                  <Text
+                    numberOfLines={2}
+                    style={{ color: '#AFC0D7', fontSize: 12, marginTop: 5 }}
+                  >
+                    📍 {record.indirizzo_servizio || record.luogo || 'Postazione non indicata'}
+                  </Text>
+                )}
+              </View>
+              <Ionicons name="chevron-forward" size={22} color="#79DFFF" />
+            </View>
+          </TouchableOpacity>
+        ))}
+
+        <TouchableOpacity
+          style={styles.saveButton}
+          onPress={() => nuovoGiorno(giorno)}
+        >
+          <Text style={styles.saveText}>+ AGGIUNGI ALTRO TURNO</Text>
+        </TouchableOpacity>
+      </Screen>
+    );
+  }
+
   if (
     screen ===
     'edit'
@@ -25166,7 +25332,13 @@ if (screen === 'profiloCollega') {
       <Screen scrollRef={editScreenScrollRef}>
         <Back
           onPress={
-            () => { setEditingId(null); setScreen("turni"); }
+            () => {
+              const haRecordGiorno = turniMese.some(
+                (t) => Number(t.giorno) === Number(giorno)
+              );
+              setEditingId(null);
+              setScreen(haRecordGiorno ? 'giornoTurni' : 'calendar');
+            }
           }
         />
 
@@ -25952,6 +26124,25 @@ if (screen === 'profiloCollega') {
               keyboardType="decimal-pad"
             />
 
+            <Field
+              label="MINUTI AGGIUNTIVI RETRIBUITI"
+              value={minutiAggiuntiviRetribuiti}
+              onChange={setMinutiAggiuntiviRetribuiti}
+              keyboardType="number-pad"
+            />
+
+            <Text
+              style={{
+                color: '#8fa5cc',
+                fontSize: 10,
+                lineHeight: 15,
+                marginTop: -8,
+                marginBottom: 10,
+              }}
+            >
+              Facoltativo · inserisci solo minuti realmente pagati, ad esempio stacco o trasferimento. Gli intervalli vuoti non vengono conteggiati automaticamente.
+            </Text>
+
             <TouchableOpacity
               style={[
                 styles.restButton,
@@ -26054,24 +26245,21 @@ if (screen === 'profiloCollega') {
   Number(t.mese) === mese + 1 &&
   Number(t.anno) === anno
 );
-    const minutiTotali = turniLavorati.reduce((tot, t) => {
-      if (!t.inizio || !t.fine) return tot;
-      const [hi, mi] = t.inizio.split(":").map(Number);
-      const [hf, mf] = t.fine.split(":").map(Number);
-      let minuti = (hf * 60 + mf) - (hi * 60 + mi);
-      if (minuti < 0) minuti += 24 * 60;
-      return tot + minuti;
-    }, 0);
-    const oreTotali = Math.round(minutiTotali / 60);
-    const minutiStraordinari = turniLavorati.reduce((tot, t) => {
-      if (!t.inizio || !t.fine) return tot;
-      const [hi, mi] = t.inizio.split(":").map(Number);
-      const [hf, mf] = t.fine.split(":").map(Number);
-      let minuti = (hf * 60 + mf) - (hi * 60 + mi);
-      if (minuti < 0) minuti += 24 * 60;
-      return tot + Math.max(0, minuti - 480);
-    }, 0);
-    const oreStraordinari = Math.round(minutiStraordinari / 60);
+    const riepiloghiGiornalieri = aggregaTurniPerGiorno(
+      turniLavorati.filter((t) => t.riposo_lavorato !== true),
+      oreOrdinarieGiornaliereNumero
+    );
+    const oreTotali = turniLavorati.reduce(
+      (tot, t) => tot + oreRetribuiteTurno(t),
+      0
+    );
+    const oreStraordinari = riepiloghiGiornalieri.reduce(
+      (tot, gruppo) => tot + gruppo.oreStraordinarie,
+      0
+    );
+    const giorniLavorati = new Set(
+      turniLavorati.map(chiaveDataTurno).filter(Boolean)
+    ).size;
     const turniNotte = turniLavorati.filter(t => {
       if (!t.inizio || !t.fine) return false;
 
@@ -26245,7 +26433,7 @@ if (screen === 'profiloCollega') {
         }}>
               <Ionicons name="calendar-outline" size={23} color="#5EDBFF" />
               <Text style={{ color: "#8997B2", fontSize: 10, marginTop: 6 }}>GIORNI LAVORATI</Text>
-              <Text style={{ color: "#FFFFFF", fontSize: 18, fontWeight: "800", marginTop: 2 }}>{turniLavorati.length}</Text>
+              <Text style={{ color: "#FFFFFF", fontSize: 18, fontWeight: "800", marginTop: 2 }}>{giorniLavorati}</Text>
             </View>
             <View style={{
           flex: 1,
@@ -29056,8 +29244,8 @@ function Calendar({
               );
             }
 
-            const record =
-              records.find(
+            const recordsGiorno =
+              records.filter(
                 (r) =>
                   Number(
                     r.giorno
@@ -29065,7 +29253,16 @@ function Calendar({
                   Number(
                     day
                   )
+              ).sort((a, b) =>
+                String(a?.inizio || '99:99').localeCompare(
+                  String(b?.inizio || '99:99')
+                )
               );
+
+            const record =
+              recordsGiorno.find((r) => r.tipo === 'turno') ||
+              recordsGiorno[0] ||
+              null;
 
             const tipoRiposo =
             !record ||
@@ -29245,7 +29442,7 @@ function Calendar({
               onPress={() =>
                 onPress(
                   day,
-                  record || null
+                  recordsGiorno
                 )
               }
               style={{
@@ -29447,6 +29644,33 @@ function Calendar({
                       </View>
                     )
                   )
+                )}
+
+                {recordsGiorno.length > 1 && (
+                  <View
+                    style={{
+                      position: 'absolute',
+                      top: 3,
+                      right: 3,
+                      minWidth: 15,
+                      height: 15,
+                      paddingHorizontal: 3,
+                      borderRadius: 8,
+                      backgroundColor: '#FFFFFF',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <Text
+                      style={{
+                        color: '#071A2F',
+                        fontSize: 8,
+                        fontWeight: '900',
+                      }}
+                    >
+                      {recordsGiorno.length}
+                    </Text>
+                  </View>
                 )}
               </View>
             </TouchableOpacity>
