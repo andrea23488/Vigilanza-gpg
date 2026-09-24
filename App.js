@@ -37,6 +37,7 @@ import {
   tariffaStraordinario30DaBase,
 } from './stipendioCalcoli';
 import { calcolaOreFiduciari } from './fiduciariOre';
+import { calcolaEconomiaFiduciari } from './fiduciariEconomia';
 import { supabase } from './supabase';
 import {
   creaProfiloVuoto,
@@ -817,6 +818,23 @@ export default function App() {
   // Scatti di anzianità mensili - Fiduciario
   const [stipendioScattiAnzianitaFiduciario, setStipendioScattiAnzianitaFiduciario] =
     useState('');
+
+  const [stipendioMaggDomDiurnaFiduciario, setStipendioMaggDomDiurnaFiduciario] =
+    useState('15');
+  const [stipendioMaggDomNotturnaFiduciario, setStipendioMaggDomNotturnaFiduciario] =
+    useState('0');
+  const [stipendioMaggFestDiurnaFiduciario, setStipendioMaggFestDiurnaFiduciario] =
+    useState('0');
+  const [stipendioMaggFestNotturnaFiduciario, setStipendioMaggFestNotturnaFiduciario] =
+    useState('0');
+  const [stipendioRiposoCompensoFiduciario, setStipendioRiposoCompensoFiduciario] =
+    useState('0');
+  const [stipendioAltreImponibiliFiduciario, setStipendioAltreImponibiliFiduciario] =
+    useState('0');
+  const [stipendioAltreEsentiFiduciario, setStipendioAltreEsentiFiduciario] =
+    useState('0');
+  const [stipendioTrattenuteFiduciario, setStipendioTrattenuteFiduciario] =
+    useState('0');
 
 
 
@@ -2419,25 +2437,24 @@ if (dati.tariffaStraordinario != null) {
       setStipendioLordoBaseFiduciario(
         String(dati.lordoBaseFiduciario)
       );
-
-      if (
-        dati.superminimoFiduciario !== undefined &&
-        dati.superminimoFiduciario !== null
-      ) {
-        setStipendioSuperminimoFiduciario(
-          String(dati.superminimoFiduciario)
-        );
-      }
-
-      if (
-        dati.scattiAnzianitaFiduciario !== undefined &&
-        dati.scattiAnzianitaFiduciario !== null
-      ) {
-        setStipendioScattiAnzianitaFiduciario(
-          String(dati.scattiAnzianitaFiduciario)
-        );
-      }
     }
+
+    if (dati.superminimoFiduciario != null) {
+      setStipendioSuperminimoFiduciario(String(dati.superminimoFiduciario));
+    }
+
+    if (dati.scattiAnzianitaFiduciario != null) {
+      setStipendioScattiAnzianitaFiduciario(String(dati.scattiAnzianitaFiduciario));
+    }
+
+    if (dati.maggDomDiurnaFiduciario != null) setStipendioMaggDomDiurnaFiduciario(String(dati.maggDomDiurnaFiduciario));
+    if (dati.maggDomNotturnaFiduciario != null) setStipendioMaggDomNotturnaFiduciario(String(dati.maggDomNotturnaFiduciario));
+    if (dati.maggFestDiurnaFiduciario != null) setStipendioMaggFestDiurnaFiduciario(String(dati.maggFestDiurnaFiduciario));
+    if (dati.maggFestNotturnaFiduciario != null) setStipendioMaggFestNotturnaFiduciario(String(dati.maggFestNotturnaFiduciario));
+    if (dati.riposoCompensoFiduciario != null) setStipendioRiposoCompensoFiduciario(String(dati.riposoCompensoFiduciario));
+    if (dati.altreImponibiliFiduciario != null) setStipendioAltreImponibiliFiduciario(String(dati.altreImponibiliFiduciario));
+    if (dati.altreEsentiFiduciario != null) setStipendioAltreEsentiFiduciario(String(dati.altreEsentiFiduciario));
+    if (dati.trattenuteFiduciario != null) setStipendioTrattenuteFiduciario(String(dati.trattenuteFiduciario));
 
 
       } catch (error) {
@@ -5322,61 +5339,6 @@ const totaleCompetenzeStimate = vociCompetenzeGpg.totale;
 
   // ===== MOTORE ECONOMICO FIDUCIARIO =====
 
-  /*
-   * CCNL Vigilanza Privata e Servizi di Sicurezza
-   * Sezione SERVIZI DI SICUREZZA
-   * Tabelle in vigore da aprile 2026.
-   *
-   * Il ramo GPG sopra resta completamente invariato.
-   */
-
-  // Tabelle paga conglobata - Servizi di Sicurezza.
-  // La tabella viene scelta in base al mese visualizzato,
-  // così lo storico stipendio usa la paga realmente vigente in quel periodo.
-  const tabellePagaFiduciari = [
-    {
-      dal: 202401,
-      paga: { A: 1740.40, B: 1583.88, C: 1333.43, D: 1114.29, E: 1021.43 },
-    },
-    {
-      dal: 202407,
-      paga: { A: 1762.29, B: 1603.77, C: 1350.14, D: 1128.21, E: 1035.36 },
-    },
-    {
-      dal: 202410,
-      paga: { A: 1813.36, B: 1650.20, C: 1389.14, D: 1160.71, E: 1067.86 },
-    },
-    {
-      dal: 202501,
-      paga: { A: 1886.32, B: 1716.53, C: 1444.86, D: 1207.14, E: 1114.29 },
-    },
-    {
-      dal: 202507,
-      paga: { A: 1930.09, B: 1756.33, C: 1478.29, D: 1235.00, E: 1142.14 },
-    },
-    {
-      dal: 202512,
-      paga: { A: 1973.87, B: 1796.12, C: 1511.71, D: 1262.86, E: 1170.00 },
-    },
-    {
-      dal: 202604,
-      paga: { A: 2003.05, B: 1822.65, C: 1534.00, D: 1281.43, E: 1188.57 },
-    },
-    {
-      dal: 202612,
-      paga: { A: 2032.24, B: 1849.18, C: 1556.29, D: 1300.00, E: 1207.14 },
-    },
-  ];
-
-  const chiaveMeseStipendio =
-    Number(anno) * 100 + Number(mese + 1);
-
-  const tabellaPagaFiduciariApplicabile =
-    [...tabellePagaFiduciari]
-      .reverse()
-      .find((tabella) => chiaveMeseStipendio >= tabella.dal)?.paga ||
-    tabellePagaFiduciari[0].paga;
-
   const livelloFiduciarioCorrente =
     ['A', 'B', 'C', 'D', 'E'].includes(
       String(stipendioLivello || '').toUpperCase()
@@ -5391,134 +5353,69 @@ const totaleCompetenzeStimate = vociCompetenzeGpg.totale;
         .replace(',', '.')
     );
 
-  const usaLordoBaseFiduciarioPersonalizzato =
-    stipendioProfiloCalcolo === 'personalizzato' &&
-    Number.isFinite(lordoBaseFiduciarioPersonalizzatoNumero) &&
-    lordoBaseFiduciarioPersonalizzatoNumero > 0;
+  const vociManualiFiduciario = [
+    {
+      id: 'altre-imponibili',
+      descrizione: 'Altre competenze imponibili',
+      importo: stipendioAltreImponibiliFiduciario,
+      natura: 'imponibile',
+    },
+    {
+      id: 'altre-esenti',
+      descrizione: 'Altre competenze esenti',
+      importo: stipendioAltreEsentiFiduciario,
+      natura: 'esente',
+    },
+    {
+      id: 'l207-2024',
+      descrizione: 'Indennità esente L.207/2024',
+      importo: stipendioIndennita20724,
+      natura: 'esente',
+    },
+    {
+      id: 'trattenute',
+      descrizione: 'Trattenute',
+      importo: stipendioTrattenuteFiduciario,
+      natura: 'trattenuta',
+    },
+  ];
 
-  const pagaConglobataFiduciario =
-    usaLordoBaseFiduciarioPersonalizzato
-      ? lordoBaseFiduciarioPersonalizzatoNumero
-      : tabellaPagaFiduciariApplicabile[
-          livelloFiduciarioCorrente
-        ];
+  const economiaFiduciario = calcolaEconomiaFiduciari({
+    anno,
+    mese: mese + 1,
+    livello: livelloFiduciarioCorrente,
+    oreSettimanali: stipendioOreSettimanali,
+    pagaBasePersonalizzata:
+      stipendioProfiloCalcolo === 'personalizzato'
+        ? lordoBaseFiduciarioPersonalizzatoNumero
+        : 0,
+    scattiAnzianita: stipendioScattiAnzianitaFiduciario,
+    superminimo: stipendioSuperminimoFiduciario,
+    riepilogoOre: riepilogoOreFiduciario,
+    percentualiMaggiorazioni: {
+      domenicaleDiurno: stipendioMaggDomDiurnaFiduciario,
+      domenicaleNotturno: stipendioMaggDomNotturnaFiduciario,
+      festivoDiurno: stipendioMaggFestDiurnaFiduciario,
+      festivoNotturno: stipendioMaggFestNotturnaFiduciario,
+    },
+    configurazioneRiposoLavorato: {
+      modalita: numeroEconomico(stipendioRiposoCompensoFiduciario) > 0
+        ? 'tariffa_oraria'
+        : 'nessuna',
+      valore: stipendioRiposoCompensoFiduciario,
+    },
+    vociManuali: vociManualiFiduciario,
+  });
 
-  // Part-time: riproporziona la paga mensile rispetto alle 40h.
-  const oreSettimanaliFiduciario =
-    Math.max(
-      1,
-      Math.min(
-        40,
-        Number(
-          String(stipendioOreSettimanali || '40')
-            .replace(',', '.')
-        ) || 40
-      )
-    );
-
-  const coefficientePartTimeFiduciario =
-    oreSettimanaliFiduciario / 40;
-
-  const lordoBaseFiduciario =
-    pagaConglobataFiduciario *
-    coefficientePartTimeFiduciario;
-
-  // Divisore contrattuale Servizi di Sicurezza.
-  const divisoreFiduciario = 173;
-
-  const pagaOrariaFiduciario =
-    pagaConglobataFiduciario /
-    divisoreFiduciario;
-
-  const straordinariFiduciario =
-    riepilogoOreFiduciario?.straordinari || {};
-
-  /*
-   * Ogni ora extra viene valorizzata nella categoria determinata
-   * dall'unico motore temporale Fiduciari. Le categorie restano
-   * separate e la loro somma coincide con le ore extra fisiche.
-   */
-  const importoStraordinarioFiduciario =
-    Number(straordinariFiduciario.ferialeDiurno25 || 0) *
-      pagaOrariaFiduciario * 1.25 +
-    Number(straordinariFiduciario.ferialeNotturno35 || 0) *
-      pagaOrariaFiduciario * 1.35 +
-    Number(straordinariFiduciario.festivoDiurno50 || 0) *
-      pagaOrariaFiduciario * 1.5 +
-    Number(straordinariFiduciario.festivoNotturno60 || 0) *
-      pagaOrariaFiduciario * 1.6;
-
-  /*
-   * Ore domenicali già calcolate dall'app.
-   * Lavoro domenicale ordinario:
-   * maggiorazione del 15% dal 01/01/2025.
-   *
-   * Qui aggiungiamo SOLO la maggiorazione perché
-   * la paga ordinaria è già compresa nella mensilità.
-   */
-  const maggiorazioneDomenicaleFiduciario =
-    pagaOrariaFiduciario * 0.15;
-
-  const importoDomenicaleFiduciario =
-    Number(oreDomenicaliMese || 0) *
-    maggiorazioneDomenicaleFiduciario;
-
-
-  const oreNotturneFiduciario =
-    Number(riepilogoOreFiduciario?.ore.notturne || 0);
-
-  /*
-   * ATTENZIONE:
-   * il 35% riguarda lo straordinario notturno e non deve
-   * essere applicato automaticamente a tutte le ore
-   * notturne ordinarie.
-   *
-   * Finché il calendario non distingue esattamente
-   * ordinario/straordinario per fascia oraria, non
-   * attribuiamo una maggiorazione notturna generica.
-   */
-  const maggiorazioneNotturnaFiduciario = 0;
-
+  const lordoBaseFiduciario = economiaFiduciario.pagaBase;
+  const pagaOrariaFiduciario = economiaFiduciario.pagaOraria;
+  const importoSuperminimoFiduciario = economiaFiduciario.superminimo;
+  const importoScattiAnzianitaFiduciario = economiaFiduciario.scattiAnzianita;
+  const importoStraordinarioFiduciario = economiaFiduciario.straordinari.totale;
+  const importoDomenicaleFiduciario = economiaFiduciario.maggiorazioni.totale;
+  const oreNotturneFiduciario = Number(riepilogoOreFiduciario?.ore.notturne || 0);
   const importoNotturnoFiduciario = 0;
-
-
-  /*
-   * Il Fiduciario NON eredita:
-   * - piantonamento diurno GPG
-   * - piantonamento notturno GPG
-   * - indennità compensativa GPG
-   * - tariffa riposo lavorato calibrata sul cedolino GPG
-   */
-
-    const importoSuperminimoFiduciario =
-    stipendioProfiloCalcolo === 'personalizzato'
-      ? Math.max(
-          0,
-          Number(
-            String(stipendioSuperminimoFiduciario || '0')
-              .trim()
-              .replace(',', '.')
-          ) || 0
-        )
-      : 0;
-
-  const importoScattiAnzianitaFiduciario =
-    Math.max(
-      0,
-      Number(
-        String(stipendioScattiAnzianitaFiduciario || '0')
-          .trim()
-          .replace(',', '.')
-      ) || 0
-    );
-
-const totaleCompetenzeFiduciario =
-    lordoBaseFiduciario +
-    importoSuperminimoFiduciario +
-    importoScattiAnzianitaFiduciario +
-    importoStraordinarioFiduciario +
-    importoDomenicaleFiduciario +
-    importoNotturnoFiduciario;
+  const totaleCompetenzeFiduciario = economiaFiduciario.totaleCompetenze;
 
   // ===== MATURATO REALE AD OGGI =====
 
@@ -5861,7 +5758,7 @@ const quotaTempoMese = Math.min(
 
   // ===== FIDUCIARIO: componenti realmente maturate =====
 
-  const maturatoFiduciarioAdOggi =
+  const maturatoFiduciarioImponibileAdOggi =
     (
       Number(lordoBaseFiduciario || 0) *
       quotaTempoMese
@@ -5893,7 +5790,21 @@ const quotaTempoMese = Math.min(
       importoNotturnoFiduciario,
       oreNotturneFiduciarioCompletate,
       oreNotturneFiduciario
+    ) +
+
+    (
+      Number(economiaFiduciario.altreCompetenzeImponibili || 0) *
+      quotaTempoMese
     );
+
+  const maturatoFiduciarioEsenteAdOggi =
+    Number(economiaFiduciario.competenzeEsenti || 0) * quotaTempoMese;
+
+  const trattenuteFiduciarioAdOggi =
+    Number(economiaFiduciario.trattenute || 0) * quotaTempoMese;
+
+  const maturatoFiduciarioAdOggi =
+    maturatoFiduciarioImponibileAdOggi + maturatoFiduciarioEsenteAdOggi;
 
 
   const maturatoAdOggi =
@@ -5902,14 +5813,18 @@ const quotaTempoMese = Math.min(
       : maturatoGpgAdOggi;
 
 
-  const coefficienteNettoAdOggi =
-    stipendioTipoOperatore === 'fiduciario'
-      ? 0.78
-      : (1860.00 / 2273.30);
-
+  // Stima netta semplificata: non sostituisce il calcolo fiscale personale.
+  // Per i Fiduciari la quota esente non viene ridotta dal coefficiente e le
+  // trattenute configurate vengono sottratte separatamente.
+  const coefficienteNettoGpgAdOggi = 1860.00 / 2273.30;
+  const coefficienteNettoFiduciarioSemplificato = 0.78;
   const nettoStimatoAdOggi =
-    Number(maturatoAdOggi || 0) *
-    coefficienteNettoAdOggi;
+    stipendioTipoOperatore === 'fiduciario'
+      ? (
+          maturatoFiduciarioImponibileAdOggi *
+          coefficienteNettoFiduciarioSemplificato
+        ) + maturatoFiduciarioEsenteAdOggi - trattenuteFiduciarioAdOggi
+      : Number(maturatoGpgAdOggi || 0) * coefficienteNettoGpgAdOggi;
 
 
   const numeroTurniFuturi =
@@ -5942,15 +5857,14 @@ const nettoBaseNumero =
 // Il netto resta una stima: senza imponibili, detrazioni e conguagli del
 // singolo cedolino non è possibile ricostruire una fiscalità completa.
 const coefficienteNettoStimato = 1992.00 / 2577.16;
-const coefficienteNettoFiduciario = 0.78;
 
   const nettoStimatoMese =
-    maturatoMese *
-    (
-      stipendioTipoOperatore === 'fiduciario'
-        ? coefficienteNettoFiduciario
-        : coefficienteNettoStimato
-    );
+    stipendioTipoOperatore === 'fiduciario'
+      ? (
+          economiaFiduciario.competenzeImponibili *
+          coefficienteNettoFiduciarioSemplificato
+        ) + economiaFiduciario.competenzeEsenti - economiaFiduciario.trattenute
+      : maturatoMese * coefficienteNettoStimato;
   const mediaNettaGiornata =
     giornateStipendioMese.length > 0
       ? maturatoMese / giornateStipendioMese.length
@@ -5999,12 +5913,9 @@ const coefficienteNettoFiduciario = 0.78;
 
   // ===== NETTO PREVISTO FINE MESE =====
   const nettoPrevistoFineMese =
-    Number(previsioneFineMese || 0) *
-    (
-      stipendioTipoOperatore === 'fiduciario'
-        ? 0.78
-        : (1860.00 / 2273.30)
-    );
+    stipendioTipoOperatore === 'fiduciario'
+      ? nettoStimatoMese
+      : Number(previsioneFineMese || 0) * (1860.00 / 2273.30);
 
 
   const turnoOggi = turniMese.find(
@@ -9287,6 +9198,47 @@ if (screen === 'colleghi') {
           </Text>
         </View>
 
+        {isFiduciario ? (
+          <View
+            style={{
+              backgroundColor: '#0B2038',
+              borderRadius: 20,
+              padding: 16,
+              marginBottom: 16,
+              borderWidth: 1,
+              borderColor: 'rgba(111,234,255,0.28)',
+            }}
+          >
+            <Text style={{ color: '#6FEAFF', fontSize: 11, fontWeight: '900', marginBottom: 10 }}>
+              DETTAGLIO FIDUCIARI
+            </Text>
+            {[
+              ['Ore totali', `${Number(riepilogoOreFiduciario?.ore.fisiche || 0).toFixed(1)} h`],
+              ['Ordinarie', `${Number(riepilogoOreFiduciario?.ore.ordinarie || 0).toFixed(1)} h`],
+              ['Straordinarie', `${Number(riepilogoOreFiduciario?.ore.straordinarie || 0).toFixed(1)} h`],
+              ['Riposo lavorato', `${Number(riepilogoOreFiduciario?.ore.riposoLavorato || 0).toFixed(1)} h`],
+              ['Lordo base', `€ ${economiaFiduciario.arrotondato.pagaBase.toFixed(2)}`],
+              ['Scatti', `€ ${economiaFiduciario.arrotondato.scattiAnzianita.toFixed(2)}`],
+              ['Superminimo', `€ ${economiaFiduciario.arrotondato.superminimo.toFixed(2)}`],
+              ['Straordinari', `€ ${economiaFiduciario.arrotondato.straordinari.toFixed(2)}`],
+              ['Maggiorazioni', `€ ${economiaFiduciario.arrotondato.maggiorazioni.toFixed(2)}`],
+              ['Altre competenze', `€ ${economiaFiduciario.arrotondato.altreCompetenze.toFixed(2)}`],
+              ['Trattenute', `€ ${economiaFiduciario.arrotondato.trattenute.toFixed(2)}`],
+              ['Lordo stimato', `€ ${economiaFiduciario.arrotondato.lordoStimato.toFixed(2)}`],
+            ].map(([label, value]) => (
+              <View key={label} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4 }}>
+                <Text style={{ color: '#9FB2D9', fontSize: 11 }}>{label}</Text>
+                <Text style={{ color: '#FFFFFF', fontSize: 11, fontWeight: '900' }}>{value}</Text>
+              </View>
+            ))}
+            {economiaFiduciario.diagnostica.riposoLavoratoDaConfigurare ? (
+              <Text style={{ color: '#FFD66B', fontSize: 9, lineHeight: 13, marginTop: 9 }}>
+                Il riposo lavorato è conteggiato nelle ore ma non ha un compenso aggiuntivo configurato.
+              </Text>
+            ) : null}
+          </View>
+        ) : null}
+
         <View
           style={{
             backgroundColor: '#284cff',
@@ -11298,8 +11250,7 @@ if (screen === 'configuraStipendio') {
 
 
       {/* ===== SUPERMINIMO FIDUCIARIO ===== */}
-      {stipendioTipoOperatore === 'fiduciario' &&
-       stipendioProfiloCalcolo === 'personalizzato' ? (
+      {stipendioTipoOperatore === 'fiduciario' ? (
         <View
           style={{
             marginBottom: 18,
@@ -11402,6 +11353,59 @@ if (screen === 'configuraStipendio') {
               fontWeight: '800',
             }}
           />
+
+          <Text style={{ color: '#6FEAFF', fontWeight: '900', marginTop: 20 }}>
+            MAGGIORAZIONI ORDINARIE · %
+          </Text>
+          <Text style={{ color: '#8FA5CC', fontSize: 9, lineHeight: 13, marginTop: 5, marginBottom: 8 }}>
+            Configura solo le percentuali previste dal tuo contratto o accordo aziendale. Le ore restano conteggiate una sola volta.
+          </Text>
+
+          {[
+            ['Domenicale diurna', stipendioMaggDomDiurnaFiduciario, setStipendioMaggDomDiurnaFiduciario],
+            ['Domenicale notturna', stipendioMaggDomNotturnaFiduciario, setStipendioMaggDomNotturnaFiduciario],
+            ['Festiva diurna', stipendioMaggFestDiurnaFiduciario, setStipendioMaggFestDiurnaFiduciario],
+            ['Festiva notturna', stipendioMaggFestNotturnaFiduciario, setStipendioMaggFestNotturnaFiduciario],
+          ].map(([label, value, setter]) => (
+            <View key={label} style={{ marginTop: 9 }}>
+              <Text style={{ color: '#dfe6ff', fontSize: 10, fontWeight: '700' }}>{label}</Text>
+              <TextInput
+                value={value}
+                onChangeText={setter}
+                keyboardType="decimal-pad"
+                placeholder="0"
+                placeholderTextColor="#7184aa"
+                style={{ backgroundColor: '#091936', color: 'white', borderRadius: 12, padding: 11, marginTop: 5 }}
+              />
+            </View>
+          ))}
+
+          <Text style={{ color: '#6FEAFF', fontWeight: '900', marginTop: 20 }}>
+            ALTRE VOCI FIDUCIARI · €
+          </Text>
+          <Text style={{ color: '#8FA5CC', fontSize: 9, lineHeight: 13, marginTop: 5, marginBottom: 8 }}>
+            Sono importi manuali: l'app non li deduce automaticamente dai turni.
+          </Text>
+
+          {[
+            ['Riposo lavorato · compenso aggiuntivo €/h', stipendioRiposoCompensoFiduciario, setStipendioRiposoCompensoFiduciario],
+            ['Altre competenze imponibili', stipendioAltreImponibiliFiduciario, setStipendioAltreImponibiliFiduciario],
+            ['Altre competenze esenti', stipendioAltreEsentiFiduciario, setStipendioAltreEsentiFiduciario],
+            ['Indennità esente L.207/24', stipendioIndennita20724, setStipendioIndennita20724],
+            ['Trattenute', stipendioTrattenuteFiduciario, setStipendioTrattenuteFiduciario],
+          ].map(([label, value, setter]) => (
+            <View key={label} style={{ marginTop: 9 }}>
+              <Text style={{ color: '#dfe6ff', fontSize: 10, fontWeight: '700' }}>{label}</Text>
+              <TextInput
+                value={value}
+                onChangeText={setter}
+                keyboardType="decimal-pad"
+                placeholder="0,00"
+                placeholderTextColor="#7184aa"
+                style={{ backgroundColor: '#091936', color: 'white', borderRadius: 12, padding: 11, marginTop: 5 }}
+              />
+            </View>
+          ))}
         </View>
       ) : null}
 
@@ -11632,6 +11636,14 @@ if (screen === 'configuraStipendio') {
                   lordoBaseFiduciario: stipendioLordoBaseFiduciario,
                   superminimoFiduciario: stipendioSuperminimoFiduciario,
                   scattiAnzianitaFiduciario: stipendioScattiAnzianitaFiduciario,
+                  maggDomDiurnaFiduciario: stipendioMaggDomDiurnaFiduciario,
+                  maggDomNotturnaFiduciario: stipendioMaggDomNotturnaFiduciario,
+                  maggFestDiurnaFiduciario: stipendioMaggFestDiurnaFiduciario,
+                  maggFestNotturnaFiduciario: stipendioMaggFestNotturnaFiduciario,
+                  riposoCompensoFiduciario: stipendioRiposoCompensoFiduciario,
+                  altreImponibiliFiduciario: stipendioAltreImponibiliFiduciario,
+                  altreEsentiFiduciario: stipendioAltreEsentiFiduciario,
+                  trattenuteFiduciario: stipendioTrattenuteFiduciario,
                 })
               );
 

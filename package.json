@@ -35,6 +35,7 @@
     "test:turni": "node scripts/test-turni-calcoli.cjs",
     "test:stipendio": "node scripts/test-stipendio-calcoli.cjs",
     "test:fiduciari": "node scripts/test-fiduciari-ore.cjs",
+    "test:fiduciari-economia": "node scripts/test-fiduciari-economia.cjs",
     "postinstall": "patch-package"
   },
   "private": true,
