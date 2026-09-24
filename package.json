@@ -31,6 +31,7 @@
     "android": "expo run:android",
     "ios": "expo run:ios",
     "web": "expo start --web",
+    "test:profilo": "node scripts/test-profilo-utente.cjs",
     "test:turni": "node scripts/test-turni-calcoli.cjs",
     "test:stipendio": "node scripts/test-stipendio-calcoli.cjs",
     "postinstall": "patch-package"

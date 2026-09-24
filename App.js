@@ -38,6 +38,10 @@ import {
 } from './stipendioCalcoli';
 import { supabase } from './supabase';
 import {
+  creaProfiloVuoto,
+  costruisciProfiloUtente,
+} from './profiloUtente';
+import {
   autenticaConBiometria,
   leggiBiometriaAbilitata,
   messaggioErroreBiometria,
@@ -116,9 +120,6 @@ const SUPABASE_URL =
 const SUPABASE_KEY =
   process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 
-const PROFILE_STORAGE_KEY =
-  '@vigilanza_gpg_profile';
-
 const PHOTO_STORAGE_KEY =
   '@vigilanza_gpg_profile_photo';
 
@@ -164,15 +165,6 @@ const MESI = [
   'Novembre',
   'Dicembre',
 ];
-
-const PROFILO_DEFAULT = {
-  nome: 'Andrea',
-  cognome: 'Ischiboni',
-  azienda: 'Italpol',
-  ruolo: 'Guardia Particolare Giurata',
-  sede: 'Roma',
-};
-
 
 function KeyboardDoneOverlay() {
   const [keyboardInfo, setKeyboardInfo] =
@@ -652,6 +644,11 @@ export default function App() {
   const giorniSettimana = ["Dom", "Lun", "Mar", "Mer", "Gio", "Ven", "Sab"];
  const [accessoTest, setAccessoTest] = useState(false);
   const [authInizializzata, setAuthInizializzata] = useState(false);
+  const [utenteAutenticato, setUtenteAutenticato] = useState(null);
+  const [profiloCaricamento, setProfiloCaricamento] = useState(false);
+  const [profiloErrore, setProfiloErrore] = useState('');
+  const [ricaricaProfilo, setRicaricaProfilo] = useState(0);
+  const utenteIdSessioneRef = useRef(null);
   const [biometriaInizializzata, setBiometriaInizializzata] = useState(false);
   const [biometriaAbilitata, setBiometriaAbilitata] = useState(false);
   const [biometriaSbloccata, setBiometriaSbloccata] = useState(false);
@@ -678,7 +675,21 @@ export default function App() {
 
     const applicaSessione = (sessione) => {
       if (!attivo) return;
-      setAccessoTest(Boolean(sessione?.user));
+      const utente = sessione?.user || null;
+      const prossimoUserId = utente?.id || null;
+      const sessioneCambiata =
+        utenteIdSessioneRef.current !== prossimoUserId;
+
+      utenteIdSessioneRef.current = prossimoUserId;
+      setUtenteAutenticato(utente);
+
+      if (sessioneCambiata) {
+        azzeraStatoProfilo();
+        setProfiloErrore('');
+        setProfiloCaricamento(Boolean(utente));
+      }
+
+      setAccessoTest(Boolean(utente));
       setAuthInizializzata(true);
     };
 
@@ -819,7 +830,19 @@ export default function App() {
   };
 
   const usaAccessoNormale = async () => {
-    await supabase.auth.signOut();
+    azzeraStatoProfilo();
+    setProfiloCaricamento(true);
+    const { error } = await supabase.auth.signOut();
+
+    if (error) {
+      setProfiloCaricamento(false);
+      setProfiloErrore(
+        'Non è stato possibile terminare la sessione. Riprova.'
+      );
+      Alert.alert('Errore', error.message);
+      return;
+    }
+
     richiestaBiometriaRef.current = false;
     setBiometriaSbloccata(false);
     setErroreBiometria('');
@@ -4750,7 +4773,7 @@ useEffect(() => {
   ] = useState(false);
 
   const [profilo, setProfilo] =
-    useState(PROFILO_DEFAULT);
+    useState(creaProfiloVuoto);
 
   const [
     fotoProfilo,
@@ -4761,35 +4784,35 @@ useEffect(() => {
     nomeDraft,
     setNomeDraft,
   ] = useState(
-    PROFILO_DEFAULT.nome
+    ''
   );
 
   const [
     cognomeDraft,
     setCognomeDraft,
   ] = useState(
-    PROFILO_DEFAULT.cognome
+    ''
   );
 
   const [
     aziendaDraft,
     setAziendaDraft,
   ] = useState(
-    PROFILO_DEFAULT.azienda
+    ''
   );
 
   const [
     ruoloDraft,
     setRuoloDraft,
   ] = useState(
-    PROFILO_DEFAULT.ruolo
+    ''
   );
 
   const [
     sedeDraft,
     setSedeDraft,
   ] = useState(
-    PROFILO_DEFAULT.sede
+    ''
   );
 
   const [
@@ -4804,8 +4827,29 @@ useEffect(() => {
     inServizioDalDraft,
     setInServizioDalDraft,
   ] = useState(
-    PROFILO_DEFAULT.in_servizio_dal || ''
+    ''
   );
+
+  function applicaStatoProfilo(nuovoProfilo) {
+    setProfilo(nuovoProfilo);
+    setNomeDraft(nuovoProfilo.nome);
+    setCognomeDraft(nuovoProfilo.cognome);
+    setAziendaDraft(nuovoProfilo.azienda);
+    setRuoloDraft(nuovoProfilo.ruolo);
+    setSedeDraft(nuovoProfilo.sede);
+    setPuntoPartenzaDraft(nuovoProfilo.punto_partenza || '');
+    setInServizioDalDraft(
+      nuovoProfilo.in_servizio_dal
+        ? String(nuovoProfilo.in_servizio_dal)
+        : ''
+    );
+    setMatricolaDraft(nuovoProfilo.codice_gpg || '');
+    setFotoProfilo(nuovoProfilo.foto_url || null);
+  }
+
+  function azzeraStatoProfilo() {
+    applicaStatoProfilo(creaProfiloVuoto());
+  }
 
     /* SYNC MATRICOLA SAFE */
   useEffect(() => {
@@ -4817,18 +4861,60 @@ useEffect(() => {
   }, [profilo?.codice_gpg]);
 
 useEffect(() => {
-      caricaProfiloLocale();
       aggiornaColleghiInServizioOggi();
 
     inizializzaApp();
   }, []);
 
   useEffect(() => {
-    if (accessoTest) {
-      caricaTurni(false);
-      caricaProfiloLocale();
+    if (!accessoTest || !utenteAutenticato?.id) {
+      setProfiloCaricamento(false);
+      return;
     }
-  }, [accessoTest]);
+
+    let attivo = true;
+    const userId = utenteAutenticato.id;
+
+    setProfiloCaricamento(true);
+    setProfiloErrore('');
+    azzeraStatoProfilo();
+    caricaTurni(false);
+
+    const caricaProfiloSessione = async () => {
+      try {
+        const profiloCloud = await caricaProfiloUtente();
+        if (!attivo) return;
+
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+
+        if (!attivo || session?.user?.id !== userId) return;
+
+        const nuovoProfilo = costruisciProfiloUtente(
+          profiloCloud,
+          utenteAutenticato.user_metadata || {}
+        );
+
+        applicaStatoProfilo(nuovoProfilo);
+      } catch (error) {
+        if (!attivo) return;
+        console.log('ERRORE PROFILO CLOUD:', error);
+        azzeraStatoProfilo();
+        setProfiloErrore(
+          'Non è stato possibile caricare il tuo profilo. Controlla la connessione e riprova.'
+        );
+      } finally {
+        if (attivo) setProfiloCaricamento(false);
+      }
+    };
+
+    caricaProfiloSessione();
+
+    return () => {
+      attivo = false;
+    };
+  }, [accessoTest, utenteAutenticato?.id, ricaricaProfilo]);
 
   async function inizializzaApp() {
     try {
@@ -4844,54 +4930,6 @@ useEffect(() => {
       setLoading(false);
     }
   }
-  async function caricaProfiloLocale() {
-    try {
-      const profiloCloud = await caricaProfiloUtente();
-
-      const nuovoProfilo = profiloCloud
-        ? {
-            nome: profiloCloud.nome || "",
-            cognome: profiloCloud.cognome || "",
-            azienda: profiloCloud.azienda || "",
-            ruolo: profiloCloud.ruolo || "",
-            sede: profiloCloud.sede || "",
-          punto_partenza: profiloCloud.punto_partenza || "",
-            foto_url: profiloCloud.foto_url || null,
-          }
-        : {
-            nome: "",
-            cognome: "",
-            azienda: "",
-            ruolo: "",
-            sede: "",
-        punto_partenza: "",
-            foto_url: null,
-          };
-
-      setProfilo(nuovoProfilo);
-      setNomeDraft(nuovoProfilo.nome);
-      setCognomeDraft(nuovoProfilo.cognome);
-      setAziendaDraft(nuovoProfilo.azienda);
-      setRuoloDraft(nuovoProfilo.ruolo);
-      setSedeDraft(nuovoProfilo.sede);
-
-    setPuntoPartenzaDraft(
-      nuovoProfilo.punto_partenza || ''
-    );
-    setInServizioDalDraft(
-      nuovoProfilo.in_servizio_dal
-        ? String(nuovoProfilo.in_servizio_dal)
-        : ''
-    );
-      setFotoProfilo(nuovoProfilo.foto_url);
-
-      return nuovoProfilo;
-    } catch (error) {
-      console.log("ERRORE PROFILO CLOUD:", error);
-    }
-  }
-
-
   async function caricaTurni(mostraLoading = true) {
     try {
       if (mostraLoading) setLoading(true);
@@ -7712,8 +7750,15 @@ console.log("🕒 ORA REALE:", new Date().toString());
   }
 
 async function logout() {
+    azzeraStatoProfilo();
+    setProfiloErrore('');
+    setProfiloCaricamento(true);
     const { error } = await supabase.auth.signOut();
     if (error) {
+      setProfiloCaricamento(false);
+      setProfiloErrore(
+        'Non è stato possibile completare il logout. Riprova.'
+      );
       Alert.alert("Errore", error.message);
       return;
     }
@@ -7721,6 +7766,8 @@ async function logout() {
     setTurni([]);
     richiestaBiometriaRef.current = false;
     setBiometriaSbloccata(!biometriaAbilitata);
+    setUtenteAutenticato(null);
+    setProfiloCaricamento(false);
     setAccessoTest(false);
     setScreen("home");
   }
@@ -7927,6 +7974,34 @@ async function logout() {
         </TouchableOpacity>
         <TouchableOpacity onPress={usaAccessoNormale} style={{ padding: 14, marginTop: 8 }}>
           <Text style={{ color: '#8FB8FF', fontWeight: '800' }}>ACCEDI CON EMAIL E PASSWORD</Text>
+        </TouchableOpacity>
+      </SafeAreaView>
+    );
+  }
+  if (profiloCaricamento) {
+    return (
+      <SafeAreaView style={styles.loading}>
+        <ActivityIndicator size="large" color={COLORS.blue} />
+        <Text style={styles.loadingText}>Caricamento profilo...</Text>
+      </SafeAreaView>
+    );
+  }
+  if (profiloErrore) {
+    return (
+      <SafeAreaView style={[styles.loading, { paddingHorizontal: 28 }]}>
+        <Ionicons name="cloud-offline-outline" size={52} color={COLORS.blue} />
+        <Text style={[styles.loadingText, { fontSize: 20, marginTop: 18 }]}>Profilo non disponibile</Text>
+        <Text style={{ color: COLORS.muted, textAlign: 'center', marginTop: 10, lineHeight: 20 }}>
+          {profiloErrore}
+        </Text>
+        <TouchableOpacity
+          onPress={() => setRicaricaProfilo((valore) => valore + 1)}
+          style={{ backgroundColor: '#284cff', borderRadius: 14, paddingVertical: 14, paddingHorizontal: 28, marginTop: 22 }}
+        >
+          <Text style={{ color: '#FFFFFF', fontWeight: '900' }}>RIPROVA</Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={logout} style={{ padding: 14, marginTop: 8 }}>
+          <Text style={{ color: '#8FB8FF', fontWeight: '800' }}>ESCI DALL’ACCOUNT</Text>
         </TouchableOpacity>
       </SafeAreaView>
     );
@@ -27469,7 +27544,7 @@ if (screen === 'profiloCollega') {
                     fontWeight: '900',
                   }}
                 >
-                  Ciao {profilo.nome} 👋
+                  {profilo.nome ? `Ciao ${profilo.nome} 👋` : 'Ciao 👋'}
                 </Text>
 
                 <Text
@@ -27482,7 +27557,9 @@ if (screen === 'profiloCollega') {
                     lineHeight: Platform.OS === 'android' ? 15 : undefined,
                   }}
                 >
-                  {profilo.azienda} · {profilo.ruolo}
+                  {[profilo.azienda, profilo.ruolo]
+                    .filter(Boolean)
+                    .join(' · ')}
                 </Text>
 
                 <View

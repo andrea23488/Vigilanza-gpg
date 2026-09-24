@@ -285,12 +285,7 @@ export default function LoginScreen({ onEnterTest, onAuthenticated }) {
         Alert.alert(
           'Account creato ✅',
           'Registrazione completata. Il tuo account è già attivo.',
-          [
-            {
-              text: 'OK',
-              onPress: onEnterTest,
-            },
-          ]
+          [{ text: 'OK' }]
         );
       } else {
         Alert.alert(
@@ -341,12 +336,7 @@ export default function LoginScreen({ onEnterTest, onAuthenticated }) {
       Alert.alert(
         'Accesso riuscito ✅',
         'Bentornato in Vigilanza GPG.',
-        [
-          {
-            text: 'ENTRA',
-            onPress: onEnterTest,
-          },
-        ]
+        [{ text: 'ENTRA' }]
       );
     } catch (error) {
       console.log('ERRORE LOGIN:', error);
@@ -462,7 +452,7 @@ E FIDUCIARI
                 label="NOME"
                 value={nome}
                 onChange={setNome}
-                placeholder="Andrea"
+                placeholder="Nome"
               />
 
               <Field
@@ -563,7 +553,7 @@ E FIDUCIARI
         )}
 
         <Text style={styles.footer}>
-          VIGILANZA GPG • VERSIONE TEST
+          VIGILANZA GPG
         </Text>
       </ScrollView>
     
