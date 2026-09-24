@@ -36,6 +36,7 @@ import {
   numeroEconomico,
   tariffaStraordinario30DaBase,
 } from './stipendioCalcoli';
+import { calcolaOreFiduciari } from './fiduciariOre';
 import { supabase } from './supabase';
 import {
   creaProfiloVuoto,
@@ -402,243 +403,6 @@ function calcolaStraordinariConfigurati({
   return extraMese;
 }
 
-
-/*
- * Dettaglio straordinari Fiduciario / Servizi di Sicurezza.
- *
- * NON sostituisce calcolaStraordinariConfigurati():
- * serve solo a classificare le ore extra settimanali
- * per fascia e natura, senza modificare il motore GPG.
- */
-function calcolaDettaglioStraordinariFiduciario({
-  tuttiTurni,
-  sogliaSettimanale,
-  meseTarget,
-  annoTarget,
-  isFestivo,
-}) {
-  const limite =
-    Number(sogliaSettimanale) > 0
-      ? Number(sogliaSettimanale)
-      : 40;
-
-  const risultato = {
-    ferialeDiurno25: 0,
-    ferialeDiurno30: 0,
-    ferialeNotturno35: 0,
-    festivoDiurno50: 0,
-    festivoNotturno60: 0,
-    totale: 0,
-  };
-
-  const turniUtili = (tuttiTurni || [])
-    .filter(
-      (t) =>
-        t &&
-        t.tipo === 'turno' &&
-        t.riposo_lavorato !== true &&
-        Number(t.ore || 0) > 0 &&
-        Number(t.giorno) > 0 &&
-        Number(t.mese) > 0 &&
-        Number(t.anno) > 0
-    )
-    .map((t) => {
-      const data = new Date(
-        Number(t.anno),
-        Number(t.mese) - 1,
-        Number(t.giorno),
-        12, 0, 0
-      );
-
-      const giornoSettimana = data.getDay();
-      const distanzaLunedi =
-        giornoSettimana === 0
-          ? -6
-          : 1 - giornoSettimana;
-
-      const lunedi = new Date(data);
-      lunedi.setDate(data.getDate() + distanzaLunedi);
-      lunedi.setHours(0, 0, 0, 0);
-
-      return {
-        ...t,
-        data,
-        chiaveSettimana: [
-          lunedi.getFullYear(),
-          String(lunedi.getMonth() + 1).padStart(2, '0'),
-          String(lunedi.getDate()).padStart(2, '0'),
-        ].join('-'),
-      };
-    })
-    .sort((a, b) => a.data - b.data);
-
-  const settimane = {};
-
-  turniUtili.forEach((t) => {
-    if (!settimane[t.chiaveSettimana]) {
-      settimane[t.chiaveSettimana] = [];
-    }
-
-    settimane[t.chiaveSettimana].push(t);
-  });
-
-  const isMinutoNotturno = (minutoAssoluto) => {
-    const minutoGiorno =
-      ((minutoAssoluto % 1440) + 1440) % 1440;
-
-    return minutoGiorno >= 22 * 60 ||
-      minutoGiorno < 6 * 60;
-  };
-
-  Object.values(settimane).forEach((turniSettimana) => {
-    let cumulato = 0;
-
-    turniSettimana.forEach((t) => {
-      const oreTurno = Number(t.ore || 0);
-
-      const extraPrima =
-        Math.max(0, cumulato - limite);
-
-      const cumulatoPrima = cumulato;
-      cumulato += oreTurno;
-
-      const extraDopo =
-        Math.max(0, cumulato - limite);
-
-      const extraTurno =
-        Math.max(0, extraDopo - extraPrima);
-
-      if (
-        extraTurno <= 0 ||
-        Number(t.mese) !== Number(meseTarget) ||
-        Number(t.anno) !== Number(annoTarget)
-      ) {
-        return;
-      }
-
-      const [hi, mi] =
-        String(t.inizio || '00:00')
-          .split(':')
-          .map(Number);
-
-      const [hf, mf] =
-        String(t.fine || '00:00')
-          .split(':')
-          .map(Number);
-
-      const inizioMinuti =
-        (Number(hi) || 0) * 60 +
-        (Number(mi) || 0);
-
-      let fineMinuti =
-        (Number(hf) || 0) * 60 +
-        (Number(mf) || 0);
-
-      if (fineMinuti <= inizioMinuti) {
-        fineMinuti += 1440;
-      }
-
-      /*
-       * Le ore extra sono la parte finale del turno che
-       * porta oltre la soglia settimanale.
-       */
-      const minutiExtra = extraTurno * 60;
-
-      const inizioExtra =
-        Math.max(
-          inizioMinuti,
-          fineMinuti - minutiExtra
-        );
-
-      const dataBaseTurno = new Date(
-        Number(t.anno),
-        Number(t.mese) - 1,
-        Number(t.giorno),
-        0, 0, 0
-      );
-
-      /*
-       * Classifichiamo a blocchi da 15 minuti.
-       * Consente di gestire anche turni che attraversano
-       * le 22:00 o le 06:00 senza attribuire tutta l'ora
-       * alla fascia sbagliata.
-       */
-      const passo = 15;
-
-      for (
-        let minuto = inizioExtra;
-        minuto < fineMinuti;
-        minuto += passo
-      ) {
-        const fineBlocco =
-          Math.min(minuto + passo, fineMinuti);
-
-        const oreBlocco =
-          (fineBlocco - minuto) / 60;
-
-        const notturno =
-          isMinutoNotturno(minuto);
-
-        // Data reale del blocco, anche se il turno supera mezzanotte.
-        const dataBlocco = new Date(
-          dataBaseTurno.getTime() + minuto * 60 * 1000
-        );
-
-        const domenica =
-          dataBlocco.getDay() === 0;
-
-        const festivo =
-          typeof isFestivo === 'function'
-            ? Boolean(
-                isFestivo(
-                  dataBlocco.getFullYear(),
-                  dataBlocco.getMonth() + 1,
-                  dataBlocco.getDate()
-                )
-              )
-            : false;
-
-        const domenicaleOFestivo =
-          domenica || festivo;
-
-        if (domenicaleOFestivo) {
-          if (notturno) {
-            risultato.festivoNotturno60 += oreBlocco;
-          } else {
-            risultato.festivoDiurno50 += oreBlocco;
-          }
-        } else if (notturno) {
-          risultato.ferialeNotturno35 += oreBlocco;
-        } else {
-          /*
-           * 41ª-48ª ora settimanale: +25%
-           * dalla 49ª ora: +30%
-           */
-          const oreSettimanaAlBlocco =
-            cumulatoPrima +
-            (
-              (minuto - inizioMinuti) / 60
-            );
-
-          if (oreSettimanaAlBlocco >= 48) {
-            risultato.ferialeDiurno30 += oreBlocco;
-          } else {
-            risultato.ferialeDiurno25 += oreBlocco;
-          }
-        }
-
-        risultato.totale += oreBlocco;
-      }
-    });
-  });
-
-  Object.keys(risultato).forEach((chiave) => {
-    risultato[chiave] =
-      Math.round(risultato[chiave] * 100) / 100;
-  });
-
-  return risultato;
-}
 
 export default function App() {
   const giorniSettimana = ["Dom", "Lun", "Mar", "Mer", "Gio", "Ven", "Sab"];
@@ -5080,7 +4844,7 @@ const debugLuglio = lista
     (t) => t.tipo === 'turno'
   );
 
-  const oreDomenicaliMese = giornateStipendioMese.reduce((tot, t) => {
+  const oreDomenicaliMeseLegacy = giornateStipendioMese.reduce((tot, t) => {
   if (!t.inizio || !t.fine) return tot;
 
   const giorno = Number(t.giorno);
@@ -5117,12 +4881,12 @@ const debugLuglio = lista
   return tot + minutiDomenicali / 60;
 }, 0);
 
-const oreStipendioMese = giornateStipendioMese.reduce(
+const oreStipendioMeseLegacy = giornateStipendioMese.reduce(
     (tot, t) => tot + oreRetribuiteTurno(t),
     0
   );
 
-  const extraStipendioMese =
+  const extraStipendioMeseLegacy =
     calcolaStraordinariConfigurati({
       giornateMese: giornateStipendioMese,
       tuttiTurni: turni,
@@ -5135,32 +4899,54 @@ const oreStipendioMese = giornateStipendioMese.reduce(
       annoTarget: anno,
     });
 
-  const dettaglioStraordinariFiduciarioTest =
-    stipendioTipoOperatore === 'fiduciario' &&
-    stipendioCalcoloStraordinari === 'settimanale'
-      ? calcolaDettaglioStraordinariFiduciario({
-          tuttiTurni: turni,
+  const riepilogoOreFiduciario = isFiduciario
+    ? calcolaOreFiduciari({
+        turni,
+        meseTarget: mese + 1,
+        annoTarget: anno,
+        configurazione: {
+          modalitaStraordinario:
+            stipendioCalcoloStraordinari === 'settimanale'
+              ? 'settimanale'
+              : 'giornaliera',
+          sogliaGiornaliera: oreOrdinarieGiornaliereNumero,
           sogliaSettimanale: Number(
-            String(stipendioOreSettimanali || '40')
-              .replace(',', '.')
+            String(stipendioOreSettimanali || '40').replace(',', '.')
           ),
-          meseTarget: mese + 1,
-          annoTarget: anno,
-          isFestivo: isFestivoNazionaleItaliano,
-        })
-      : null;
+        },
+      })
+    : null;
 
-  if (dettaglioStraordinariFiduciarioTest) {
-    console.log(
-      '🧮 TEST STRAORDINARI FIDUCIARIO',
-      {
-        vecchioTotale: Number(extraStipendioMese || 0),
-        nuovoDettaglio: dettaglioStraordinariFiduciarioTest,
-      }
-    );
-  }
+  const oreStipendioMese = isFiduciario
+    ? Number(riepilogoOreFiduciario?.ore.fisiche || 0)
+    : oreStipendioMeseLegacy;
+  const oreDomenicaliMese = isFiduciario
+    ? Number(riepilogoOreFiduciario?.ore.domenicali || 0)
+    : oreDomenicaliMeseLegacy;
+  const extraStipendioMese = isFiduciario
+    ? Number(riepilogoOreFiduciario?.ore.straordinarie || 0)
+    : extraStipendioMeseLegacy;
 
   const dettaglioStraordinariMese = (() => {
+    if (isFiduciario) {
+      const settimane = new Map();
+      (riepilogoOreFiduciario?.segmenti || [])
+        .filter((segmento) => segmento.straordinario)
+        .forEach((segmento) => {
+          settimane.set(
+            segmento.settimana,
+            (settimane.get(segmento.settimana) || 0) + segmento.minuti / 60
+          );
+        });
+
+      return [...settimane.entries()].map(([etichetta, extra]) => ({
+        tipo: 'settimana',
+        etichetta,
+        ore: extra,
+        extra,
+      }));
+    }
+
     // GIORNALIERO
     if (stipendioCalcoloStraordinari !== 'settimanale') {
       return aggregaTurniPerGiorno(
@@ -5644,20 +5430,23 @@ const totaleCompetenzeStimate = vociCompetenzeGpg.totale;
     pagaConglobataFiduciario /
     divisoreFiduciario;
 
-  /*
-   * Le ore straordinarie vengono già determinate dal calendario
-   * dell'app. Per ora distinguiamo correttamente il ramo
-   * Fiduciario dal ramo GPG.
-   *
-   * Straordinario feriale diurno:
-   * retribuzione oraria + maggiorazione 25%.
-   */
-  const tariffaStraordinarioFiduciario =
-    pagaOrariaFiduciario * 1.25;
+  const straordinariFiduciario =
+    riepilogoOreFiduciario?.straordinari || {};
 
+  /*
+   * Ogni ora extra viene valorizzata nella categoria determinata
+   * dall'unico motore temporale Fiduciari. Le categorie restano
+   * separate e la loro somma coincide con le ore extra fisiche.
+   */
   const importoStraordinarioFiduciario =
-    Number(extraStipendioMese || 0) *
-    tariffaStraordinarioFiduciario;
+    Number(straordinariFiduciario.ferialeDiurno25 || 0) *
+      pagaOrariaFiduciario * 1.25 +
+    Number(straordinariFiduciario.ferialeNotturno35 || 0) *
+      pagaOrariaFiduciario * 1.35 +
+    Number(straordinariFiduciario.festivoDiurno50 || 0) *
+      pagaOrariaFiduciario * 1.5 +
+    Number(straordinariFiduciario.festivoNotturno60 || 0) *
+      pagaOrariaFiduciario * 1.6;
 
   /*
    * Ore domenicali già calcolate dall'app.
@@ -5675,67 +5464,8 @@ const totaleCompetenzeStimate = vociCompetenzeGpg.totale;
     maggiorazioneDomenicaleFiduciario;
 
 
-  /*
-   * Calcolo reale delle ore comprese tra le 22:00 e le 06:00.
-   * Non usiamo il numero dei "turni notturni": calcoliamo
-   * effettivamente quante ore del turno cadono nella fascia.
-   */
-  const calcolaOreNotturneFiduciario = (turno) => {
-    if (
-      !turno ||
-      turno.tipo !== 'turno' ||
-      !turno.inizio ||
-      !turno.fine
-    ) {
-      return 0;
-    }
-
-    const [hi, mi] =
-      String(turno.inizio).split(':').map(Number);
-
-    const [hf, mf] =
-      String(turno.fine).split(':').map(Number);
-
-    const inizio =
-      hi * 60 + mi;
-
-    let fineTurno =
-      hf * 60 + mf;
-
-    if (fineTurno <= inizio) {
-      fineTurno += 24 * 60;
-    }
-
-    let minutiNotte = 0;
-
-    // Consideriamo abbastanza finestre per coprire
-    // anche i turni che superano la mezzanotte.
-    [
-      [-120, 360],      // 22:00 giorno precedente -> 06:00
-      [1320, 1800],    // 22:00 -> 06:00 giorno seguente
-      [2760, 3240],
-    ].forEach(([inizioNotte, fineNotte]) => {
-      const da =
-        Math.max(inizio, inizioNotte);
-
-      const a =
-        Math.min(fineTurno, fineNotte);
-
-      if (a > da) {
-        minutiNotte += a - da;
-      }
-    });
-
-    return minutiNotte / 60;
-  };
-
   const oreNotturneFiduciario =
-    giornateStipendioMese.reduce(
-      (tot, turno) =>
-        tot +
-        calcolaOreNotturneFiduciario(turno),
-      0
-    );
+    Number(riepilogoOreFiduciario?.ore.notturne || 0);
 
   /*
    * ATTENZIONE:
@@ -5879,9 +5609,27 @@ const totaleCompetenzeFiduciario =
       0
     );
 
+  const riepilogoOreFiduciarioCompletate = isFiduciario
+    ? calcolaOreFiduciari({
+        turni: giornateStipendioCompletate,
+        meseTarget: mese + 1,
+        annoTarget: anno,
+        configurazione: {
+          modalitaStraordinario:
+            stipendioCalcoloStraordinari === 'settimanale'
+              ? 'settimanale'
+              : 'giornaliera',
+          sogliaGiornaliera: oreOrdinarieGiornaliereNumero,
+          sogliaSettimanale: Number(
+            String(stipendioOreSettimanali || '40').replace(',', '.')
+          ),
+        },
+      })
+    : null;
+
 
   // Straordinari maturati sui soli turni conclusi
-  const extraCompletatoStipendio =
+  const extraCompletatoStipendioLegacy =
     calcolaStraordinariConfigurati({
       giornateMese: giornateStipendioCompletate,
       tuttiTurni: turni,
@@ -5894,6 +5642,10 @@ const totaleCompetenzeFiduciario =
       meseTarget: mese + 1,
       annoTarget: anno,
     });
+
+  const extraCompletatoStipendio = isFiduciario
+    ? Number(riepilogoOreFiduciarioCompletate?.ore.straordinarie || 0)
+    : extraCompletatoStipendioLegacy;
 
 
   // Ore domenicali dei soli turni conclusi
@@ -5949,10 +5701,9 @@ const totaleCompetenzeFiduciario =
     }, 0);
 
 
-  const oreDomenicaliCompletate =
-    calcolaDomenicaliCompletate(
-      giornateStipendioCompletate
-    );
+  const oreDomenicaliCompletate = isFiduciario
+    ? Number(riepilogoOreFiduciarioCompletate?.ore.domenicali || 0)
+    : calcolaDomenicaliCompletate(giornateStipendioCompletate);
 
 
   // Stessa classificazione GPG già utilizzata dal motore
@@ -5999,14 +5750,7 @@ const totaleCompetenzeFiduciario =
 
   // Ore notturne reali Fiduciario
   const oreNotturneFiduciarioCompletate =
-    giornateStipendioCompletate.reduce(
-      (tot, turno) =>
-        tot +
-        calcolaOreNotturneFiduciario(
-          turno
-        ),
-      0
-    );
+    Number(riepilogoOreFiduciarioCompletate?.ore.notturne || 0);
 
 
   // Helper: prende la quota già maturata di una componente
