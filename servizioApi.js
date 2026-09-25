@@ -1,5 +1,31 @@
 import { supabase } from './supabase';
 
+export const CAMPI_COLLEGHI_IN_SERVIZIO = [
+  'user_id',
+  'collega_id',
+  'giorno',
+  'mese',
+  'anno',
+  'inizio_utente',
+  'fine_utente',
+  'inizio_collega',
+  'fine_collega',
+].join(', ');
+
+export function minimizzaRigaCollegaInServizio(riga) {
+  return {
+    user_id: riga.user_id,
+    collega_id: riga.collega_id,
+    giorno: riga.giorno,
+    mese: riga.mese,
+    anno: riga.anno,
+    inizio_utente: riga.inizio_utente,
+    fine_utente: riga.fine_utente,
+    inizio_collega: riga.inizio_collega,
+    fine_collega: riga.fine_collega,
+  };
+}
+
 async function getCurrentUser() {
   const {
     data: { session },
@@ -17,7 +43,7 @@ export async function caricaColleghiInServizio(giorno, mese, anno) {
 
   const { data, error } = await supabase
     .from('colleghi_in_servizio')
-    .select('*')
+    .select(CAMPI_COLLEGHI_IN_SERVIZIO)
     .eq('giorno', giorno)
     .eq('mese', mese)
     .eq('anno', anno)
@@ -89,7 +115,7 @@ export async function caricaColleghiInServizio(giorno, mese, anno) {
       const insiemeA = Math.min(endA, endB);
 
       return {
-        ...riga,
+        ...minimizzaRigaCollegaInServizio(riga),
         altro_user_id: altroUserId,
         profilo: profilo || null,
         insieme_da: formatMinutes(insiemeDa),
@@ -100,4 +126,3 @@ export async function caricaColleghiInServizio(giorno, mese, anno) {
 
   return risultati;
 }
-

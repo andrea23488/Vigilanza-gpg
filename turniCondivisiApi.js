@@ -1,5 +1,32 @@
 import { supabase } from './supabase';
 
+export const POSTAZIONE_NON_INDICATA = 'Postazione non indicata';
+
+export function valoreOperativitaStorica(valore) {
+  const normalizzato = String(valore || '')
+    .trim()
+    .toLocaleLowerCase('it-IT');
+
+  if (!normalizzato) return false;
+
+  return (
+    /^(ronda|piantonamento)(\s|$|[-/])/.test(normalizzato) ||
+    ['servizio', 'turno', 'operatività', 'operativita'].includes(normalizzato)
+  );
+}
+
+export function postazioneTurnoCondiviso(turno) {
+  const indirizzo = String(turno?.indirizzo_servizio || '').trim();
+  if (indirizzo) return indirizzo;
+
+  const luogoStorico = String(turno?.luogo || '').trim();
+  if (luogoStorico && !valoreOperativitaStorica(luogoStorico)) {
+    return luogoStorico;
+  }
+
+  return POSTAZIONE_NON_INDICATA;
+}
+
 async function getCurrentUser() {
   const {
     data: { session },
@@ -206,12 +233,11 @@ export async function caricaTurniCondivisiRicevuti() {
       };
 
       if (condivisione.livello === 'orari_luogo') {
-        const postazione = String(
-          turno.indirizzo_servizio || turno.luogo || ''
-        ).trim();
+        const postazione = postazioneTurnoCondiviso(turno);
 
-        turnoVisibile.postazione = postazione || null;
-        turnoVisibile.indirizzo_servizio = postazione || null;
+        turnoVisibile.postazione = postazione;
+        turnoVisibile.indirizzo_servizio =
+          postazione === POSTAZIONE_NON_INDICATA ? null : postazione;
       }
 
       return {
