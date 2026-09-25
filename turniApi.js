@@ -1,4 +1,8 @@
 import { supabase } from './supabase';
+import {
+  creaErroreBackendTurni,
+  eseguiRichiestaTurni,
+} from './turniRete';
 
 async function getAuthContext() {
   const {
@@ -43,17 +47,21 @@ export async function caricaTurniUtente() {
     `&user_id=eq.${user.id}` +
     `&order=anno.asc,mese.asc,giorno.asc,inizio.asc.nullslast`;
 
-  const response = await fetch(url, {
-    method: 'GET',
-    headers: buildHeaders(accessToken),
+  const { response, testo } = await eseguiRichiestaTurni({
+    url,
+    operazione: 'il caricamento dei turni',
+    opzioni: {
+      method: 'GET',
+      headers: buildHeaders(accessToken),
+    },
   });
 
-  const testo = await response.text();
-
   if (!response.ok) {
-    throw new Error(
-      `Errore lettura turni HTTP ${response.status}: ${testo}`
-    );
+    throw creaErroreBackendTurni({
+      operazione: 'il caricamento dei turni',
+      status: response.status,
+      dettagli: testo,
+    });
   }
 
   return testo ? JSON.parse(testo) : [];
@@ -67,24 +75,26 @@ export async function creaTurnoUtente(payload) {
     user_id: user.id,
   };
 
-  const response = await fetch(
-    `${process.env.EXPO_PUBLIC_SUPABASE_URL}/rest/v1/turni`,
-    {
+  const url = `${process.env.EXPO_PUBLIC_SUPABASE_URL}/rest/v1/turni`;
+  const { response, testo } = await eseguiRichiestaTurni({
+    url,
+    operazione: 'il salvataggio del turno',
+    opzioni: {
       method: 'POST',
       headers: {
         ...buildHeaders(accessToken, true),
         Prefer: 'return=representation',
       },
       body: JSON.stringify(payloadCompleto),
-    }
-  );
-
-  const testo = await response.text();
+    },
+  });
 
   if (!response.ok) {
-    throw new Error(
-      `Errore creazione turno HTTP ${response.status}: ${testo}`
-    );
+    throw creaErroreBackendTurni({
+      operazione: 'il salvataggio del turno',
+      status: response.status,
+      dettagli: testo,
+    });
   }
 
   const righe = testo ? JSON.parse(testo) : [];
@@ -104,24 +114,26 @@ export async function aggiornaTurnoUtente(id, payload) {
     user_id: user.id,
   };
 
-  const response = await fetch(
-    `${process.env.EXPO_PUBLIC_SUPABASE_URL}/rest/v1/turni?id=eq.${id}&user_id=eq.${user.id}`,
-    {
+  const url = `${process.env.EXPO_PUBLIC_SUPABASE_URL}/rest/v1/turni?id=eq.${id}&user_id=eq.${user.id}`;
+  const { response, testo } = await eseguiRichiestaTurni({
+    url,
+    operazione: 'la modifica del turno',
+    opzioni: {
       method: 'PATCH',
       headers: {
         ...buildHeaders(accessToken, true),
         Prefer: 'return=representation',
       },
       body: JSON.stringify(payloadCompleto),
-    }
-  );
-
-  const testo = await response.text();
+    },
+  });
 
   if (!response.ok) {
-    throw new Error(
-      `Errore modifica turno HTTP ${response.status}: ${testo}`
-    );
+    throw creaErroreBackendTurni({
+      operazione: 'la modifica del turno',
+      status: response.status,
+      dettagli: testo,
+    });
   }
 
   const righe = testo ? JSON.parse(testo) : [];
@@ -136,20 +148,22 @@ export async function aggiornaTurnoUtente(id, payload) {
 export async function eliminaTurnoUtente(id) {
   const { user, accessToken } = await getAuthContext();
 
-  const response = await fetch(
-    `${process.env.EXPO_PUBLIC_SUPABASE_URL}/rest/v1/turni?id=eq.${id}&user_id=eq.${user.id}`,
-    {
+  const url = `${process.env.EXPO_PUBLIC_SUPABASE_URL}/rest/v1/turni?id=eq.${id}&user_id=eq.${user.id}`;
+  const { response, testo } = await eseguiRichiestaTurni({
+    url,
+    operazione: 'l’eliminazione del turno',
+    opzioni: {
       method: 'DELETE',
       headers: buildHeaders(accessToken),
-    }
-  );
-
-  const testo = await response.text();
+    },
+  });
 
   if (!response.ok) {
-    throw new Error(
-      `Errore eliminazione turno HTTP ${response.status}: ${testo}`
-    );
+    throw creaErroreBackendTurni({
+      operazione: 'l’eliminazione del turno',
+      status: response.status,
+      dettagli: testo,
+    });
   }
 
   return true;

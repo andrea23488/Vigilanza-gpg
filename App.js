@@ -24,6 +24,7 @@ import {
   sottoscriviMessaggiConversazione,
 } from './chatApi';
 import { caricaTurniUtente, creaTurnoUtente, aggiornaTurnoUtente, eliminaTurnoUtente } from './turniApi';
+import { messaggioErroreTurni } from './turniRete';
 import {
   aggregaTurniPerGiorno,
   calcolaOreIntervallo,
@@ -4711,7 +4712,11 @@ useEffect(() => {
       setLoading(false);
     }
   }
-  async function caricaTurni(mostraLoading = true) {
+  async function caricaTurni(mostraLoading = true, opzioni = {}) {
+    const {
+      preservaTurniSuErrore = false,
+      mostraErrore = true,
+    } = opzioni;
     try {
       if (mostraLoading) setLoading(true);
       const dati = await caricaTurniUtente();
@@ -4826,12 +4831,21 @@ const debugLuglio = lista
     setTurni(lista);
       return lista;
     } catch (error) {
-      console.log("ERRORE LETTURA TURNI UTENTE:", error);
-      if (error.message !== "Utente non autenticato.") {
-        Alert.alert("Errore database", error.message || "Impossibile leggere i turni.");
+      console.log("ERRORE LETTURA TURNI UTENTE:", {
+        codice: error?.codice,
+        status: error?.status,
+        operazione: error?.operazione,
+        dettagli: error?.dettagli,
+        error,
+      });
+      if (mostraErrore && error.message !== "Utente non autenticato.") {
+        Alert.alert(
+          "Errore caricamento turni",
+          messaggioErroreTurni(error, "Impossibile leggere i turni.")
+        );
       }
-      setTurni([]);
-      return [];
+      if (!preservaTurniSuErrore) setTurni([]);
+      return null;
     } finally {
       if (mostraLoading) setLoading(false);
     }
@@ -7058,24 +7072,21 @@ console.log("🕒 ORA REALE:", new Date().toString());
       }
 
       if (tipo === 'turno') {
-        const altriTurniGiorno = turni.filter(
+        const altriTurni = turni.filter(
           (t) =>
             t.tipo === 'turno' &&
-            Number(t.giorno) === Number(giorno) &&
-            Number(t.mese) === Number(mese + 1) &&
-            Number(t.anno) === Number(anno) &&
             String(t.id) !== String(editingId)
         );
 
         const conflitti = rilevaSovrapposizioniGiornaliere([
-          ...altriTurniGiorno,
+          ...altriTurni,
           { ...payload, id: editingId || 'nuovo' },
         ]);
 
         if (conflitti.length > 0) {
           Alert.alert(
             'Turni sovrapposti',
-            'Questo turno si sovrappone a un altro servizio della stessa giornata. Correggi gli orari prima di salvare.'
+            'Questo turno si sovrappone a un altro servizio, anche considerando i turni che attraversano la mezzanotte. Correggi gli orari prima di salvare.'
           );
           return;
         }
@@ -7133,8 +7144,12 @@ console.log("🕒 ORA REALE:", new Date().toString());
         }
       );
 
-      await caricaTurni(
-        false
+      const refreshCompletato = await caricaTurni(
+        false,
+        {
+          preservaTurniSuErrore: true,
+          mostraErrore: false,
+        }
       );
 
       setEditingId(
@@ -7143,7 +7158,9 @@ console.log("🕒 ORA REALE:", new Date().toString());
 
       Alert.alert(
         'Salvato ✅',
-        'La giornata è stata salvata nel database.',
+        refreshCompletato === null
+          ? 'Il turno è stato salvato, ma non è stato possibile aggiornare subito l’elenco dal server. I dati locali restano disponibili: controlla la connessione e usa Aggiorna.'
+          : 'La giornata è stata salvata nel database.',
         [
           {
             text: 'OK',
@@ -7160,13 +7177,18 @@ console.log("🕒 ORA REALE:", new Date().toString());
     } catch (error) {
       console.log(
         'ERRORE SALVATAGGIO:',
-        error
+        {
+          codice: error?.codice,
+          status: error?.status,
+          operazione: error?.operazione,
+          dettagli: error?.dettagli,
+          error,
+        }
       );
 
       Alert.alert(
-        'Errore database',
-        error.message ||
-          'Salvataggio non riuscito.'
+        'Salvataggio non riuscito',
+        messaggioErroreTurni(error, 'Salvataggio non riuscito.')
       );
     } finally {
       setSaving(false);
@@ -7227,13 +7249,28 @@ console.log("🕒 ORA REALE:", new Date().toString());
       );
 
       setEditingId(null);
-      await caricaTurni(false);
+      const refreshCompletato = await caricaTurni(false, {
+        preservaTurniSuErrore: true,
+        mostraErrore: false,
+      });
       setScreen('giornoTurni');
+      if (refreshCompletato === null) {
+        Alert.alert(
+          'Turno eliminato',
+          'Il turno è stato eliminato, ma non è stato possibile aggiornare subito l’elenco dal server. Controlla la connessione e usa Aggiorna.'
+        );
+      }
     } catch (error) {
-      console.log("ERRORE ELIMINAZIONE TURNO UTENTE:", error);
+      console.log("ERRORE ELIMINAZIONE TURNO UTENTE:", {
+        codice: error?.codice,
+        status: error?.status,
+        operazione: error?.operazione,
+        dettagli: error?.dettagli,
+        error,
+      });
       Alert.alert(
         "Errore",
-        error.message || "Eliminazione non riuscita."
+        messaggioErroreTurni(error, "Eliminazione non riuscita.")
       );
     } finally {
       setSaving(false);
@@ -25981,6 +26018,26 @@ if (screen === 'profiloCollega') {
           )
         }
       />
+
+      <Quick
+        title="06–18"
+        onPress={() =>
+          turnoRapido(
+            '06:00',
+            '18:00'
+          )
+        }
+      />
+
+      <Quick
+        title="18–06"
+        onPress={() =>
+          turnoRapido(
+            '18:00',
+            '06:00'
+          )
+        }
+      />
             </View>
 
             <View
@@ -42551,11 +42608,13 @@ const styles =
     quickRow: {
       flexDirection:
         'row',
+      flexWrap: 'wrap',
       marginBottom: 18,
     },
 
     quick: {
-      flex: 1,
+      flexGrow: 1,
+      flexBasis: '22%',
       backgroundColor: '#10213A',
       paddingVertical: 13,
       paddingHorizontal: 3,

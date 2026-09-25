@@ -27,6 +27,73 @@ export function calcolaOreIntervallo(inizio, fine) {
   return (end - start) / 60;
 }
 
+function leggiOraTurno(valore) {
+  const parti = String(valore || '').split(':');
+  if (parti.length !== 2) return null;
+
+  const ore = Number(parti[0]);
+  const minuti = Number(parti[1]);
+  if (
+    !Number.isInteger(ore) ||
+    !Number.isInteger(minuti) ||
+    ore < 0 ||
+    ore > 23 ||
+    minuti < 0 ||
+    minuti > 59
+  ) {
+    return null;
+  }
+
+  return { ore, minuti };
+}
+
+export function intervalloTemporaleTurno(turno) {
+  if (turno?.tipo !== 'turno') return null;
+
+  const anno = Number(turno.anno);
+  const mese = Number(turno.mese);
+  const giorno = Number(turno.giorno);
+  const oraInizio = leggiOraTurno(turno.inizio);
+  const oraFine = leggiOraTurno(turno.fine);
+
+  if (
+    !Number.isInteger(anno) ||
+    !Number.isInteger(mese) ||
+    !Number.isInteger(giorno) ||
+    !oraInizio ||
+    !oraFine
+  ) {
+    return null;
+  }
+
+  const inizio = Date.UTC(
+    anno,
+    mese - 1,
+    giorno,
+    oraInizio.ore,
+    oraInizio.minuti
+  );
+  const dataVerifica = new Date(inizio);
+  if (
+    dataVerifica.getUTCFullYear() !== anno ||
+    dataVerifica.getUTCMonth() !== mese - 1 ||
+    dataVerifica.getUTCDate() !== giorno
+  ) {
+    return null;
+  }
+
+  let fine = Date.UTC(
+    anno,
+    mese - 1,
+    giorno,
+    oraFine.ore,
+    oraFine.minuti
+  );
+  if (fine <= inizio) fine += 24 * 60 * 60 * 1000;
+
+  return { turno, inizio, fine };
+}
+
 export function minutiAggiuntiviTurno(turno) {
   const minuti = Number(turno?.minuti_aggiuntivi_retribuiti || 0);
   return Number.isFinite(minuti) && minuti > 0 ? minuti : 0;
@@ -92,21 +159,17 @@ export function aggregaTurniPerGiorno(turni = [], sogliaGiornaliera = 7) {
 
 export function rilevaSovrapposizioniGiornaliere(turni = []) {
   const intervalli = (Array.isArray(turni) ? turni : [])
-    .filter((turno) => turno?.tipo === 'turno' && turno?.inizio && turno?.fine)
-    .map((turno) => {
-      const [hi, mi] = String(turno.inizio).split(':').map(Number);
-      const [hf, mf] = String(turno.fine).split(':').map(Number);
-      const inizio = hi * 60 + mi;
-      let fine = hf * 60 + mf;
-      if (fine <= inizio) fine += 24 * 60;
-      return { turno, inizio, fine };
-    })
+    .map(intervalloTemporaleTurno)
+    .filter(Boolean)
     .sort((a, b) => a.inizio - b.inizio);
 
   const conflitti = [];
-  for (let i = 1; i < intervalli.length; i += 1) {
-    if (intervalli[i].inizio < intervalli[i - 1].fine) {
-      conflitti.push([intervalli[i - 1].turno, intervalli[i].turno]);
+  for (let i = 0; i < intervalli.length; i += 1) {
+    for (let j = i + 1; j < intervalli.length; j += 1) {
+      if (intervalli[j].inizio >= intervalli[i].fine) break;
+      if (intervalli[j].fine > intervalli[i].inizio) {
+        conflitti.push([intervalli[i].turno, intervalli[j].turno]);
+      }
     }
   }
   return conflitti;
