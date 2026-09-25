@@ -26,6 +26,12 @@ import {
 import { caricaTurniUtente, creaTurnoUtente, aggiornaTurnoUtente, eliminaTurnoUtente } from './turniApi';
 import { messaggioErroreTurni } from './turniRete';
 import {
+  CHIAVE_POSTAZIONI,
+  caricaPostazioniLocali,
+  copiaFotoPostazionePermanente,
+  eliminaFotoPostazioneSeInutilizzata,
+} from './postazioniMedia';
+import {
   aggregaTurniPerGiorno,
   calcolaOreIntervallo,
   chiaveDataTurno,
@@ -2649,46 +2655,37 @@ if (dati.tariffaStraordinario != null) {
   const [postazioneFotoDraft, setPostazioneFotoDraft] =
     useState(null);
 
-  const copiaFotoPostazione = async (
-    uri,
-    nomeOriginale
-  ) => {
-    if (!uri) return null;
+  const eliminaFotoPostazioneSicura = async (uri, postazioniResidue) => {
+    if (!uri) return;
+    try {
+      await eliminaFotoPostazioneSeInutilizzata({
+        uri,
+        postazioniResidue,
+      });
+    } catch (error) {
+      console.log('Pulizia foto postazione non riuscita:', {
+        uri,
+        error,
+      });
+    }
+  };
 
-    const cartella =
-      FileSystem.documentDirectory +
-      'postazioni_vigilanza/';
+  const impostaNuovaFotoPostazione = async (uri, nomeOriginale) => {
+    const fotoPrecedente = postazioneFotoDraft;
+    const foto = await copiaFotoPostazionePermanente({
+      uri,
+      nomeOriginale,
+    });
+    setPostazioneFotoDraft(foto);
 
-    const info =
-      await FileSystem.getInfoAsync(
-        cartella
-      );
-
-    if (!info.exists) {
-      await FileSystem.makeDirectoryAsync(
-        cartella,
-        { intermediates: true }
+    if (fotoPrecedente && fotoPrecedente !== foto) {
+      await eliminaFotoPostazioneSicura(
+        fotoPrecedente,
+        postazioniSalvate
       );
     }
 
-    const estensione =
-      String(nomeOriginale || '')
-        .split('.')
-        .pop()
-        .replace(/[^a-zA-Z0-9]/g, '')
-        .toLowerCase() ||
-      'jpg';
-
-    const destinazione =
-      cartella +
-      `postazione_${Date.now()}.${estensione}`;
-
-    await FileSystem.copyAsync({
-      from: uri,
-      to: destinazione,
-    });
-
-    return destinazione;
+    return foto;
   };
 
   const scegliFotoPostazione = async () => {
@@ -2722,14 +2719,11 @@ if (dati.tariffaStraordinario != null) {
       const asset =
         risultato.assets[0];
 
-      const foto =
-        await copiaFotoPostazione(
+      await impostaNuovaFotoPostazione(
           asset.uri,
           asset.fileName ||
             `postazione_${Date.now()}.jpg`
         );
-
-      setPostazioneFotoDraft(foto);
 
     } catch (e) {
       console.log(
@@ -2775,14 +2769,11 @@ if (dati.tariffaStraordinario != null) {
       const asset =
         risultato.assets[0];
 
-      const foto =
-        await copiaFotoPostazione(
+      await impostaNuovaFotoPostazione(
           asset.uri,
           asset.fileName ||
             `postazione_${Date.now()}.jpg`
         );
-
-      setPostazioneFotoDraft(foto);
 
     } catch (e) {
       console.log(
@@ -2822,16 +2813,19 @@ if (dati.tariffaStraordinario != null) {
 
     (async () => {
       try {
-        const dati = await AsyncStorage.getItem(
-          'vigilanza_postazioni'
-        );
+        const risultato = await caricaPostazioniLocali({
+          storage: AsyncStorage,
+        });
 
-        if (attivo && dati) {
-          const parsed = JSON.parse(dati);
+        if (risultato.errori.length > 0) {
+          console.log(
+            'Alcune foto postazioni non sono state migrate:',
+            risultato.errori
+          );
+        }
 
-          if (Array.isArray(parsed)) {
-            setPostazioniSalvate(parsed);
-          }
+        if (attivo) {
+          setPostazioniSalvate(risultato.postazioni);
         }
       } catch (e) {
         console.log(
@@ -2864,6 +2858,14 @@ if (dati.tariffaStraordinario != null) {
     setPostazioneFotoDraft(null);
 
     setScreen('postazioneDettaglio');
+  };
+
+  const chiudiDettaglioPostazione = async () => {
+    await eliminaFotoPostazioneSicura(
+      postazioneFotoDraft,
+      postazioniSalvate
+    );
+    setScreen('postazioni');
   };
 
   const apriPostazione = (postazione) => {
@@ -2915,7 +2917,9 @@ if (dati.tariffaStraordinario != null) {
     );
 
     setPostazioneFotoDraft(
-      postazione?.foto || null
+      postazione?.fotoNonDisponibile
+        ? null
+        : postazione?.foto || null
     );
 
     setScreen('postazioneDettaglio');
@@ -2955,6 +2959,7 @@ if (dati.tariffaStraordinario != null) {
       telefonoResponsabile:
         postazioneTelefonoResponsabileDraft.trim(),
       foto: postazioneFotoDraft || null,
+      fotoNonDisponibile: false,
       aggiornatoIl: new Date().toISOString(),
     };
 
@@ -2966,14 +2971,19 @@ if (dati.tariffaStraordinario != null) {
         )
       : [nuova, ...postazioniSalvate];
 
-    setPostazioniSalvate(nuove);
-    setPostazioneSelezionata(nuova);
-
     try {
       await AsyncStorage.setItem(
-        'vigilanza_postazioni',
+        CHIAVE_POSTAZIONI,
         JSON.stringify(nuove)
       );
+
+      setPostazioniSalvate(nuove);
+      setPostazioneSelezionata(nuova);
+
+      const fotoPrecedente = postazioneSelezionata?.foto || null;
+      if (fotoPrecedente && fotoPrecedente !== nuova.foto) {
+        await eliminaFotoPostazioneSicura(fotoPrecedente, nuove);
+      }
 
       Alert.alert(
         'Postazione salvata',
@@ -3017,18 +3027,27 @@ if (dati.tariffaStraordinario != null) {
                   postazioneSelezionata.id
               );
 
-            setPostazioniSalvate(nuove);
-
             try {
               await AsyncStorage.setItem(
-                'vigilanza_postazioni',
+                CHIAVE_POSTAZIONI,
                 JSON.stringify(nuove)
+              );
+
+              setPostazioniSalvate(nuove);
+              await eliminaFotoPostazioneSicura(
+                postazioneSelezionata.foto,
+                nuove
               );
             } catch (e) {
               console.log(
                 'Errore eliminazione postazione:',
                 e
               );
+              Alert.alert(
+                'Errore',
+                'Non è stato possibile eliminare la postazione.'
+              );
+              return;
             }
 
             setPostazioneSelezionata(null);
@@ -18242,7 +18261,7 @@ if (screen === 'strumenti') {
                     'rgba(83,199,184,0.24)',
                 }}
               >
-                {postazione.foto ? (
+                {postazione.foto && !postazione.fotoNonDisponibile ? (
                   <Image
                     source={{
                       uri: postazione.foto,
@@ -18331,9 +18350,7 @@ if (screen === 'strumenti') {
     return (
       <Screen>
         <Back
-          onPress={() =>
-            setScreen('postazioni')
-          }
+          onPress={chiudiDettaglioPostazione}
         />
 
         <View
