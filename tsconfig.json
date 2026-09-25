@@ -1,4 +1,15 @@
 {
   "compilerOptions": {},
-  "extends": "expo/tsconfig.base"
+  "extends": "expo/tsconfig.base",
+  "exclude": [
+    "**/*BACKUP*",
+    "**/*backup*",
+    "**/*ROTTO*",
+    "**/*rotto*",
+    "**/*PRIMA*",
+    "**/*prima*",
+    "**/*STABILE*",
+    "**/*stabile*",
+    "supabase/functions/**"
+  ]
 }

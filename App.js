@@ -7645,7 +7645,6 @@ async function logout() {
     return (
       <SafeAreaView style={styles.loading}>
         <ActivityIndicator size="large" color={COLORS.blue} />
-        <Text style={styles.loadingText}>Ripristino sessione...</Text>
       </SafeAreaView>
     );
   }
@@ -7689,11 +7688,10 @@ async function logout() {
       </SafeAreaView>
     );
   }
-  if (profiloCaricamento) {
+  if (profiloCaricamento || loading) {
     return (
       <SafeAreaView style={styles.loading}>
         <ActivityIndicator size="large" color={COLORS.blue} />
-        <Text style={styles.loadingText}>Caricamento profilo...</Text>
       </SafeAreaView>
     );
   }
@@ -7717,33 +7715,6 @@ async function logout() {
       </SafeAreaView>
     );
   }
-  if (loading) {
-    return (
-      <SafeAreaView
-        style={
-          styles.loading
-        }
-      >
-        <ActivityIndicator
-          size="large"
-          color={
-            COLORS.blue
-          }
-        />
-
-        <Text
-          style={
-            styles.loadingText
-          }
-        >
-          Caricamento Vigilanza GPG...
-        </Text>
-      </SafeAreaView>
-    );
-  }
-
-  
-
   if (screen === 'dettaglioConsegna') {
     return (
       <SafeAreaView
