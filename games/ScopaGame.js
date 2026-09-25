@@ -204,6 +204,58 @@ function calcolaPunti(preseGiocatore, preseCpu, scopeGiocatore, scopeCpu) {
   };
 }
 
+function OpzionePresaScopa({ presa, onPress }) {
+  const descrizione = testoPresaScopa(presa);
+
+  return (
+    <TouchableOpacity
+      accessibilityRole="button"
+      accessibilityLabel={`Prendi ${descrizione}`}
+      accessibilityHint="Seleziona queste carte dal tavolo"
+      onPress={() => onPress(presa)}
+      style={{
+        backgroundColor: '#FFFFFF',
+        borderRadius: 16,
+        paddingVertical: 12,
+        paddingHorizontal: 8,
+        marginBottom: 12,
+        borderWidth: 2,
+        borderColor: '#D6E5DC',
+      }}
+    >
+      <View
+        style={{
+          flexDirection: 'row',
+          flexWrap: 'wrap',
+          justifyContent: 'center',
+          alignItems: 'center',
+        }}
+      >
+        {presa.map((carta) => (
+          <View
+            key={`opzione-carta-${carta.id}`}
+            style={{ marginHorizontal: 3, marginVertical: 3 }}
+          >
+            <NapoletanaCard carta={carta} piccola />
+          </View>
+        ))}
+      </View>
+
+      <Text
+        style={{
+          color: '#071A12',
+          fontWeight: '900',
+          textAlign: 'center',
+          fontSize: 14,
+          marginTop: 5,
+        }}
+      >
+        {descrizione}
+      </Text>
+    </TouchableOpacity>
+  );
+}
+
 export default function ScopaGame({ onBack }) {
   const insets = useSafeAreaInsets();
   const [manoGiocatore, setManoGiocatore] = useState([]);
@@ -719,9 +771,9 @@ export default function ScopaGame({ onBack }) {
         <View
           style={{
             flex: 1,
-            backgroundColor: 'rgba(0,0,0,0.72)',
+            backgroundColor: 'rgba(0,0,0,0.68)',
             justifyContent: 'center',
-            paddingHorizontal: 22,
+            paddingHorizontal: 14,
             paddingTop: Math.max(insets.top, 16),
             paddingBottom: Math.max(insets.bottom, 16),
           }}
@@ -735,10 +787,12 @@ export default function ScopaGame({ onBack }) {
             style={{
               backgroundColor: '#103C2A',
               borderRadius: 24,
-              padding: 18,
+              padding: 14,
               borderWidth: 2,
               borderColor: 'rgba(255,255,255,0.30)',
-              maxHeight: '100%',
+              width: '100%',
+              maxWidth: 520,
+              alignSelf: 'center',
             }}
           >
             <Text
@@ -765,29 +819,33 @@ export default function ScopaGame({ onBack }) {
               {`Hai ${opzioniPresa.length} possibilità`}
             </Text>
 
+            <Text
+              style={{
+                color: '#D9E9DF',
+                fontSize: 13,
+                fontWeight: '800',
+                textAlign: 'center',
+                marginBottom: 6,
+              }}
+            >
+              CARTA GIOCATA
+            </Text>
+
+            <View
+              style={{
+                alignItems: 'center',
+                marginBottom: 14,
+              }}
+            >
+              <NapoletanaCard carta={cartaDaGiocare} piccola />
+            </View>
+
             {opzioniPresa.map((presa) => (
-              <TouchableOpacity
+              <OpzionePresaScopa
                 key={`modal-presa-${chiavePresaScopa(presa)}`}
-                onPress={() => scegliPresaGiocatore(presa)}
-                style={{
-                  backgroundColor: '#FFFFFF',
-                  borderRadius: 16,
-                  paddingVertical: 14,
-                  paddingHorizontal: 12,
-                  marginBottom: 10,
-                }}
-              >
-                <Text
-                  style={{
-                    color: '#071A12',
-                    fontWeight: '900',
-                    textAlign: 'center',
-                    fontSize: 16,
-                  }}
-                >
-                  {testoPresaScopa(presa)}
-                </Text>
-              </TouchableOpacity>
+                presa={presa}
+                onPress={scegliPresaGiocatore}
+              />
             ))}
           </View>
           </ScrollView>
@@ -1105,55 +1163,6 @@ export default function ScopaGame({ onBack }) {
             ))
           )}
         </View>
-
-        {opzioniPresa.length > 1 && cartaDaGiocare && (
-          <View
-            style={{
-              backgroundColor: 'rgba(255,255,255,0.09)',
-              borderRadius: 18,
-              padding: 12,
-              marginBottom: 15,
-              borderWidth: 1,
-              borderColor: 'rgba(255,255,255,0.16)',
-            }}
-          >
-            <Text
-              style={{
-                color: '#FFFFFF',
-                fontWeight: '900',
-                fontSize: 16,
-                textAlign: 'center',
-                marginBottom: 10,
-              }}
-            >
-              SCEGLI LA PRESA
-            </Text>
-
-            {opzioniPresa.map((presa) => (
-              <TouchableOpacity
-                key={`presa-${chiavePresaScopa(presa)}`}
-                onPress={() => scegliPresaGiocatore(presa)}
-                style={{
-                  backgroundColor: 'rgba(255,255,255,0.12)',
-                  paddingVertical: 12,
-                  paddingHorizontal: 12,
-                  borderRadius: 13,
-                  marginBottom: 8,
-                }}
-              >
-                <Text
-                  style={{
-                    color: '#FFFFFF',
-                    fontWeight: '800',
-                    textAlign: 'center',
-                  }}
-                >
-                  {`Prendi: ${testoPresaScopa(presa)}`}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        )}
 
         <Text
           style={{

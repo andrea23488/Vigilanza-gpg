@@ -121,6 +121,14 @@ function main() {
   assert.match(briscolaRulesSource, /creaMazzoItaliano/);
   assert.match(briscolaSource, /creaMazzoBriscola/);
   assert.doesNotMatch(scopaSource + briscolaSource, /assets\/carte-piacentine/);
+
+  // La scelta multipla mostra gli oggetti carta reali, identificati tramite ID.
+  assert.match(scopaSource, /function OpzionePresaScopa\(\{ presa, onPress \}\)/);
+  assert.match(scopaSource, /presa\.map\(\(carta\) => \(/);
+  assert.match(scopaSource, /key=\{`opzione-carta-\$\{carta\.id\}`\}/);
+  assert.match(scopaSource, /<NapoletanaCard carta=\{carta\} piccola \/>/);
+  assert.match(scopaSource, /onPress=\{\(\) => onPress\(presa\)\}/);
+  assert.doesNotMatch(scopaSource, /opzioniPresa\[[^\]]+\]/);
   const deckBriscola = briscola.creaMazzoBriscola();
   assert.equal(deckBriscola.length, 40);
   assert.deepEqual(
