@@ -1,5 +1,5 @@
 import React from 'react';
-import { CARTE_PIACENTINE } from './cartePiacentine';
+import { risolviAssetCarta } from './cartePiacentine';
 import {
   Image,
   View,
@@ -782,11 +782,7 @@ function Figura({ carta }) {
 function FronteCarta({ carta }) {
   if (!carta) return null;
 
-  const seme = String(carta.seme || '').toLowerCase();
-  const valore = Number(carta.valore);
-
-  const immagine =
-    CARTE_PIACENTINE?.[seme]?.[valore];
+  const immagine = risolviAssetCarta(carta);
 
   if (!immagine) {
     return null;

@@ -12,27 +12,10 @@ import {
 } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import NapoletanaCard from './NapoletanaCard';
-import { creaMazzoItaliano } from './mazzoItaliano';
-
-const REGOLE_BRISCOLA = {
-  1: { punti: 11, forza: 10 },
-  2: { punti: 0, forza: 1 },
-  3: { punti: 10, forza: 9 },
-  4: { punti: 0, forza: 2 },
-  5: { punti: 0, forza: 3 },
-  6: { punti: 0, forza: 4 },
-  7: { punti: 0, forza: 5 },
-  8: { punti: 2, forza: 6 },
-  9: { punti: 3, forza: 7 },
-  10: { punti: 4, forza: 8 },
-};
-
-
-function creaMazzo() {
-  return creaMazzoItaliano((carta) =>
-    REGOLE_BRISCOLA[carta.valore]
-  );
-}
+import {
+  cartaVincenteBriscola,
+  creaMazzoBriscola,
+} from './briscolaRegole';
 
 
 function mescola(array) {
@@ -44,33 +27,6 @@ function mescola(array) {
   }
 
   return copia;
-}
-
-
-function cartaVincente(prima, seconda, semeBriscola) {
-  if (prima.seme === seconda.seme) {
-    return prima.forza > seconda.forza
-      ? prima
-      : seconda;
-  }
-
-  if (
-    prima.seme === semeBriscola &&
-    seconda.seme !== semeBriscola
-  ) {
-    return prima;
-  }
-
-  if (
-    seconda.seme === semeBriscola &&
-    prima.seme !== semeBriscola
-  ) {
-    return seconda;
-  }
-
-  // Se i semi sono diversi e nessuna è briscola,
-  // vince chi ha giocato per primo.
-  return prima;
 }
 
 
@@ -119,7 +75,7 @@ export default function BriscolaGame({ onBack }) {
   const nuovaPartita = React.useCallback(() => {
     pulisciTimeout();
 
-    const nuovoMazzo = mescola(creaMazzo());
+    const nuovoMazzo = mescola(creaMazzoBriscola());
 
     const manoG = nuovoMazzo.splice(0, 3);
     const manoC = nuovoMazzo.splice(0, 3);
@@ -191,7 +147,7 @@ export default function BriscolaGame({ onBack }) {
     // CPU risponde:
     // se può vincere, usa la carta vincente meno costosa.
     const vincenti = mano.filter((carta) => {
-      const vincente = cartaVincente(
+      const vincente = cartaVincenteBriscola(
         cartaAvversario,
         carta,
         semeBriscola
@@ -355,7 +311,7 @@ export default function BriscolaGame({ onBack }) {
     manoC,
     mazzoCorrente
   ) => {
-    const vincente = cartaVincente(
+    const vincente = cartaVincenteBriscola(
       prima,
       seconda,
       briscola.seme

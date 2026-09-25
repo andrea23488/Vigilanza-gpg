@@ -48,3 +48,19 @@ export const CARTE_PIACENTINE = {
     10: require('../assets/carte-piacentine/spade_10.png'),
   },
 };
+
+// I file ricevuti originariamente hanno i nomi fisici Spade/Bastoni invertiti:
+// bastoni_X.png contiene graficamente le Spade e spade_X.png i Bastoni.
+// Questa compensazione è intenzionale e non va rimossa senza sostituire gli asset.
+export const IDENTITA_GRAFICA_CARTE_PIACENTINE = {
+  denari: { prefissoFile: 'denari', semeDisegnato: 'denari' },
+  coppe: { prefissoFile: 'coppe', semeDisegnato: 'coppe' },
+  spade: { prefissoFile: 'bastoni', semeDisegnato: 'spade' },
+  bastoni: { prefissoFile: 'spade', semeDisegnato: 'bastoni' },
+};
+
+export function risolviAssetCarta(carta) {
+  const seme = String(carta?.seme || '').toLowerCase();
+  const valore = Number(carta?.valore);
+  return CARTE_PIACENTINE?.[seme]?.[valore] || null;
+}

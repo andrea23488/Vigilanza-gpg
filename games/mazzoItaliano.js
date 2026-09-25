@@ -18,6 +18,11 @@ export const VALORI_ITALIANI = [
   { valore: 10, nome: 'Re' },
 ];
 
+export function nomeCompletoCarta(carta) {
+  if (!carta) return '';
+  return `${carta.nome} di ${carta.semeNome}`;
+}
+
 export function creaMazzoItaliano(estendiCarta) {
   return SEMI_ITALIANI.flatMap((seme) =>
     VALORI_ITALIANI.map((valore) => {

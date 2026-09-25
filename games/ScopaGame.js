@@ -16,6 +16,14 @@ import {
   creaMazzoItaliano,
   SEMI_ITALIANI,
 } from './mazzoItaliano';
+import {
+  chiavePresaScopa,
+  diagnosticaOpzioniScopa,
+  preparaOpzioniPresaScopa,
+  rimuoviPresaDalTavolo,
+  testoPresaScopa,
+  validaPresaScopa,
+} from './scopaRegole';
 
 const PRIMIERA = {
   7: 21,
@@ -48,45 +56,8 @@ function mescola(array) {
   return a;
 }
 
-function combinazioniSomma(carte, target) {
-  const risultati = [];
-
-  function cerca(indice, corrente, somma) {
-    if (somma === target) {
-      risultati.push([...corrente]);
-      return;
-    }
-
-    if (somma > target) return;
-
-    for (let i = indice; i < carte.length; i += 1) {
-      cerca(
-        i + 1,
-        [...corrente, carte[i]],
-        somma + carte[i].valore
-      );
-    }
-  }
-
-  cerca(0, [], 0);
-  return risultati;
-}
-
-function trovaPresePossibili(carta, tavolo) {
-  // Nella Scopa, se sul tavolo esiste una carta dello stesso
-  // valore di quella giocata, bisogna prendere una di quelle
-  // e non è possibile scegliere una combinazione alternativa.
-  const uguali = tavolo.filter((c) => c.valore === carta.valore);
-
-  if (uguali.length > 0) {
-    return uguali.map((c) => [c]);
-  }
-
-  return combinazioniSomma(tavolo, carta.valore);
-}
-
 function scegliMigliorePresaCpu(carta, tavolo) {
-  const opzioni = trovaPresePossibili(carta, tavolo);
+  const opzioni = preparaOpzioniPresaScopa(carta, tavolo);
 
   if (!opzioni.length) return [];
 
@@ -436,9 +407,7 @@ export default function ScopaGame({ onBack }) {
     let nuovoUltimo = ultimoAPrendere;
 
     if (presa.length) {
-      const ids = new Set(presa.map((c) => c.id));
-
-      nuovoTavolo = tavolo.filter((c) => !ids.has(c.id));
+      nuovoTavolo = rimuoviPresaDalTavolo(tavolo, presa);
       nuovePrese = [...nuovePrese, carta, ...presa];
       nuovoUltimo = 'giocatore';
 
@@ -494,16 +463,18 @@ export default function ScopaGame({ onBack }) {
   function giocaCartaGiocatore(carta) {
     if (bloccato || fine) return;
 
-    const opzioni = trovaPresePossibili(carta, tavolo);
+    const opzioni = preparaOpzioniPresaScopa(carta, tavolo);
 
-    console.log(
-      'SCOPA - carta giocata:',
-      carta.valore,
-      'opzioni:',
-      opzioni.map((presa) =>
-        presa.map((c) => `${c.valore}-${c.seme}`).join('+')
-      )
-    );
+    if (__DEV__) {
+      console.log(
+        'SCOPA_DIAGNOSTICA_PRESA',
+        diagnosticaOpzioniScopa({
+          cartaGiocata: carta,
+          tavolo,
+          opzioni,
+        })
+      );
+    }
 
     if (opzioni.length > 1) {
       setCartaDaGiocare(carta);
@@ -525,6 +496,22 @@ export default function ScopaGame({ onBack }) {
 
   function scegliPresaGiocatore(presa) {
     if (!cartaDaGiocare) return;
+
+    const verifica = validaPresaScopa({
+      cartaGiocata: cartaDaGiocare,
+      tavolo,
+      presa,
+    });
+    if (!verifica.valida) {
+      if (__DEV__) {
+        console.warn('SCOPA_PRESA_NON_PIU_VALIDA', verifica);
+      }
+      setCartaDaGiocare(null);
+      setOpzioniPresa([]);
+      setBloccato(false);
+      setMessaggio('Il tavolo è cambiato: scegli di nuovo la carta.');
+      return;
+    }
 
     completaGiocataGiocatore(
       cartaDaGiocare,
@@ -660,11 +647,7 @@ export default function ScopaGame({ onBack }) {
     let nuovoUltimo = ultimo;
 
     if (presa.length) {
-      const ids = new Set(presa.map((c) => c.id));
-
-      nuovoTavolo = tavoloCorrente.filter(
-        (c) => !ids.has(c.id)
-      );
+      nuovoTavolo = rimuoviPresaDalTavolo(tavoloCorrente, presa);
 
       nuovePreseCpu = [...nuovePreseCpu, carta, ...presa];
       nuovoUltimo = 'cpu';
@@ -782,9 +765,9 @@ export default function ScopaGame({ onBack }) {
               {`Hai ${opzioniPresa.length} possibilità`}
             </Text>
 
-            {opzioniPresa.map((presa, index) => (
+            {opzioniPresa.map((presa) => (
               <TouchableOpacity
-                key={`modal-presa-${index}`}
+                key={`modal-presa-${chiavePresaScopa(presa)}`}
                 onPress={() => scegliPresaGiocatore(presa)}
                 style={{
                   backgroundColor: '#FFFFFF',
@@ -802,9 +785,7 @@ export default function ScopaGame({ onBack }) {
                     fontSize: 16,
                   }}
                 >
-                  {presa
-                    .map((c) => `${c.valore} ${c.semeNome}`)
-                    .join(' + ')}
+                  {testoPresaScopa(presa)}
                 </Text>
               </TouchableOpacity>
             ))}
@@ -1148,9 +1129,9 @@ export default function ScopaGame({ onBack }) {
               SCEGLI LA PRESA
             </Text>
 
-            {opzioniPresa.map((presa, index) => (
+            {opzioniPresa.map((presa) => (
               <TouchableOpacity
-                key={`presa-${index}`}
+                key={`presa-${chiavePresaScopa(presa)}`}
                 onPress={() => scegliPresaGiocatore(presa)}
                 style={{
                   backgroundColor: 'rgba(255,255,255,0.12)',
@@ -1167,9 +1148,7 @@ export default function ScopaGame({ onBack }) {
                     textAlign: 'center',
                   }}
                 >
-                  {`Prendi: ${presa
-                    .map((c) => `${c.valore} ${c.semeNome}`)
-                    .join(' + ')}`}
+                  {`Prendi: ${testoPresaScopa(presa)}`}
                 </Text>
               </TouchableOpacity>
             ))}
