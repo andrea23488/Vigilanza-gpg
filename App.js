@@ -9219,9 +9219,9 @@ if (screen === 'colleghi') {
               marginTop: 8,
             }}
           >
-            Extra: {extraStipendioMese.toFixed(1)} h · Giorni lavorati: {giornateStipendioMese.filter(
-  (t) => t.riposo_lavorato !== true
-).length}
+            Extra: {extraStipendioMese.toFixed(1)} h · Giorni lavorati: {new Set(
+  giornateStipendioMese.map(chiaveDataTurno).filter(Boolean)
+).size}
           </Text>
         </View>
 
