@@ -28413,6 +28413,65 @@ if (screen === 'profiloCollega') {
                 </View>
               </TouchableOpacity>
 
+              {/* CALENDARIO */}
+              <TouchableOpacity
+                activeOpacity={0.84}
+                onPress={() => setScreen('calendar')}
+                style={{
+                  flex: 1,
+                  minHeight: 105,
+                  borderRadius: 22,
+                  padding: 15,
+                  justifyContent: 'space-between',
+                  backgroundColor: '#0A1B31',
+                  borderWidth: 1.2,
+                  borderColor: 'rgba(99,223,255,0.42)',
+                  shadowColor: '#63DFFF',
+                  shadowOpacity: 0.14,
+                  shadowRadius: 10,
+                  shadowOffset: { width: 0, height: 5 },
+                }}
+              >
+                <View
+                  style={{
+                    width: 40,
+                    height: 40,
+                    borderRadius: 14,
+                    backgroundColor: 'rgba(99,223,255,0.11)',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <Ionicons
+                    name="calendar-number-outline"
+                    size={23}
+                    color="#63DFFF"
+                  />
+                </View>
+
+                <View>
+                  <Text
+                    style={{
+                      color: '#FFFFFF',
+                      fontSize: 14,
+                      fontWeight: '900',
+                    }}
+                  >
+                    CALENDARIO
+                  </Text>
+                  <Text
+                    style={{
+                      color: '#8294B4',
+                      fontSize: 9,
+                      fontWeight: '700',
+                      marginTop: 3,
+                    }}
+                  >
+                    Vista mensile turni
+                  </Text>
+                </View>
+              </TouchableOpacity>
+
             </View>
           </View>
 
