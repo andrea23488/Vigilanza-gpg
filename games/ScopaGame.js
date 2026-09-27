@@ -574,14 +574,14 @@ export default function ScopaGame({ onBack }) {
 
     setCartaDaGiocare(null);
     setOpzioniPresa([]);
-  }
 
-  function completaPresaDopoChiusuraModal() {
-    const conferma = confermaPresaRef.current;
-    if (!conferma) return;
+    setTimeout(() => {
+      const conferma = confermaPresaRef.current;
+      if (!conferma) return;
 
-    confermaPresaRef.current = null;
-    completaGiocataGiocatore(conferma.carta, conferma.presa);
+      confermaPresaRef.current = null;
+      completaGiocataGiocatore(conferma.carta, conferma.presa);
+    }, 220);
   }
 
   function scegliCartaCpu(mano, tavoloCorrente) {
@@ -780,7 +780,6 @@ export default function ScopaGame({ onBack }) {
         transparent
         animationType="fade"
         onRequestClose={() => {}}
-      onDismiss={completaPresaDopoChiusuraModal}
       >
         <View
           style={{
