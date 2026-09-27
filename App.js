@@ -95,9 +95,13 @@ import {
   ActivityIndicator,
   AppState,
   Image,
+  Animated,
+  Easing,
+  useWindowDimensions,
 } from 'react-native';
 
 import * as ImagePicker from 'expo-image-picker';
+import Svg, { Ellipse } from 'react-native-svg';
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
@@ -290,6 +294,216 @@ function KeyboardDoneOverlay() {
           </Text>
         </TouchableOpacity>
       </View>
+    </View>
+  );
+}
+
+
+function HomeOrbital({ children, accent = '#55E8FF' }) {
+  const { width } = useWindowDimensions();
+  const animation = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    animation.setValue(0);
+
+    const entrance = Animated.timing(animation, {
+      toValue: 1,
+      duration: 1250,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+      isInteraction: false,
+    });
+
+    const ambient = Animated.timing(animation, {
+      toValue: 2,
+      duration: 14000,
+      easing: Easing.linear,
+      useNativeDriver: true,
+      isInteraction: false,
+    });
+
+    entrance.start(({ finished }) => {
+      if (finished) {
+        ambient.start();
+      }
+    });
+
+    return () => {
+      animation.stopAnimation();
+    };
+  }, [animation]);
+
+  const size = Math.min(Math.max(width - 34, 270), 365);
+  const height = size * 0.88;
+  const centerX = size / 2;
+  const centerY = height / 2;
+  const radius = size * 0.365;
+
+  const formationOpacity = animation.interpolate({
+    inputRange: [0, 0.65, 1, 2],
+    outputRange: [0, 0.72, 1, 1],
+  });
+
+  const formationScale = animation.interpolate({
+    inputRange: [0, 1, 2],
+    outputRange: [0.94, 1, 1],
+  });
+
+  const orbitRotation = animation.interpolate({
+    inputRange: [0, 1, 2],
+    outputRange: ['-5deg', '0deg', '360deg'],
+  });
+
+  const ambientGlow = animation.interpolate({
+    inputRange: [0, 0.7, 1, 1.35, 2],
+    outputRange: [0, 0.28, 0.42, 0.18, 0.30],
+  });
+
+  return (
+    <View
+      style={{
+        width: '100%',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginTop: 2,
+        marginBottom: 2,
+      }}
+    >
+      <Animated.View
+        pointerEvents="none"
+        style={{
+          width: size,
+          height,
+          alignItems: 'center',
+          justifyContent: 'center',
+          opacity: formationOpacity,
+          transform: [{ scale: formationScale }],
+        }}
+      >
+        <View
+          pointerEvents="none"
+          style={{
+            position: 'absolute',
+            width: size * 0.78,
+            height: size * 0.78,
+            borderRadius: size,
+            backgroundColor: accent,
+            opacity: 0.035,
+            shadowColor: accent,
+            shadowOpacity: 0.32,
+            shadowRadius: 38,
+            shadowOffset: { width: 0, height: 0 },
+          }}
+        />
+
+        <Svg
+          width={size}
+          height={height}
+          viewBox={`0 0 ${size} ${height}`}
+          style={{ position: 'absolute' }}
+        >
+          <Ellipse
+            cx={centerX}
+            cy={centerY}
+            rx={size * 0.405}
+            ry={height * 0.405}
+            fill="none"
+            stroke={accent}
+            strokeWidth={1}
+            strokeOpacity={0.12}
+          />
+          <Ellipse
+            cx={centerX}
+            cy={centerY}
+            rx={size * 0.385}
+            ry={height * 0.385}
+            fill="none"
+            stroke="#FFFFFF"
+            strokeWidth={0.7}
+            strokeOpacity={0.06}
+            strokeDasharray="2 9"
+          />
+        </Svg>
+
+        <AnimatedOrbit
+          pointerEvents="none"
+          style={{
+            position: 'absolute',
+            width: size,
+            height,
+            alignItems: 'center',
+            justifyContent: 'center',
+            opacity: ambientGlow,
+            transform: [{ rotate: orbitRotation }],
+          }}
+        >
+          <Svg
+            width={size}
+            height={height}
+            viewBox={`0 0 ${size} ${height}`}
+          >
+            <Ellipse
+              cx={centerX}
+              cy={centerY}
+              rx={size * 0.385}
+              ry={height * 0.385}
+              fill="none"
+              stroke={accent}
+              strokeWidth={2.2}
+              strokeLinecap="round"
+              strokeDasharray={`${size * 0.24} ${size * 1.9}`}
+            />
+          </Svg>
+        </AnimatedOrbit>
+
+        <Svg
+          width={size}
+          height={height}
+          viewBox={`0 0 ${size} ${height}`}
+          style={{ position: 'absolute' }}
+        >
+          <Ellipse
+            cx={centerX}
+            cy={centerY}
+            rx={size * 0.385}
+            ry={height * 0.385}
+            fill="none"
+            stroke={accent}
+            strokeWidth={1.15}
+            strokeOpacity={0.48}
+          />
+        </Svg>
+
+        <View
+          pointerEvents="none"
+          style={{
+            position: 'absolute',
+            top: height * 0.10,
+            right: size * 0.17,
+            width: 5,
+            height: 5,
+            borderRadius: 3,
+            backgroundColor: accent,
+            opacity: 0.8,
+            shadowColor: accent,
+            shadowOpacity: 0.9,
+            shadowRadius: 7,
+            shadowOffset: { width: 0, height: 0 },
+          }}
+        />
+
+        <View
+          style={{
+            width: size * 0.70,
+            minHeight: height * 0.69,
+            alignItems: 'center',
+            justifyContent: 'center',
+            paddingHorizontal: 18,
+          }}
+        >
+          {children}
+        </View>
+      </Animated.View>
     </View>
   );
 }
@@ -27303,6 +27517,44 @@ if (screen === 'profiloCollega') {
     const ritardoHomeV2 =
       Number(etaServizio?.ritardo_traffico || 0);
 
+    const homeFeatureCards = [
+      {
+        key: 'stipendio',
+        title: 'STIPENDIO',
+        icon: 'wallet-outline',
+        color: '#55E86E',
+        onPress: () => setScreen('stipendio'),
+      },
+      {
+        key: 'strumenti',
+        title: 'STRUMENTI',
+        icon: 'briefcase-outline',
+        color: '#63DFFF',
+        onPress: () => setScreen('strumenti'),
+      },
+      {
+        key: 'calendarioColleghi',
+        title: 'CALENDARIO',
+        icon: 'calendar-outline',
+        color: '#7FDBFF',
+        onPress: () => setScreen('calendarioColleghi'),
+      },
+      {
+        key: 'colleghi',
+        title: 'COLLEGHI',
+        icon: 'people-outline',
+        color: '#8DAAFF',
+        onPress: async () => {
+          try {
+            setScreen('colleghi');
+            await aggiornaColleghi();
+          } catch (e) {
+            console.log('Errore apertura colleghi Home V2:', e);
+          }
+        },
+      },
+    ];
+
     return (
       <Screen>
         <ScrollView
@@ -27311,13 +27563,12 @@ if (screen === 'profiloCollega') {
             paddingBottom: 125,
           }}
         >
-
           {/* ================= HEADER ================= */}
           <View
             style={{
               paddingHorizontal: Platform.OS === 'android' ? 15 : 18,
-              paddingTop: Platform.OS === 'android' ? 12 : 6,
-              paddingBottom: Platform.OS === 'android' ? 14 : 10,
+              paddingTop: Platform.OS === 'android' ? 10 : 5,
+              paddingBottom: 8,
             }}
           >
             <View
@@ -27332,30 +27583,30 @@ if (screen === 'profiloCollega') {
                 activeOpacity={0.85}
                 style={{
                   flex: 1,
-                  paddingRight: Platform.OS === 'android' ? 8 : 0,
+                  paddingRight: 10,
                 }}
               >
                 <Text
                   numberOfLines={1}
                   adjustsFontSizeToFit
-                  minimumFontScale={0.80}
+                  minimumFontScale={0.8}
                   style={{
                     color: '#FFFFFF',
-                    fontSize: Platform.OS === 'android' ? 21 : 23,
+                    fontSize: Platform.OS === 'android' ? 20 : 22,
                     fontWeight: '900',
+                    letterSpacing: -0.25,
                   }}
                 >
                   {profilo.nome ? `Ciao ${profilo.nome} 👋` : 'Ciao 👋'}
                 </Text>
 
                 <Text
-                  numberOfLines={2}
+                  numberOfLines={1}
                   style={{
-                    color: Platform.OS === 'android' ? '#C8D4EA' : '#AEB9D6',
-                    fontSize: Platform.OS === 'android' ? 11 : 12,
+                    color: '#AEB9D6',
+                    fontSize: 11,
                     fontWeight: '700',
-                    marginTop: 4,
-                    lineHeight: Platform.OS === 'android' ? 15 : undefined,
+                    marginTop: 3,
                   }}
                 >
                   {[profilo.azienda, profilo.ruolo]
@@ -27366,18 +27617,25 @@ if (screen === 'profiloCollega') {
                 <View
                   style={{
                     alignSelf: 'flex-start',
-                    marginTop: 9,
-                    backgroundColor: 'rgba(24,190,88,0.17)',
-                    borderRadius: 18,
-                    paddingHorizontal: 12,
-                    paddingVertical: 6,
+                    marginTop: 7,
+                    paddingHorizontal: 10,
+                    paddingVertical: 5,
+                    borderRadius: 15,
+                    backgroundColor: turnoInCorso
+                      ? 'rgba(65,240,108,0.14)'
+                      : 'rgba(140,168,207,0.10)',
+                    borderWidth: 1,
+                    borderColor: turnoInCorso
+                      ? 'rgba(85,244,124,0.45)'
+                      : 'rgba(140,168,207,0.22)',
                   }}
                 >
                   <Text
                     style={{
-                      color: '#42F56C',
-                      fontSize: 11,
+                      color: turnoInCorso ? '#55F47C' : '#AAB8CF',
+                      fontSize: 10,
                       fontWeight: '900',
+                      letterSpacing: 0.65,
                     }}
                   >
                     {turnoInCorso ? '● IN SERVIZIO' : '○ FUORI SERVIZIO'}
@@ -27385,152 +27643,134 @@ if (screen === 'profiloCollega') {
                 </View>
               </TouchableOpacity>
 
-      <TouchableOpacity
-        onPress={async () => {
-          try {
-            const [datiChat, datiConsegne] = await Promise.all([
-              caricaRiepilogoConversazioni(),
-              caricaConsegneRicevute(),
-            ]);
-
-            console.log("CONSEGNE RICEVUTE >>>", datiConsegne);
-
-            setRiepilogoChat(datiChat || {});
-            setConsegneRicevute(datiConsegne || []);
-          } catch (error) {
-            console.log(
-              'Errore aggiornamento Centro Notifiche:',
-              error
-            );
-          }
-
-          setScreen('centroNotifiche');
-        }}
-              activeOpacity={0.8}
-              style={{
-                width: 46,
-                height: 46,
-                borderRadius: 23,
-                backgroundColor: 'rgba(255,255,255,0.08)',
-                borderWidth: 1,
-                borderColor: 'rgba(141,184,255,0.30)',
-                alignItems: 'center',
-                justifyContent: 'center',
-                position: 'relative',
-                marginRight: 10,
-              }}
-            >
-              <Ionicons
-                name="notifications-outline"
-                size={24}
-                color="#FFFFFF"
-              />
-
-              {numeroNotifiche > 0 && (
-                <View
-                  style={{
-                    position: 'absolute',
-                    top: -4,
-                    right: -4,
-                    minWidth: 20,
-                    height: 20,
-                    paddingHorizontal: 5,
-                    borderRadius: 10,
-                    backgroundColor: '#FF3B30',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    borderWidth: 2,
-                    borderColor: '#101A3D',
-                  }}
-                >
-                  <Text
-                    style={{
-                      color: '#FFFFFF',
-                      fontSize: 10,
-                      fontWeight: '900',
-                    }}
-                  >
-                    {numeroNotifiche > 99 ? '99+' : numeroNotifiche}
-                  </Text>
-                </View>
-              )}
-            </TouchableOpacity>
-
-            <TouchableOpacity
-                onPress={apriProfilo}
-                activeOpacity={0.85}
+              <View
                 style={{
-                  width: 58,
-                  height: 58,
-                  borderRadius: 29,
-                  borderWidth: 2,
-                  borderColor: '#8DB8FF',
+                  flexDirection: 'row',
                   alignItems: 'center',
-                  justifyContent: 'center',
-                  overflow: 'hidden',
-                  backgroundColor: '#142044',
                 }}
               >
-                {fotoProfilo ? (
-                  <Image
-                    source={{ uri: fotoProfilo }}
-                    style={{
-                      width: '100%',
-                      height: '100%',
-                    }}
-                  />
-                ) : (
+                <TouchableOpacity
+                  onPress={async () => {
+                    try {
+                      const [datiChat, datiConsegne] = await Promise.all([
+                        caricaRiepilogoConversazioni(),
+                        caricaConsegneRicevute(),
+                      ]);
+
+                      console.log("CONSEGNE RICEVUTE >>>", datiConsegne);
+
+                      setRiepilogoChat(datiChat || {});
+                      setConsegneRicevute(datiConsegne || []);
+                    } catch (error) {
+                      console.log(
+                        'Errore aggiornamento Centro Notifiche:',
+                        error
+                      );
+                    }
+
+                    setScreen('centroNotifiche');
+                  }}
+                  activeOpacity={0.8}
+                  style={{
+                    width: 44,
+                    height: 44,
+                    borderRadius: 22,
+                    backgroundColor: 'rgba(255,255,255,0.055)',
+                    borderWidth: 1,
+                    borderColor: 'rgba(141,184,255,0.28)',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    position: 'relative',
+                    marginRight: 9,
+                  }}
+                >
                   <Ionicons
-                    name="person"
-                    size={27}
+                    name="notifications-outline"
+                    size={23}
                     color="#FFFFFF"
                   />
-                )}
-              </TouchableOpacity>
+
+                  {numeroNotifiche > 0 && (
+                    <View
+                      style={{
+                        position: 'absolute',
+                        top: -4,
+                        right: -4,
+                        minWidth: 19,
+                        height: 19,
+                        paddingHorizontal: 4,
+                        borderRadius: 10,
+                        backgroundColor: '#FF3B30',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        borderWidth: 2,
+                        borderColor: '#101A3D',
+                      }}
+                    >
+                      <Text
+                        style={{
+                          color: '#FFFFFF',
+                          fontSize: 9,
+                          fontWeight: '900',
+                        }}
+                      >
+                        {numeroNotifiche > 99 ? '99+' : numeroNotifiche}
+                      </Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  onPress={apriProfilo}
+                  activeOpacity={0.85}
+                  style={{
+                    width: 52,
+                    height: 52,
+                    borderRadius: 26,
+                    borderWidth: 1.7,
+                    borderColor: '#78DFFF',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    overflow: 'hidden',
+                    backgroundColor: '#142044',
+                  }}
+                >
+                  {fotoProfilo ? (
+                    <Image
+                      source={{ uri: fotoProfilo }}
+                      style={{
+                        width: '100%',
+                        height: '100%',
+                      }}
+                    />
+                  ) : (
+                    <Ionicons
+                      name="person"
+                      size={25}
+                      color="#FFFFFF"
+                    />
+                  )}
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
 
-          {/* ================= TURNO ================= */}
-          <View
-            style={{
-              marginHorizontal: 28,
-              marginTop: 7,
-              paddingHorizontal: 18,
-              paddingVertical: 8,
-              borderRadius: 25,
-
-              backgroundColor: turnoInCorso
-                ? '#06170E'
-                : '#09182C',
-
-              borderWidth: 1.5,
-              borderColor: turnoInCorso
-                ? '#55F47C'
-                : '#42CFFF',
-
-              shadowColor: turnoInCorso
-                ? '#55F47C'
-                : '#42CFFF',
-
-              shadowOpacity: turnoInCorso ? 0.28 : 0.14,
-              shadowRadius: 17,
-              shadowOffset: {
-                width: 0,
-                height: 7,
-              },
-            }}
-          >
+          {/* ================= DIGITAL CORE / TURNO ================= */}
+          <HomeOrbital accent={turnoInCorso ? '#55F47C' : '#55E8FF'}>
             <TouchableOpacity
-              activeOpacity={0.86}
+              activeOpacity={0.88}
               onPress={() => setScreen('calendar')}
+              style={{
+                width: '100%',
+                alignItems: 'center',
+              }}
             >
               <Text
                 style={{
-                  color: '#4BE66B',
-                  textAlign: 'center',
-                  fontSize: 12,
+                  color: turnoInCorso ? '#55F47C' : '#69DFFF',
+                  fontSize: 10,
                   fontWeight: '900',
-                  letterSpacing: 0.4,
+                  letterSpacing: 1.7,
                 }}
               >
                 TURNO DI OGGI
@@ -27539,13 +27779,15 @@ if (screen === 'profiloCollega') {
               <Text
                 numberOfLines={1}
                 adjustsFontSizeToFit
-                minimumFontScale={0.8}
+                minimumFontScale={0.72}
                 style={{
                   color: '#FFFFFF',
                   textAlign: 'center',
-                  fontSize: 28,
+                  fontSize: 31,
+                  lineHeight: 37,
                   fontWeight: '900',
-                  marginTop: 7,
+                  marginTop: 8,
+                  letterSpacing: -0.8,
                 }}
               >
                 {turnoHomeV2?.tipo === 'turno'
@@ -27556,279 +27798,277 @@ if (screen === 'profiloCollega') {
               </Text>
 
               <Text
+                numberOfLines={1}
                 style={{
                   color: '#C8D0E0',
                   textAlign: 'center',
-                  fontSize: 13,
+                  fontSize: 12,
                   fontWeight: '700',
                   marginTop: 5,
+                  maxWidth: '100%',
                 }}
               >
                 📍 {turnoHomeV2?.luogo || 'Luogo non indicato'}
               </Text>
-            </TouchableOpacity>
 
-            {/* separatore */}
-            <View
-              style={{
-                height: 1,
-                backgroundColor: 'rgba(85,244,124,0.18)',
-                marginTop: 10,
-                marginBottom: 8,
-              }}
-            />
-
-            {/* COUNTDOWN */}
-            <View
-              style={{
-                alignItems: 'center',
-              }}
-            >
-              <Text
-                style={{
-                  color: '#55F47C',
-                  fontSize: 10,
-                  fontWeight: '900',
-                  letterSpacing: 1.2,
-                }}
-              >
-                {countdownLabel}
-              </Text>
-
-              <Text
-                style={{
-                  color: '#FFFFFF',
-                  fontSize: 21,
-                  fontWeight: '900',
-                  marginTop: 2,
-                }}
-              >
-                {countdownTurno}
-              </Text>
-            </View>
-
-            {/* PERCORSO + TRAFFICO */}
               <View
                 style={{
-                  height: 1,
-                  backgroundColor: 'rgba(85,244,124,0.18)',
-                  marginTop: 8,
-                  marginBottom: 7,
-                }}
-              />
-
-              <TouchableOpacity
-                activeOpacity={0.85}
-                onPress={async () => {
-                  const partenza = String(
-                    profilo?.punto_partenza || ''
-                  ).trim();
-
-                  const turnoPercorso =
-                    turnoInCorso ||
-                    turnoOggi ||
-                    prossimoServizioMeteo?.turno ||
-                    null;
-
-                  const destinazione = String(
-                    turnoPercorso?.indirizzo_servizio || ''
-                  ).trim();
-
-                  if (!partenza) {
-                    Alert.alert(
-                      'Punto di partenza mancante',
-                      'Inserisci il tuo punto di partenza abituale nel profilo.'
-                    );
-                    return;
-                  }
-
-                  if (!destinazione) {
-                    Alert.alert(
-                      'Indirizzo del servizio mancante',
-                      'Apri il prossimo turno e inserisci l’indirizzo del servizio.'
-                    );
-                    return;
-                  }
-
-                  try {
-                    const url =
-                      'https://www.google.com/maps/dir/?api=1' +
-                      '&origin=' +
-                      encodeURIComponent(partenza) +
-                      '&destination=' +
-                      encodeURIComponent(destinazione) +
-                      '&travelmode=driving';
-
-                    await Linking.openURL(url);
-                  } catch (error) {
-                    Alert.alert(
-                      'Percorso non disponibile',
-                      'Non riesco ad aprire le indicazioni stradali in questo momento.'
-                    );
-                  }
-                }}
-              style={{
-                minHeight: 38,
-                flexDirection: 'row',
-                alignItems: 'center',
-              }}
-            >
-              <View
-                style={{
-                  width: 34,
-                  height: 34,
-                  borderRadius: 11,
-                  backgroundColor: 'rgba(71,221,255,0.11)',
+                  marginTop: 13,
+                  minWidth: 118,
+                  paddingHorizontal: 13,
+                  paddingVertical: 7,
+                  borderRadius: 16,
+                  backgroundColor: turnoInCorso
+                    ? 'rgba(85,244,124,0.10)'
+                    : 'rgba(99,223,255,0.08)',
+                  borderWidth: 1,
+                  borderColor: turnoInCorso
+                    ? 'rgba(85,244,124,0.34)'
+                    : 'rgba(99,223,255,0.26)',
                   alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                <Ionicons
-                  name="car-outline"
-                  size={21}
-                  color="#63DFFF"
-                />
-              </View>
-
-              <View
-                style={{
-                  flex: 1,
-                  marginLeft: 11,
                 }}
               >
                 <Text
                   style={{
-                    color: '#FFFFFF',
-                    fontSize: 13,
-                    fontWeight: '800',
+                    color: turnoInCorso ? '#55F47C' : '#8FEAFF',
+                    fontSize: 9,
+                    fontWeight: '900',
+                    letterSpacing: 1.15,
                   }}
                 >
-                  {etaServizioLoading
-                    ? 'Calcolo traffico in corso...'
-                    : minutiEtaHomeV2 > 0
-                    ? `${minutiEtaHomeV2} min${
-                        ritardoHomeV2 > 0
-                          ? ` · traffico +${ritardoHomeV2} min`
-                          : ' · traffico regolare'
-                      }`
-                    : 'Percorso al servizio'}
+                  {countdownLabel}
                 </Text>
 
-                {!etaServizioLoading && minutiEtaHomeV2 <= 0 ? (
-                  <Text
-                    style={{
-                      color: '#8FA5CC',
-                      fontSize: 10,
-                      marginTop: 2,
-                    }}
-                  >
-                    Apri indicazioni stradali
-                  </Text>
-                ) : null}
+                <Text
+                  style={{
+                    color: '#FFFFFF',
+                    fontSize: 19,
+                    fontWeight: '900',
+                    marginTop: 1,
+                  }}
+                >
+                  {countdownTurno}
+                </Text>
               </View>
+            </TouchableOpacity>
+          </HomeOrbital>
 
+          {/* ================= PERCORSO ================= */}
+          <TouchableOpacity
+            activeOpacity={0.85}
+            onPress={async () => {
+              const partenza = String(
+                profilo?.punto_partenza || ''
+              ).trim();
+
+              const turnoPercorso =
+                turnoInCorso ||
+                turnoOggi ||
+                prossimoServizioMeteo?.turno ||
+                null;
+
+              const destinazione = String(
+                turnoPercorso?.indirizzo_servizio || ''
+              ).trim();
+
+              if (!partenza) {
+                Alert.alert(
+                  'Punto di partenza mancante',
+                  'Inserisci il tuo punto di partenza abituale nel profilo.'
+                );
+                return;
+              }
+
+              if (!destinazione) {
+                Alert.alert(
+                  'Indirizzo del servizio mancante',
+                  'Apri il prossimo turno e inserisci l’indirizzo del servizio.'
+                );
+                return;
+              }
+
+              try {
+                const url =
+                  'https://www.google.com/maps/dir/?api=1' +
+                  '&origin=' +
+                  encodeURIComponent(partenza) +
+                  '&destination=' +
+                  encodeURIComponent(destinazione) +
+                  '&travelmode=driving';
+
+                await Linking.openURL(url);
+              } catch (error) {
+                Alert.alert(
+                  'Percorso non disponibile',
+                  'Non riesco ad aprire le indicazioni stradali in questo momento.'
+                );
+              }
+            }}
+            style={{
+              marginHorizontal: 16,
+              marginTop: 1,
+              minHeight: 58,
+              paddingHorizontal: 13,
+              borderRadius: 19,
+              backgroundColor: 'rgba(8,25,48,0.78)',
+              borderWidth: 1,
+              borderColor: 'rgba(99,223,255,0.24)',
+              flexDirection: 'row',
+              alignItems: 'center',
+            }}
+          >
+            <View
+              style={{
+                width: 36,
+                height: 36,
+                borderRadius: 12,
+                backgroundColor: 'rgba(71,221,255,0.09)',
+                borderWidth: 1,
+                borderColor: 'rgba(99,223,255,0.18)',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
               <Ionicons
-                name="chevron-forward"
-                size={19}
-                color="#8FEAFF"
+                name="car-outline"
+                size={20}
+                color="#63DFFF"
               />
-              </TouchableOpacity>
-          </View>
+            </View>
 
-          {/* ===== CTA AGGIUNGI TURNO HOME ===== */}
-<TouchableOpacity
-  activeOpacity={0.85}
-  onPress={() => {
-    const oggiReale = new Date();
+            <View
+              style={{
+                flex: 1,
+                marginLeft: 10,
+              }}
+            >
+              <Text
+                style={{
+                  color: '#FFFFFF',
+                  fontSize: 12.5,
+                  fontWeight: '800',
+                }}
+              >
+                {etaServizioLoading
+                  ? 'Calcolo traffico in corso...'
+                  : minutiEtaHomeV2 > 0
+                  ? `${minutiEtaHomeV2} min${ritardoHomeV2 > 0
+                      ? ` · traffico +${ritardoHomeV2} min`
+                      : ' · traffico regolare'}`
+                  : 'Percorso al servizio'}
+              </Text>
 
-    const domani = new Date(oggiReale);
-    domani.setDate(domani.getDate() + 1);
+              {!etaServizioLoading && minutiEtaHomeV2 <= 0 ? (
+                <Text
+                  style={{
+                    color: '#8298BB',
+                    fontSize: 9.5,
+                    marginTop: 2,
+                  }}
+                >
+                  Apri indicazioni stradali
+                </Text>
+              ) : null}
+            </View>
 
-    Alert.alert(
-      'Aggiungi turno',
-      'Quando vuoi inserire il turno?',
-      [
-        {
-          text: 'Oggi',
-          onPress: () => {
-            setMese(oggiReale.getMonth());
-            setAnno(oggiReale.getFullYear());
-            nuovoGiorno(oggiReale.getDate());
-          },
-        },
-        {
-          text: 'Domani',
-          onPress: () => {
-            setMese(domani.getMonth());
-            setAnno(domani.getFullYear());
-            nuovoGiorno(domani.getDate());
-          },
-        },
-        {
-          text: 'Scegli dal calendario',
-          onPress: () => {
-            setEditingId(null);
-            setMese(oggiReale.getMonth());
-            setAnno(oggiReale.getFullYear());
-            setScreen('calendar');
-          },
-        },
-        {
-          text: 'Annulla',
-          style: 'cancel',
-        },
-      ]
-    );
-  }}
-  style={{
-    marginHorizontal: 16,
-    marginTop: 7,
-    marginBottom: 7,
-    height: 42,
-    borderRadius: 18,
-    borderWidth: 1.2,
-    borderColor: 'rgba(105,223,255,0.70)',
-    backgroundColor: 'rgba(49,103,210,0.16)',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-  }}
->
-  <Ionicons
-    name="add-circle-outline"
-    size={21}
-    color="#69DFFF"
-  />
-  <Text
-    style={{
-      color: '#FFFFFF',
-      fontSize: 13,
-      fontWeight: '900',
-      marginLeft: 8,
-      letterSpacing: 0.35,
-    }}
-  >
-    {(turnoInCorso || turnoOggi)
-      ? 'AGGIUNGI TURNO'
-      : 'AGGIUNGI IL TURNO DI OGGI'}
-  </Text>
-</TouchableOpacity>
+            <Ionicons
+              name="chevron-forward"
+              size={18}
+              color="#8FEAFF"
+            />
+          </TouchableOpacity>
 
-{/* ================= MESE ================= */}
+          {/* ================= AGGIUNGI TURNO ================= */}
+          <TouchableOpacity
+            activeOpacity={0.84}
+            onPress={() => {
+              const oggiReale = new Date();
+
+              const domani = new Date(oggiReale);
+              domani.setDate(domani.getDate() + 1);
+
+              Alert.alert(
+                'Aggiungi turno',
+                'Quando vuoi inserire il turno?',
+                [
+                  {
+                    text: 'Oggi',
+                    onPress: () => {
+                      setMese(oggiReale.getMonth());
+                      setAnno(oggiReale.getFullYear());
+                      nuovoGiorno(oggiReale.getDate());
+                    },
+                  },
+                  {
+                    text: 'Domani',
+                    onPress: () => {
+                      setMese(domani.getMonth());
+                      setAnno(domani.getFullYear());
+                      nuovoGiorno(domani.getDate());
+                    },
+                  },
+                  {
+                    text: 'Scegli dal calendario',
+                    onPress: () => {
+                      setEditingId(null);
+                      setMese(oggiReale.getMonth());
+                      setAnno(oggiReale.getFullYear());
+                      setScreen('calendar');
+                    },
+                  },
+                  {
+                    text: 'Annulla',
+                    style: 'cancel',
+                  },
+                ]
+              );
+            }}
+            style={{
+              marginHorizontal: 16,
+              marginTop: 8,
+              height: 44,
+              borderRadius: 17,
+              borderWidth: 1,
+              borderColor: 'rgba(105,223,255,0.52)',
+              backgroundColor: 'rgba(49,103,210,0.10)',
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <Ionicons
+              name="add-circle-outline"
+              size={20}
+              color="#69DFFF"
+            />
+            <Text
+              style={{
+                color: '#FFFFFF',
+                fontSize: 12,
+                fontWeight: '900',
+                marginLeft: 7,
+                letterSpacing: 0.55,
+              }}
+            >
+              {(turnoInCorso || turnoOggi)
+                ? 'AGGIUNGI TURNO'
+                : 'AGGIUNGI IL TURNO DI OGGI'}
+            </Text>
+          </TouchableOpacity>
+
+          {/* ================= RIEPILOGO MENSILE ================= */}
           <TouchableOpacity
             activeOpacity={0.86}
             onPress={() => setScreen('calendar')}
             style={{
               marginHorizontal: 16,
-              marginTop: 7,
-              paddingHorizontal: 14,
-              paddingVertical: 9,
-              borderRadius: 19,
-
-              backgroundColor: '#0B1930',
-
+              marginTop: 14,
+              paddingHorizontal: 15,
+              paddingVertical: 12,
+              borderRadius: 21,
+              backgroundColor: 'rgba(11,25,48,0.92)',
               borderWidth: 1,
-              borderColor: 'rgba(78,112,255,0.60)',
+              borderColor: 'rgba(78,112,255,0.42)',
             }}
           >
             <View
@@ -27841,8 +28081,9 @@ if (screen === 'profiloCollega') {
               <Text
                 style={{
                   color: '#FFFFFF',
-                  fontSize: 13,
+                  fontSize: 12,
                   fontWeight: '900',
+                  letterSpacing: 0.5,
                 }}
               >
                 {meseHomeV2}
@@ -27850,12 +28091,12 @@ if (screen === 'profiloCollega') {
 
               <Text
                 style={{
-                  color: '#FFFFFF',
-                  fontSize: 12,
+                  color: '#7FDBFF',
+                  fontSize: 11,
                   fontWeight: '900',
                 }}
               >
-                AVANZ. {avanzamentoHomeV2}%
+                {avanzamentoHomeV2}%
               </Text>
             </View>
 
@@ -27864,7 +28105,7 @@ if (screen === 'profiloCollega') {
                 height: 5,
                 borderRadius: 10,
                 backgroundColor: '#19264A',
-                marginTop: 6,
+                marginTop: 7,
                 overflow: 'hidden',
               }}
             >
@@ -27881,377 +28122,271 @@ if (screen === 'profiloCollega') {
             <View
               style={{
                 flexDirection: 'row',
-                marginTop: 8,
+                marginTop: 10,
               }}
             >
-              <View
-                style={{
-                  flex: 1,
-                  alignItems: 'center',
-                }}
-              >
-                <Text
-                  style={{
-                    color: '#FFFFFF',
-                    fontSize: 17,
-                    fontWeight: '900',
-                  }}
-                >
-                  {Number(oreStipendioMese || 0).toFixed(1)}h
-                </Text>
+              {[
+                {
+                  value: `${Number(oreStipendioMese || 0).toFixed(1)}h`,
+                  label: 'LAVORATE',
+                },
+                {
+                  value: `${Number(extraStipendioMese || 0).toFixed(0)}h`,
+                  label: 'EXTRA',
+                },
+                {
+                  value: giornateStipendioMese.length,
+                  label: 'GIORNI',
+                },
+              ].map((item, index) => (
+                <React.Fragment key={item.label}>
+                  {index > 0 && (
+                    <View
+                      style={{
+                        width: 1,
+                        backgroundColor: 'rgba(160,180,220,0.22)',
+                      }}
+                    />
+                  )}
 
-                <Text
-                  style={{
-                    color: '#9DA9C8',
-                    fontSize: 9,
-                    fontWeight: '800',
-                  }}
-                >
-                  LAVORATE
-                </Text>
-              </View>
+                  <View
+                    style={{
+                      flex: 1,
+                      alignItems: 'center',
+                    }}
+                  >
+                    <Text
+                      style={{
+                        color: '#FFFFFF',
+                        fontSize: 17,
+                        fontWeight: '900',
+                      }}
+                    >
+                      {item.value}
+                    </Text>
 
-              <View
-                style={{
-                  width: 1,
-                  backgroundColor: 'rgba(160,180,220,0.25)',
-                }}
-              />
-
-              <View
-                style={{
-                  flex: 1,
-                  alignItems: 'center',
-                }}
-              >
-                <Text
-                  style={{
-                    color: '#FFFFFF',
-                    fontSize: 17,
-                    fontWeight: '900',
-                  }}
-                >
-                  {Number(extraStipendioMese || 0).toFixed(0)}h
-                </Text>
-
-                <Text
-                  style={{
-                    color: '#9DA9C8',
-                    fontSize: 9,
-                    fontWeight: '800',
-                  }}
-                >
-                  EXTRA
-                </Text>
-              </View>
-
-              <View
-                style={{
-                  width: 1,
-                  backgroundColor: 'rgba(160,180,220,0.25)',
-                }}
-              />
-
-              <View
-                style={{
-                  flex: 1,
-                  alignItems: 'center',
-                }}
-              >
-                <Text
-                  style={{
-                    color: '#FFFFFF',
-                    fontSize: 19,
-                    fontWeight: '900',
-                  }}
-                >
-                  {giornateStipendioMese.length}
-                </Text>
-
-                <Text
-                  style={{
-                    color: '#9DA9C8',
-                    fontSize: 9,
-                    fontWeight: '800',
-                  }}
-                >
-                  GIORNI
-                </Text>
-              </View>
+                    <Text
+                      style={{
+                        color: '#9DA9C8',
+                        fontSize: 8.5,
+                        fontWeight: '800',
+                        marginTop: 2,
+                      }}
+                    >
+                      {item.label}
+                    </Text>
+                  </View>
+                </React.Fragment>
+              ))}
             </View>
           </TouchableOpacity>
 
-          {/* ================= STIPENDIO ================= */}
-          <TouchableOpacity
-            activeOpacity={0.84}
-            onPress={() => setScreen('stipendio')}
-            style={{
-              marginHorizontal: 16,
-              marginTop: 7,
-              minHeight: 50,
-              paddingHorizontal: 16,
-              borderRadius: 18,
-              backgroundColor: '#0B1930',
-              borderWidth: 1,
-              borderColor: '#315C87',
-              flexDirection: 'row',
-              alignItems: 'center',
-            }}
-          >
-            <Ionicons
-              name="wallet-outline"
-              size={23}
-              color="#55E86E"
-            />
-
-            <Text
-              style={{
-                color: '#FFFFFF',
-                fontSize: 15,
-                fontWeight: '900',
-                marginLeft: 13,
-                flex: 1,
-              }}
-            >
-              STIPENDIO
-            </Text>
-
-            <Ionicons
-              name="chevron-forward"
-              size={21}
-              color="#FFFFFF"
-            />
-          </TouchableOpacity>
-
-          {/* ================= STRUMENTI ================= */}
-          <TouchableOpacity
-            activeOpacity={0.84}
-            onPress={() => setScreen('strumenti')}
-            style={{
-              marginHorizontal: 16,
-              marginTop: 6,
-              minHeight: 50,
-              paddingHorizontal: 16,
-              borderRadius: 18,
-              backgroundColor: 'rgba(16,38,78,0.95)',
-              borderWidth: 1,
-              borderColor: 'rgba(91,218,255,0.42)',
-              flexDirection: 'row',
-              alignItems: 'center',
-            }}
-          >
-            <Ionicons
-              name="briefcase-outline"
-              size={23}
-              color="#63DFFF"
-            />
-
-            <Text
-              style={{
-                color: '#FFFFFF',
-                fontSize: 15,
-                fontWeight: '900',
-                marginLeft: 13,
-                flex: 1,
-              }}
-            >
-              STRUMENTI
-            </Text>
-
-            <Ionicons
-              name="chevron-forward"
-              size={21}
-              color="#63DFFF"
-            />
-          </TouchableOpacity>
-
-          {/* HOME_CALENDARIO_CONDIVISO */}
-          <TouchableOpacity
-            onPress={() => setScreen('calendarioColleghi')}
-            activeOpacity={0.84}
-            style={{
-              marginHorizontal: 16,
-              marginTop: 6,
-              minHeight: 50,
-              paddingHorizontal: 16,
-              borderRadius: 18,
-              backgroundColor: '#0B1930',
-              borderWidth: 1,
-              borderColor: '#315C87',
-              flexDirection: 'row',
-              alignItems: 'center',
-            }}
-          >
-            <Ionicons
-              name="calendar-outline"
-              size={23}
-              color="#63DFFF"
-            />
-
-            <Text
-              style={{
-                color: '#FFFFFF',
-                fontSize: 15,
-                fontWeight: '900',
-                marginLeft: 13,
-                flex: 1,
-              }}
-            >
-              CALENDARIO COLLEGHI
-            </Text>
-
-            <Ionicons
-              name="chevron-forward"
-              size={21}
-              color="#63DFFF"
-            />
-          </TouchableOpacity>
-
-
-          {/* ================= BARRA RAPIDA ================= */}
+          {/* ================= FUNZIONI PRINCIPALI ================= */}
           <View
             style={{
               marginHorizontal: 16,
-              marginTop: 7,
-              marginBottom: 8,
-              minHeight: 68,
-              borderRadius: 21,
-              borderWidth: 1,
-              borderColor: '#31516F',
-              backgroundColor: '#071526',
+              marginTop: 15,
+            }}
+          >
+            <Text
+              style={{
+                color: '#7FDBFF',
+                fontSize: 9.5,
+                fontWeight: '900',
+                letterSpacing: 1.45,
+                marginBottom: 9,
+              }}
+            >
+              CENTRO OPERATIVO
+            </Text>
 
+            <View
+              style={{
+                flexDirection: 'row',
+                flexWrap: 'wrap',
+                justifyContent: 'space-between',
+              }}
+            >
+              {homeFeatureCards.map((card) => (
+                <TouchableOpacity
+                  key={card.key}
+                  activeOpacity={0.78}
+                  onPress={card.onPress}
+                  style={{
+                    width: '48.4%',
+                    minHeight: 116,
+                    marginBottom: 10,
+                    padding: 14,
+                    borderRadius: 21,
+                    backgroundColor: card.key === 'stipendio'
+                      ? 'rgba(14,43,45,0.92)'
+                      : 'rgba(10,29,53,0.94)',
+                    borderWidth: 1,
+                    borderColor: card.key === 'stipendio'
+                      ? 'rgba(85,232,110,0.45)'
+                      : 'rgba(99,223,255,0.24)',
+                    overflow: 'hidden',
+                    justifyContent: 'space-between',
+                    shadowColor: card.color,
+                    shadowOpacity: 0.14,
+                    shadowRadius: 12,
+                    shadowOffset: { width: 0, height: 6 },
+                    elevation: 4,
+                  }}
+                >
+                  <View
+                    pointerEvents="none"
+                    style={{
+                      position: 'absolute',
+                      width: 90,
+                      height: 90,
+                      borderRadius: 45,
+                      right: -32,
+                      top: -35,
+                      backgroundColor: card.color,
+                      opacity: 0.045,
+                    }}
+                  />
+
+                  <View
+                    style={{
+                      width: 44,
+                      height: 44,
+                      borderRadius: 14,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      backgroundColor: card.key === 'stipendio'
+                        ? 'rgba(85,232,110,0.12)'
+                        : 'rgba(99,223,255,0.09)',
+                      borderWidth: 1,
+                      borderColor: `${card.color}55`,
+                    }}
+                  >
+                    <Ionicons
+                      name={card.icon}
+                      size={24}
+                      color={card.color}
+                    />
+                  </View>
+
+                  <View>
+                    <Text
+                      style={{
+                        color: '#FFFFFF',
+                        fontSize: 13,
+                        fontWeight: '900',
+                        letterSpacing: 0.15,
+                      }}
+                    >
+                      {card.title}
+                    </Text>
+
+                    <View
+                      style={{
+                        width: 22,
+                        height: 2,
+                        borderRadius: 2,
+                        backgroundColor: card.color,
+                        marginTop: 6,
+                        opacity: 0.75,
+                      }}
+                    />
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+
+          {/* ================= BARRA INFERIORE ================= */}
+          <View
+            style={{
+              marginHorizontal: 16,
+              marginTop: 5,
+              marginBottom: 8,
+              minHeight: 70,
+              borderRadius: 22,
+              borderWidth: 1,
+              borderColor: 'rgba(49,81,111,0.82)',
+              backgroundColor: 'rgba(7,21,38,0.96)',
               flexDirection: 'row',
               alignItems: 'center',
               justifyContent: 'space-around',
-
-              paddingHorizontal: 8,
-              paddingVertical: 10,
+              paddingHorizontal: 7,
+              paddingVertical: 9,
             }}
           >
-            {/* TURNI */}
-            <TouchableOpacity
-              onPress={() => setScreen('turni')}
-              activeOpacity={0.75}
-              style={{
-                flex: 1,
-                alignItems: 'center',
-              }}
-            >
-              <Ionicons
-                name="calendar-outline"
-                size={25}
-                color="#55E86E"
-              />
-
-              <Text
+            {[
+              {
+                title: 'TURNI',
+                icon: 'calendar-outline',
+                color: '#55E86E',
+                onPress: () => setScreen('turni'),
+              },
+              {
+                title: 'CALENDARIO',
+                icon: 'calendar-number-outline',
+                color: '#7FDBFF',
+                onPress: () => setScreen('calendar'),
+              },
+              {
+                title: 'COLLEGHI',
+                icon: 'people-outline',
+                color: '#7FDBFF',
+                onPress: async () => {
+                  try {
+                    setScreen('colleghi');
+                    await aggiornaColleghi();
+                  } catch (e) {
+                    console.log(
+                      'Errore apertura colleghi Home V2:',
+                      e
+                    );
+                  }
+                },
+              },
+              {
+                title: 'CHAT',
+                icon: 'chatbubble-ellipses-outline',
+                color: '#7FDBFF',
+                onPress: () => setScreen('listaChat'),
+              },
+            ].map((item) => (
+              <TouchableOpacity
+                key={item.title}
+                onPress={item.onPress}
+                activeOpacity={0.75}
                 style={{
-                  color: '#55E86E',
-                  fontSize: 9,
-                  fontWeight: '900',
-                  marginTop: 6,
+                  flex: 1,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  minHeight: 50,
+                  borderRadius: 15,
                 }}
               >
-                TURNI
-              </Text>
-            </TouchableOpacity>
+                <Ionicons
+                  name={item.icon}
+                  size={22}
+                  color={item.color}
+                />
 
-            {/* CALENDARIO */}
-            <TouchableOpacity
-              onPress={() => setScreen('calendar')}
-              activeOpacity={0.75}
-              style={{
-                flex: 1,
-                alignItems: 'center',
-              }}
-            >
-              <Ionicons
-                name="calendar-number-outline"
-                size={25}
-                color="#7FDBFF"
-              />
-
-              <Text
-                style={{
-                  color: '#FFFFFF',
-                  fontSize: 9,
-                  fontWeight: '900',
-                  marginTop: 6,
-                }}
-              >
-                CALENDARIO
-              </Text>
-            </TouchableOpacity>
-
-            {/* COLLEGHI */}
-            <TouchableOpacity
-              onPress={async () => {
-                try {
-                  setScreen('colleghi');
-                  await aggiornaColleghi();
-                } catch (e) {
-                  console.log(
-                    'Errore apertura colleghi Home V2:',
-                    e
-                  );
-                }
-              }}
-              activeOpacity={0.75}
-              style={{
-                flex: 1,
-                alignItems: 'center',
-              }}
-            >
-              <Ionicons
-                name="people-outline"
-                size={25}
-                color="#7FDBFF"
-              />
-
-              <Text
-                style={{
-                  color: '#FFFFFF',
-                  fontSize: 9,
-                  fontWeight: '900',
-                  marginTop: 6,
-                }}
-              >
-                COLLEGHI
-              </Text>
-            </TouchableOpacity>
-
-            {/* CHAT */}
-            <TouchableOpacity
-              onPress={() => setScreen('listaChat')}
-              activeOpacity={0.75}
-              style={{
-                flex: 1,
-                alignItems: 'center',
-              }}
-            >
-              <Ionicons
-                name="chatbubble-ellipses-outline"
-                size={25}
-                color="#7FDBFF"
-              />
-
-              <Text
-                style={{
-                  color: '#FFFFFF',
-                  fontSize: 9,
-                  fontWeight: '900',
-                  marginTop: 6,
-                }}
-              >
-                CHAT
-              </Text>
-            </TouchableOpacity>
+                <Text
+                  style={{
+                    color: '#FFFFFF',
+                    fontSize: 8.5,
+                    fontWeight: '900',
+                    marginTop: 5,
+                    letterSpacing: 0.35,
+                  }}
+                >
+                  {item.title}
+                </Text>
+              </TouchableOpacity>
+            ))}
           </View>
-
         </ScrollView>
       </Screen>
     );
   }
-
   return (
     <Screen>
       <ScrollView
