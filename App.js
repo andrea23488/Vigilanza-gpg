@@ -28201,151 +28201,294 @@ if (screen === 'profiloCollega') {
             </View>
           </TouchableOpacity>
 
-          {/* ================= STIPENDIO ================= */}
-          <TouchableOpacity
-            activeOpacity={0.84}
-            onPress={() => setScreen('stipendio')}
-            style={{
-              marginHorizontal: 16,
-              marginTop: 7,
-              minHeight: 50,
-              paddingHorizontal: 16,
-              borderRadius: 18,
-              backgroundColor: '#0B1930',
-              borderWidth: 1,
-              borderColor: '#315C87',
-              flexDirection: 'row',
-              alignItems: 'center',
-            }}
-          >
-            <Ionicons
-              name="wallet-outline"
-              size={23}
-              color="#55E86E"
-            />
-
-            <Text
-              style={{
-                color: '#FFFFFF',
-                fontSize: 15,
-                fontWeight: '900',
-                marginLeft: 13,
-                flex: 1,
-              }}
-            >
-              STIPENDIO
-            </Text>
-
-            <Ionicons
-              name="chevron-forward"
-              size={21}
-              color="#FFFFFF"
-            />
-          </TouchableOpacity>
-
-          {/* ================= STRUMENTI ================= */}
-          <TouchableOpacity
-            activeOpacity={0.84}
-            onPress={() => setScreen('strumenti')}
-            style={{
-              marginHorizontal: 16,
-              marginTop: 6,
-              minHeight: 50,
-              paddingHorizontal: 16,
-              borderRadius: 18,
-              backgroundColor: 'rgba(16,38,78,0.95)',
-              borderWidth: 1,
-              borderColor: 'rgba(91,218,255,0.42)',
-              flexDirection: 'row',
-              alignItems: 'center',
-            }}
-          >
-            <Ionicons
-              name="briefcase-outline"
-              size={23}
-              color="#63DFFF"
-            />
-
-            <Text
-              style={{
-                color: '#FFFFFF',
-                fontSize: 15,
-                fontWeight: '900',
-                marginLeft: 13,
-                flex: 1,
-              }}
-            >
-              STRUMENTI
-            </Text>
-
-            <Ionicons
-              name="chevron-forward"
-              size={21}
-              color="#63DFFF"
-            />
-          </TouchableOpacity>
-
-          {/* HOME_CALENDARIO_CONDIVISO */}
-          <TouchableOpacity
-            onPress={() => setScreen('calendarioColleghi')}
-            activeOpacity={0.84}
-            style={{
-              marginHorizontal: 16,
-              marginTop: 6,
-              minHeight: 50,
-              paddingHorizontal: 16,
-              borderRadius: 18,
-              backgroundColor: '#0B1930',
-              borderWidth: 1,
-              borderColor: '#315C87',
-              flexDirection: 'row',
-              alignItems: 'center',
-            }}
-          >
-            <Ionicons
-              name="calendar-outline"
-              size={23}
-              color="#63DFFF"
-            />
-
-            <Text
-              style={{
-                color: '#FFFFFF',
-                fontSize: 15,
-                fontWeight: '900',
-                marginLeft: 13,
-                flex: 1,
-              }}
-            >
-              CALENDARIO COLLEGHI
-            </Text>
-
-            <Ionicons
-              name="chevron-forward"
-              size={21}
-              color="#63DFFF"
-            />
-          </TouchableOpacity>
-
-
-          {/* ================= BARRA RAPIDA ================= */}
+          {/* ================= CENTRO OPERATIVO ================= */}
           <View
             style={{
               marginHorizontal: 16,
-              marginTop: 7,
+              marginTop: 10,
               marginBottom: 8,
-              minHeight: 68,
-              borderRadius: 21,
-              borderWidth: 1,
-              borderColor: '#31516F',
-              backgroundColor: '#071526',
+            }}
+          >
+            <Text
+              style={{
+                color: '#7F93B5',
+                fontSize: 10,
+                fontWeight: '900',
+                letterSpacing: 1.2,
+                marginBottom: 9,
+                marginLeft: 2,
+              }}
+            >
+              CENTRO OPERATIVO
+            </Text>
 
+            <View
+              style={{
+                flexDirection: 'row',
+                gap: 9,
+                marginBottom: 9,
+              }}
+            >
+              {/* STIPENDIO */}
+              <TouchableOpacity
+                activeOpacity={0.84}
+                onPress={() => setScreen('stipendio')}
+                style={{
+                  flex: 1,
+                  minHeight: 105,
+                  borderRadius: 22,
+                  padding: 15,
+                  justifyContent: 'space-between',
+                  backgroundColor: '#0A1B31',
+                  borderWidth: 1.2,
+                  borderColor: 'rgba(92,255,126,0.52)',
+                  shadowColor: '#55E86E',
+                  shadowOpacity: 0.18,
+                  shadowRadius: 12,
+                  shadowOffset: { width: 0, height: 5 },
+                }}
+              >
+                <View
+                  style={{
+                    width: 40,
+                    height: 40,
+                    borderRadius: 14,
+                    backgroundColor: 'rgba(85,232,110,0.12)',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <Ionicons
+                    name="wallet-outline"
+                    size={23}
+                    color="#55E86E"
+                  />
+                </View>
+
+                <View>
+                  <Text
+                    style={{
+                      color: '#FFFFFF',
+                      fontSize: 14,
+                      fontWeight: '900',
+                    }}
+                  >
+                    STIPENDIO
+                  </Text>
+                  <Text
+                    style={{
+                      color: '#8294B4',
+                      fontSize: 9,
+                      fontWeight: '700',
+                      marginTop: 3,
+                    }}
+                  >
+                    Riepilogo e stima
+                  </Text>
+                </View>
+              </TouchableOpacity>
+
+              {/* STRUMENTI */}
+              <TouchableOpacity
+                activeOpacity={0.84}
+                onPress={() => setScreen('strumenti')}
+                style={{
+                  flex: 1,
+                  minHeight: 105,
+                  borderRadius: 22,
+                  padding: 15,
+                  justifyContent: 'space-between',
+                  backgroundColor: '#0A1B31',
+                  borderWidth: 1.2,
+                  borderColor: 'rgba(99,223,255,0.42)',
+                  shadowColor: '#63DFFF',
+                  shadowOpacity: 0.14,
+                  shadowRadius: 10,
+                  shadowOffset: { width: 0, height: 5 },
+                }}
+              >
+                <View
+                  style={{
+                    width: 40,
+                    height: 40,
+                    borderRadius: 14,
+                    backgroundColor: 'rgba(99,223,255,0.11)',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <Ionicons
+                    name="briefcase-outline"
+                    size={23}
+                    color="#63DFFF"
+                  />
+                </View>
+
+                <View>
+                  <Text
+                    style={{
+                      color: '#FFFFFF',
+                      fontSize: 14,
+                      fontWeight: '900',
+                    }}
+                  >
+                    STRUMENTI
+                  </Text>
+                  <Text
+                    style={{
+                      color: '#8294B4',
+                      fontSize: 9,
+                      fontWeight: '700',
+                      marginTop: 3,
+                    }}
+                  >
+                    Utilità operative
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            </View>
+
+            <View
+              style={{
+                flexDirection: 'row',
+                gap: 9,
+              }}
+            >
+              {/* SETTIMANA COLLEGHI */}
+              <TouchableOpacity
+                activeOpacity={0.84}
+                onPress={() => setScreen('calendarioColleghi')}
+                style={{
+                  flex: 1,
+                  minHeight: 105,
+                  borderRadius: 22,
+                  padding: 15,
+                  justifyContent: 'space-between',
+                  backgroundColor: '#0A1B31',
+                  borderWidth: 1.2,
+                  borderColor: 'rgba(114,154,255,0.44)',
+                  shadowColor: '#729AFF',
+                  shadowOpacity: 0.14,
+                  shadowRadius: 10,
+                  shadowOffset: { width: 0, height: 5 },
+                }}
+              >
+                <View
+                  style={{
+                    width: 40,
+                    height: 40,
+                    borderRadius: 14,
+                    backgroundColor: 'rgba(114,154,255,0.12)',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <Ionicons
+                    name="calendar-outline"
+                    size={23}
+                    color="#8DB8FF"
+                  />
+                </View>
+
+                <View>
+                  <Text
+                    style={{
+                      color: '#FFFFFF',
+                      fontSize: 13,
+                      fontWeight: '900',
+                    }}
+                  >
+                    SETTIMANA
+                  </Text>
+                  <Text
+                    style={{
+                      color: '#8294B4',
+                      fontSize: 9,
+                      fontWeight: '700',
+                      marginTop: 3,
+                    }}
+                  >
+                    Turni con i colleghi
+                  </Text>
+                </View>
+              </TouchableOpacity>
+
+              {/* CHAT */}
+              <TouchableOpacity
+                activeOpacity={0.84}
+                onPress={() => setScreen('listaChat')}
+                style={{
+                  flex: 1,
+                  minHeight: 105,
+                  borderRadius: 22,
+                  padding: 15,
+                  justifyContent: 'space-between',
+                  backgroundColor: '#0A1B31',
+                  borderWidth: 1.2,
+                  borderColor: 'rgba(177,121,255,0.40)',
+                  shadowColor: '#B179FF',
+                  shadowOpacity: 0.13,
+                  shadowRadius: 10,
+                  shadowOffset: { width: 0, height: 5 },
+                }}
+              >
+                <View
+                  style={{
+                    width: 40,
+                    height: 40,
+                    borderRadius: 14,
+                    backgroundColor: 'rgba(177,121,255,0.11)',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <Ionicons
+                    name="chatbubble-ellipses-outline"
+                    size={23}
+                    color="#C395FF"
+                  />
+                </View>
+
+                <View>
+                  <Text
+                    style={{
+                      color: '#FFFFFF',
+                      fontSize: 14,
+                      fontWeight: '900',
+                    }}
+                  >
+                    CHAT
+                  </Text>
+                  <Text
+                    style={{
+                      color: '#8294B4',
+                      fontSize: 9,
+                      fontWeight: '700',
+                      marginTop: 3,
+                    }}
+                  >
+                    Messaggi colleghi
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* ================= NAV RAPIDA ================= */}
+          <View
+            style={{
+              marginHorizontal: 16,
+              marginTop: 5,
+              marginBottom: 8,
+              minHeight: 58,
+              borderRadius: 19,
+              borderWidth: 1,
+              borderColor: 'rgba(70,105,145,0.46)',
+              backgroundColor: '#071526',
               flexDirection: 'row',
               alignItems: 'center',
-              justifyContent: 'space-around',
-
-              paddingHorizontal: 8,
-              paddingVertical: 10,
+              paddingHorizontal: 6,
+              paddingVertical: 8,
             }}
           >
             {/* TURNI */}
@@ -28359,16 +28502,15 @@ if (screen === 'profiloCollega') {
             >
               <Ionicons
                 name="calendar-outline"
-                size={25}
+                size={22}
                 color="#55E86E"
               />
-
               <Text
                 style={{
-                  color: '#55E86E',
+                  color: '#FFFFFF',
                   fontSize: 9,
                   fontWeight: '900',
-                  marginTop: 6,
+                  marginTop: 4,
                 }}
               >
                 TURNI
@@ -28386,16 +28528,15 @@ if (screen === 'profiloCollega') {
             >
               <Ionicons
                 name="calendar-number-outline"
-                size={25}
+                size={22}
                 color="#7FDBFF"
               />
-
               <Text
                 style={{
                   color: '#FFFFFF',
                   fontSize: 9,
                   fontWeight: '900',
-                  marginTop: 6,
+                  marginTop: 4,
                 }}
               >
                 CALENDARIO
@@ -28423,46 +28564,18 @@ if (screen === 'profiloCollega') {
             >
               <Ionicons
                 name="people-outline"
-                size={25}
+                size={22}
                 color="#7FDBFF"
               />
-
               <Text
                 style={{
                   color: '#FFFFFF',
                   fontSize: 9,
                   fontWeight: '900',
-                  marginTop: 6,
+                  marginTop: 4,
                 }}
               >
                 COLLEGHI
-              </Text>
-            </TouchableOpacity>
-
-            {/* CHAT */}
-            <TouchableOpacity
-              onPress={() => setScreen('listaChat')}
-              activeOpacity={0.75}
-              style={{
-                flex: 1,
-                alignItems: 'center',
-              }}
-            >
-              <Ionicons
-                name="chatbubble-ellipses-outline"
-                size={25}
-                color="#7FDBFF"
-              />
-
-              <Text
-                style={{
-                  color: '#FFFFFF',
-                  fontSize: 9,
-                  fontWeight: '900',
-                  marginTop: 6,
-                }}
-              >
-                CHAT
               </Text>
             </TouchableOpacity>
           </View>
