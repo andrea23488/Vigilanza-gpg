@@ -72,6 +72,7 @@ import {
 } from './colleghiApi';
 import { caricaColleghiInServizio } from './servizioApi';
 import React, { useRef, useEffect, useMemo, useState } from 'react';
+import Svg, { Ellipse } from 'react-native-svg';
 import SchedaPostoScreen from './SchedaPostoScreen';
 import PostiSalvatiScreen from './PostiSalvatiScreen';
 import CalendarioColleghiScreen from './CalendarioColleghiScreen';
@@ -95,6 +96,9 @@ import {
   ActivityIndicator,
   AppState,
   Image,
+  Animated,
+  Easing,
+  useWindowDimensions,
 } from 'react-native';
 
 import * as ImagePicker from 'expo-image-picker';
@@ -106,6 +110,314 @@ import {
   updateApplicationContext,
   watchEvents,
 } from 'react-native-watch-connectivity';
+
+
+function HomeDigitalCore({
+  turno,
+  turnoInCorso,
+  countdownLabel,
+  countdownTurno,
+  onPress,
+}) {
+  const { width } = useWindowDimensions();
+  const ingresso = useRef(new Animated.Value(0)).current;
+  const rotazione = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.sequence([
+      Animated.timing(ingresso, {
+        toValue: 1,
+        duration: 900,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+      Animated.timing(ingresso, {
+        toValue: 0.94,
+        duration: 220,
+        easing: Easing.out(Easing.quad),
+        useNativeDriver: true,
+      }),
+      Animated.timing(ingresso, {
+        toValue: 1,
+        duration: 260,
+        easing: Easing.out(Easing.quad),
+        useNativeDriver: true,
+      }),
+    ]).start();
+
+    const loop = Animated.loop(
+      Animated.timing(rotazione, {
+        toValue: 1,
+        duration: 22000,
+        easing: Easing.linear,
+        useNativeDriver: true,
+      })
+    );
+
+    loop.start();
+
+    return () => loop.stop();
+  }, [ingresso, rotazione]);
+
+  const size = Math.min(Math.max(width - 72, 270), 340);
+  const outer = size;
+  const middle = size * 0.88;
+  const inner = size * 0.74;
+
+  const rotate = rotazione.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '360deg'],
+  });
+
+  const scale = ingresso.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.88, 1],
+  });
+
+  const opacity = ingresso.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, 1],
+  });
+
+  const titoloTurno =
+    turno?.tipo === 'turno'
+      ? `${turno?.inizio || '--:--'} - ${turno?.fine || '--:--'}`
+      : turno?.tipo === 'riposo'
+      ? 'RIPOSO'
+      : turno?.tipo === 'ferie'
+      ? 'FERIE'
+      : turno?.tipo === 'malattia'
+      ? 'MALATTIA'
+      : turno?.tipo === 'permesso'
+      ? 'PERMESSO'
+      : turno?.tipo === 'congedo30'
+      ? 'CONGEDO 30%'
+      : turno?.tipo === 'congedo80'
+      ? 'CONGEDO 80%'
+      : turno?.tipo === 'legge104'
+      ? 'LEGGE 104'
+      : 'NESSUN TURNO';
+
+  const accento = turnoInCorso ? '#6BFF8A' : '#5EEBFF';
+
+  return (
+    <TouchableOpacity
+      activeOpacity={0.92}
+      onPress={onPress}
+      style={{
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginTop: 4,
+        marginBottom: 6,
+      }}
+    >
+      <Animated.View
+        style={{
+          width: size,
+          height: size,
+          alignItems: 'center',
+          justifyContent: 'center',
+          opacity,
+          transform: [{ scale }],
+        }}
+      >
+        {/* alone esterno */}
+        <View
+          pointerEvents="none"
+          style={{
+            position: 'absolute',
+            width: outer * 0.98,
+            height: outer * 0.98,
+            borderRadius: outer,
+            backgroundColor: turnoInCorso
+              ? 'rgba(61,255,118,0.055)'
+              : 'rgba(64,213,255,0.075)',
+            shadowColor: accento,
+            shadowOpacity: 0.75,
+            shadowRadius: 34,
+            shadowOffset: { width: 0, height: 0 },
+          }}
+        />
+
+        {/* secondo alone */}
+        <View
+          pointerEvents="none"
+          style={{
+            position: 'absolute',
+            width: middle,
+            height: middle,
+            borderRadius: middle,
+            backgroundColor: turnoInCorso
+              ? 'rgba(41,190,92,0.08)'
+              : 'rgba(47,157,255,0.10)',
+            shadowColor: accento,
+            shadowOpacity: 0.55,
+            shadowRadius: 22,
+            shadowOffset: { width: 0, height: 0 },
+          }}
+        />
+
+        {/* orbita esterna */}
+        <Animated.View
+          pointerEvents="none"
+          style={{
+            position: 'absolute',
+            width: outer,
+            height: outer,
+            transform: [{ rotate }],
+          }}
+        >
+          <Svg width={outer} height={outer}>
+            <Ellipse
+              cx={outer / 2}
+              cy={outer / 2}
+              rx={outer * 0.46}
+              ry={outer * 0.46}
+              fill="none"
+              stroke={accento}
+              strokeWidth={3.1}
+              opacity={0.58}
+            />
+            <Ellipse
+              cx={outer / 2}
+              cy={outer / 2}
+              rx={outer * 0.43}
+              ry={outer * 0.43}
+              fill="none"
+              stroke="#B9F8FF"
+              strokeWidth={1.2}
+              strokeDasharray={`${outer * 0.09} ${outer * 0.045}`}
+              opacity={0.34}
+            />
+            <Ellipse
+              cx={outer / 2}
+              cy={outer / 2}
+              rx={outer * 0.46}
+              ry={outer * 0.46}
+              fill="none"
+              stroke="#FFFFFF"
+              strokeWidth={5.2}
+              strokeDasharray={`${outer * 0.15} ${outer * 2.1}`}
+              opacity={0.9}
+            />
+          </Svg>
+        </Animated.View>
+
+        {/* anello medio */}
+        <View
+          pointerEvents="none"
+          style={{
+            position: 'absolute',
+            width: middle,
+            height: middle,
+            borderRadius: middle,
+            borderWidth: 2.5,
+            borderColor: turnoInCorso
+              ? 'rgba(107,255,138,0.72)'
+              : 'rgba(94,235,255,0.78)',
+            shadowColor: accento,
+            shadowOpacity: 0.7,
+            shadowRadius: 18,
+            shadowOffset: { width: 0, height: 0 },
+          }}
+        />
+
+        {/* nucleo */}
+        <View
+          style={{
+            width: inner,
+            height: inner,
+            borderRadius: inner,
+            alignItems: 'center',
+            justifyContent: 'center',
+            paddingHorizontal: 26,
+            backgroundColor: turnoInCorso ? '#07160F' : '#08152A',
+            borderWidth: 1.8,
+            borderColor: turnoInCorso
+              ? 'rgba(107,255,138,0.55)'
+              : 'rgba(94,235,255,0.60)',
+            shadowColor: accento,
+            shadowOpacity: 0.45,
+            shadowRadius: 20,
+            shadowOffset: { width: 0, height: 0 },
+          }}
+        >
+          <Text
+            style={{
+              color: accento,
+              fontSize: 10,
+              fontWeight: '900',
+              letterSpacing: 1.4,
+            }}
+          >
+            TURNO DI OGGI
+          </Text>
+
+          <Text
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.72}
+            style={{
+              color: '#FFFFFF',
+              fontSize: 31,
+              fontWeight: '900',
+              marginTop: 9,
+              textAlign: 'center',
+            }}
+          >
+            {titoloTurno}
+          </Text>
+
+          <Text
+            numberOfLines={2}
+            style={{
+              color: '#C6D8EE',
+              fontSize: 12,
+              fontWeight: '700',
+              marginTop: 7,
+              textAlign: 'center',
+            }}
+          >
+            {turno?.luogo || 'Luogo non indicato'}
+          </Text>
+
+          <View
+            style={{
+              width: '64%',
+              height: 1,
+              backgroundColor: turnoInCorso
+                ? 'rgba(107,255,138,0.22)'
+                : 'rgba(94,235,255,0.22)',
+              marginVertical: 13,
+            }}
+          />
+
+          <Text
+            style={{
+              color: accento,
+              fontSize: 9,
+              fontWeight: '900',
+              letterSpacing: 1.1,
+            }}
+          >
+            {countdownLabel}
+          </Text>
+
+          <Text
+            style={{
+              color: '#FFFFFF',
+              fontSize: 20,
+              fontWeight: '900',
+              marginTop: 3,
+            }}
+          >
+            {countdownTurno}
+          </Text>
+        </View>
+      </Animated.View>
+    </TouchableOpacity>
+  );
+}
 
 const invalidaContestoAppleWatch = () => {
   if (Platform.OS !== 'ios') return;
@@ -27490,123 +27802,29 @@ if (screen === 'profiloCollega') {
             </View>
           </View>
 
-          {/* ================= TURNO ================= */}
+          {/* ================= DIGITAL CORE TURNO ================= */}
+          <HomeDigitalCore
+            turno={turnoHomeV2}
+            turnoInCorso={Boolean(turnoInCorso)}
+            countdownLabel={countdownLabel}
+            countdownTurno={countdownTurno}
+            onPress={() => setScreen('calendar')}
+          />
+
+          {/* ================= PERCORSO SERVIZIO ================= */}
           <View
             style={{
-              marginHorizontal: 28,
-              marginTop: 7,
-              paddingHorizontal: 18,
-              paddingVertical: 8,
-              borderRadius: 25,
-
-              backgroundColor: turnoInCorso
-                ? '#06170E'
-                : '#09182C',
-
-              borderWidth: 1.5,
-              borderColor: turnoInCorso
-                ? '#55F47C'
-                : '#42CFFF',
-
-              shadowColor: turnoInCorso
-                ? '#55F47C'
-                : '#42CFFF',
-
-              shadowOpacity: turnoInCorso ? 0.28 : 0.14,
-              shadowRadius: 17,
-              shadowOffset: {
-                width: 0,
-                height: 7,
-              },
+              marginHorizontal: 16,
+              marginTop: 2,
+              marginBottom: 7,
+              paddingHorizontal: 14,
+              paddingVertical: 7,
+              borderRadius: 18,
+              backgroundColor: '#08172B',
+              borderWidth: 1,
+              borderColor: 'rgba(94,235,255,0.28)',
             }}
           >
-            <TouchableOpacity
-              activeOpacity={0.86}
-              onPress={() => setScreen('calendar')}
-            >
-              <Text
-                style={{
-                  color: '#4BE66B',
-                  textAlign: 'center',
-                  fontSize: 12,
-                  fontWeight: '900',
-                  letterSpacing: 0.4,
-                }}
-              >
-                TURNO DI OGGI
-              </Text>
-
-              <Text
-                numberOfLines={1}
-                adjustsFontSizeToFit
-                minimumFontScale={0.8}
-                style={{
-                  color: '#FFFFFF',
-                  textAlign: 'center',
-                  fontSize: 28,
-                  fontWeight: '900',
-                  marginTop: 7,
-                }}
-              >
-                {turnoHomeV2?.tipo === 'turno'
-                  ? `${turnoHomeV2.inizio || '--:--'} - ${turnoHomeV2.fine || '--:--'}`
-                  : turnoHomeV2?.tipo === 'riposo'
-                  ? 'RIPOSO'
-                  : 'NESSUN TURNO'}
-              </Text>
-
-              <Text
-                style={{
-                  color: '#C8D0E0',
-                  textAlign: 'center',
-                  fontSize: 13,
-                  fontWeight: '700',
-                  marginTop: 5,
-                }}
-              >
-                📍 {turnoHomeV2?.luogo || 'Luogo non indicato'}
-              </Text>
-            </TouchableOpacity>
-
-            {/* separatore */}
-            <View
-              style={{
-                height: 1,
-                backgroundColor: 'rgba(85,244,124,0.18)',
-                marginTop: 10,
-                marginBottom: 8,
-              }}
-            />
-
-            {/* COUNTDOWN */}
-            <View
-              style={{
-                alignItems: 'center',
-              }}
-            >
-              <Text
-                style={{
-                  color: '#55F47C',
-                  fontSize: 10,
-                  fontWeight: '900',
-                  letterSpacing: 1.2,
-                }}
-              >
-                {countdownLabel}
-              </Text>
-
-              <Text
-                style={{
-                  color: '#FFFFFF',
-                  fontSize: 21,
-                  fontWeight: '900',
-                  marginTop: 2,
-                }}
-              >
-                {countdownTurno}
-              </Text>
-            </View>
-
             {/* PERCORSO + TRAFFICO */}
               <View
                 style={{
@@ -27733,6 +27951,8 @@ if (screen === 'profiloCollega') {
                 color="#8FEAFF"
               />
               </TouchableOpacity>
+
+
           </View>
 
           {/* ===== CTA AGGIUNGI TURNO HOME ===== */}
