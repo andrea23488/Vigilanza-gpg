@@ -28413,64 +28413,6 @@ if (screen === 'profiloCollega') {
                 </View>
               </TouchableOpacity>
 
-              {/* CHAT */}
-              <TouchableOpacity
-                activeOpacity={0.84}
-                onPress={() => setScreen('listaChat')}
-                style={{
-                  flex: 1,
-                  minHeight: 105,
-                  borderRadius: 22,
-                  padding: 15,
-                  justifyContent: 'space-between',
-                  backgroundColor: '#0A1B31',
-                  borderWidth: 1.2,
-                  borderColor: 'rgba(177,121,255,0.40)',
-                  shadowColor: '#B179FF',
-                  shadowOpacity: 0.13,
-                  shadowRadius: 10,
-                  shadowOffset: { width: 0, height: 5 },
-                }}
-              >
-                <View
-                  style={{
-                    width: 40,
-                    height: 40,
-                    borderRadius: 14,
-                    backgroundColor: 'rgba(177,121,255,0.11)',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
-                >
-                  <Ionicons
-                    name="chatbubble-ellipses-outline"
-                    size={23}
-                    color="#C395FF"
-                  />
-                </View>
-
-                <View>
-                  <Text
-                    style={{
-                      color: '#FFFFFF',
-                      fontSize: 14,
-                      fontWeight: '900',
-                    }}
-                  >
-                    CHAT
-                  </Text>
-                  <Text
-                    style={{
-                      color: '#8294B4',
-                      fontSize: 9,
-                      fontWeight: '700',
-                      marginTop: 3,
-                    }}
-                  >
-                    Messaggi colleghi
-                  </Text>
-                </View>
-              </TouchableOpacity>
             </View>
           </View>
 
@@ -28517,9 +28459,9 @@ if (screen === 'profiloCollega') {
               </Text>
             </TouchableOpacity>
 
-            {/* CALENDARIO */}
+            {/* CHAT */}
             <TouchableOpacity
-              onPress={() => setScreen('calendar')}
+              onPress={() => setScreen('listaChat')}
               activeOpacity={0.75}
               style={{
                 flex: 1,
@@ -28527,9 +28469,9 @@ if (screen === 'profiloCollega') {
               }}
             >
               <Ionicons
-                name="calendar-number-outline"
+                name="chatbubble-ellipses-outline"
                 size={22}
-                color="#7FDBFF"
+                color="#C395FF"
               />
               <Text
                 style={{
@@ -28539,7 +28481,7 @@ if (screen === 'profiloCollega') {
                   marginTop: 4,
                 }}
               >
-                CALENDARIO
+                CHAT
               </Text>
             </TouchableOpacity>
 
