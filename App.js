@@ -425,7 +425,7 @@ function HomeOrbital({ children, accent = '#55E8FF' }) {
           />
         </Svg>
 
-        <AnimatedOrbit
+        <Animated.View
           pointerEvents="none"
           style={{
             position: 'absolute',
@@ -454,7 +454,7 @@ function HomeOrbital({ children, accent = '#55E8FF' }) {
               strokeDasharray={`${size * 0.24} ${size * 1.9}`}
             />
           </Svg>
-        </AnimatedOrbit>
+        </Animated.View>
 
         <Svg
           width={size}
