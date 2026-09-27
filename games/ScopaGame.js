@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -257,6 +257,7 @@ function OpzionePresaScopa({ presa, onPress }) {
 }
 
 export default function ScopaGame({ onBack }) {
+  const confermaPresaRef = useRef(null);
   const insets = useSafeAreaInsets();
   const [manoGiocatore, setManoGiocatore] = useState([]);
   const [manoCpu, setManoCpu] = useState([]);
@@ -547,13 +548,14 @@ export default function ScopaGame({ onBack }) {
   }
 
   function scegliPresaGiocatore(presa) {
-    if (!cartaDaGiocare) return;
+    if (!cartaDaGiocare || confermaPresaRef.current) return;
 
     const verifica = validaPresaScopa({
       cartaGiocata: cartaDaGiocare,
       tavolo,
       presa,
     });
+
     if (!verifica.valida) {
       if (__DEV__) {
         console.warn('SCOPA_PRESA_NON_PIU_VALIDA', verifica);
@@ -565,10 +567,21 @@ export default function ScopaGame({ onBack }) {
       return;
     }
 
-    completaGiocataGiocatore(
-      cartaDaGiocare,
-      presa
-    );
+    confermaPresaRef.current = {
+      carta: cartaDaGiocare,
+      presa: [...presa],
+    };
+
+    setCartaDaGiocare(null);
+    setOpzioniPresa([]);
+  }
+
+  function completaPresaDopoChiusuraModal() {
+    const conferma = confermaPresaRef.current;
+    if (!conferma) return;
+
+    confermaPresaRef.current = null;
+    completaGiocataGiocatore(conferma.carta, conferma.presa);
   }
 
   function scegliCartaCpu(mano, tavoloCorrente) {
@@ -767,6 +780,7 @@ export default function ScopaGame({ onBack }) {
         transparent
         animationType="fade"
         onRequestClose={() => {}}
+      onDismiss={completaPresaDopoChiusuraModal}
       >
         <View
           style={{
