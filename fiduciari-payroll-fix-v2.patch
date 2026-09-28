@@ -1,0 +1,252 @@
+diff --git a/fiduciariEconomia.js b/fiduciariEconomia.js
+--- a/fiduciariEconomia.js
++++ b/fiduciariEconomia.js
+@@ -81,6 +81,66 @@
+     .filter((voce) => voce.importo > 0);
+ }
+ 
++function normalizzaCategorieOre(categorie = {}) {
++  return Object.fromEntries(
++    Object.entries(categorie || {}).map(([categoria, ore]) => [
++      categoria,
++      nonNegativo(ore),
++    ])
++  );
++}
++
++export function normalizzaRiconciliazionePayroll(riconciliazione = null) {
++  if (!riconciliazione || typeof riconciliazione !== 'object') return null;
++  const straordinari = riconciliazione.straordinari
++    ? normalizzaCategorieOre(riconciliazione.straordinari)
++    : null;
++  const maggiorazioni = riconciliazione.maggiorazioni
++    ? normalizzaCategorieOre(riconciliazione.maggiorazioni)
++    : null;
++  const voci = normalizzaVociManuali(riconciliazione.voci || []);
++  return { straordinari, maggiorazioni, voci };
++}
++
++export function stimaNettoFiduciari({
++  economia,
++  trattenutePrevidenziali,
++  trattenuteFiscali,
++  altreTrattenute = 0,
++  detrazioni = 0,
++} = {}) {
++  if (!economia) {
++    return { disponibile: false, motivo: 'economia_mancante' };
++  }
++  const previdenziali = numero(trattenutePrevidenziali, NaN);
++  const fiscali = numero(trattenuteFiscali, NaN);
++  if (!Number.isFinite(previdenziali) || !Number.isFinite(fiscali)) {
++    return {
++      disponibile: false,
++      motivo: 'trattenute_fiscali_previdenziali_mancanti',
++      nota:
++        'Il netto non viene stimato con un coefficiente fisso: servono almeno trattenute previdenziali e fiscali.',
++    };
++  }
++  const netto =
++    nonNegativo(economia.totaleDopoTrattenute) -
++    nonNegativo(previdenziali) -
++    nonNegativo(fiscali) -
++    nonNegativo(altreTrattenute) +
++    nonNegativo(detrazioni);
++  return {
++    disponibile: true,
++    netto: arrotondaImporto(netto),
++    componenti: {
++      competenzeDopoTrattenute: arrotondaImporto(economia.totaleDopoTrattenute),
++      trattenutePrevidenziali: arrotondaImporto(previdenziali),
++      trattenuteFiscali: arrotondaImporto(fiscali),
++      altreTrattenute: arrotondaImporto(altreTrattenute),
++      detrazioni: arrotondaImporto(detrazioni),
++    },
++  };
++}
++
+ function calcolaVoceEvento(tipo, eventi, regola, pagaOraria) {
+   if (!regola || !Array.isArray(eventi) || eventi.length === 0) return null;
+ 
+@@ -137,6 +197,7 @@
+   configurazioneRiposoLavorato = {},
+   regoleEventi = {},
+   vociManuali = [],
++  riconciliazionePayroll = null,
+   tabelle,
+ }) {
+   const tabella = selezionaPagaBaseFiduciari({
+@@ -159,8 +220,15 @@
+     nonNegativo(scattiAnzianita) +
+     (superminimoInPagaOraria ? nonNegativo(superminimo) : 0);
+   const pagaOraria = baseOraria / Math.max(1, nonNegativo(divisore, 173));
+-  const straordinariOre = riepilogoOre?.straordinari || {};
+-  const maggiorazioniOre = riepilogoOre?.maggiorazioni || {};
++  const riconciliazione = normalizzaRiconciliazionePayroll(
++    riconciliazionePayroll
++  );
++  const straordinariOreCalendario = riepilogoOre?.straordinari || {};
++  const maggiorazioniOreCalendario = riepilogoOre?.maggiorazioni || {};
++  const straordinariOre =
++    riconciliazione?.straordinari || straordinariOreCalendario;
++  const maggiorazioniOre =
++    riconciliazione?.maggiorazioni || maggiorazioniOreCalendario;
+   const ore = riepilogoOre?.ore || {};
+ 
+   const percentualiExtra = {
+@@ -215,7 +283,12 @@
+     ))
+     .filter(Boolean);
+   const altreVoci = normalizzaVociManuali(vociManuali);
+-  const vociVariabili = [...vociEventi, ...altreVoci];
++  const vociRiconciliazione = riconciliazione?.voci || [];
++  const vociVariabili = [
++    ...vociEventi,
++    ...altreVoci,
++    ...vociRiconciliazione,
++  ];
+   if (importoRiposoLavorato > 0) {
+     vociVariabili.push({
+       id: 'riposo-lavorato',
+@@ -257,6 +330,16 @@
+     },
+     vociEventi,
+     vociManuali: altreVoci,
++    riconciliazionePayroll: {
++      attiva: Boolean(riconciliazione),
++      straordinariDaPayroll: Boolean(riconciliazione?.straordinari),
++      maggiorazioniDaPayroll: Boolean(riconciliazione?.maggiorazioni),
++      voci: vociRiconciliazione,
++      automatico: {
++        straordinari: straordinariOreCalendario,
++        maggiorazioni: maggiorazioniOreCalendario,
++      },
++    },
+     altreCompetenzeImponibili,
+     competenzeEsenti,
+     trattenute,
+diff --git a/fixtures/fiduciari-agosto-2026.cjs b/fixtures/fiduciari-agosto-2026.cjs
+--- a/fixtures/fiduciari-agosto-2026.cjs
++++ b/fixtures/fiduciari-agosto-2026.cjs
+@@ -102,6 +102,34 @@
+       },
+     ],
+   },
++  riconciliazioneCedolino: {
++    straordinari: {
++      ferialeDiurno25: 32.80,
++      ferialeNotturno35: 4.99,
++      festivoDiurno50: 2.70,
++      festivoNotturno60: 2.18,
++    },
++    maggiorazioni: {
++      domenicaleDiurno: 13.30,
++      domenicaleNotturno: 6.65,
++      festivoDiurno: 0,
++      festivoNotturno: 6.67,
++    },
++    voci: [
++      {
++        id: 'ferie-cedolino',
++        descrizione: 'Ferie godute',
++        importo: 49.98,
++        natura: 'imponibile',
++      },
++      {
++        id: 'assenza-cedolino',
++        descrizione: 'Assenza',
++        importo: 49.98,
++        natura: 'trattenuta',
++      },
++    ],
++  },
+   nonRiconciliabileSenzaDatiAggiuntivi: [
+     'Differenza fra 208,50 ore calendario e 209,00 ore riconosciute dal cedolino',
+     'Attribuzione aziendale delle 42,67 ore alle quattro categorie di straordinario',
+diff --git a/scripts/test-fiduciari-economia.cjs b/scripts/test-fiduciari-economia.cjs
+--- a/scripts/test-fiduciari-economia.cjs
++++ b/scripts/test-fiduciari-economia.cjs
+@@ -20,11 +20,15 @@
+   TABELLE_RETRIBUTIVE_FIDUCIARI,
+   selezionaPagaBaseFiduciari,
+   normalizzaVociManuali,
++  normalizzaRiconciliazionePayroll,
++  stimaNettoFiduciari,
+   calcolaEconomiaFiduciari,
+ } = caricaModulo('fiduciariEconomia.js', [
+   'TABELLE_RETRIBUTIVE_FIDUCIARI',
+   'selezionaPagaBaseFiduciari',
+   'normalizzaVociManuali',
++  'normalizzaRiconciliazionePayroll',
++  'stimaNettoFiduciari',
+   'calcolaEconomiaFiduciari',
+ ]);
+ const fixture = require('../fixtures/fiduciari-agosto-2026.cjs');
+@@ -180,10 +184,55 @@
+ assert.equal(economiaAgosto.arrotondato.pagaBase, 1281.43);
+ assert.equal(economiaAgosto.arrotondato.scattiAnzianita, 15);
+ assert.equal(economiaAgosto.riposoLavorato.configurato, false);
+-assert.ok(
+-  economiaAgosto.arrotondato.lordoStimato !==
+-    fixture.cedolinoReale.totaleCompetenze
+-);
++assert.equal(economiaAgosto.arrotondato.straordinari, 362.33);
++assert.equal(economiaAgosto.arrotondato.maggiorazioni, 54.33);
++assert.equal(economiaAgosto.arrotondato.altreCompetenze, 57.18);
++assert.equal(economiaAgosto.arrotondato.lordoStimato, 1770.27);
++
++const economiaRiconciliata = calcolaEconomiaFiduciari({
++  anno: fixture.annoTarget,
++  mese: fixture.meseTarget,
++  livello: fixture.configurazioneEconomicaDiagnostica.livello,
++  scattiAnzianita: fixture.configurazioneEconomicaDiagnostica.scattiAnzianita,
++  riepilogoOre: oreAgosto,
++  percentualiMaggiorazioni:
++    fixture.configurazioneEconomicaDiagnostica.percentualiMaggiorazioni,
++  vociManuali: fixture.configurazioneEconomicaDiagnostica.vociManuali,
++  riconciliazionePayroll: fixture.riconciliazioneCedolino,
++});
++assert.equal(economiaRiconciliata.arrotondato.straordinari, 414.22);
++assert.equal(economiaRiconciliata.arrotondato.maggiorazioni, 49.91);
++assert.equal(economiaRiconciliata.arrotondato.altreCompetenze, 107.16);
++assert.equal(
++  economiaRiconciliata.arrotondato.lordoStimato,
++  fixture.cedolinoReale.totaleCompetenze
++);
++assert.equal(economiaRiconciliata.arrotondato.trattenute, 49.98);
++assert.equal(economiaRiconciliata.arrotondato.totaleDopoTrattenute, 1817.74);
++assert.equal(economiaRiconciliata.riconciliazionePayroll.attiva, true);
++assert.equal(
++  economiaRiconciliata.riconciliazionePayroll.automatico.straordinari.totale,
++  33.5
++);
++
++const nettoSenzaDatiFiscali = stimaNettoFiduciari({
++  economia: economiaRiconciliata,
++});
++assert.equal(nettoSenzaDatiFiscali.disponibile, false);
++assert.equal(
++  nettoSenzaDatiFiscali.motivo,
++  'trattenute_fiscali_previdenziali_mancanti'
++);
++
++const trattenuteResidueReali =
++  economiaRiconciliata.arrotondato.totaleDopoTrattenute -
++  fixture.cedolinoReale.netto;
++const nettoRiconciliato = stimaNettoFiduciari({
++  economia: economiaRiconciliata,
++  trattenutePrevidenziali: trattenuteResidueReali,
++  trattenuteFiscali: 0,
++});
++assert.equal(nettoRiconciliato.netto, fixture.cedolinoReale.netto);
+ 
+ console.log('Regressione motore economico Fiduciari superata', {
+   pagaBase: economiaAgosto.arrotondato.pagaBase,
+@@ -192,5 +241,7 @@
+   maggiorazioni: economiaAgosto.arrotondato.maggiorazioni,
+   altreCompetenze: economiaAgosto.arrotondato.altreCompetenze,
+   lordoStimato: economiaAgosto.arrotondato.lordoStimato,
++  lordoRiconciliato: economiaRiconciliata.arrotondato.lordoStimato,
++  totaleDopoTrattenute: economiaRiconciliata.arrotondato.totaleDopoTrattenute,
+   cedolinoCompetenze: fixture.cedolinoReale.totaleCompetenze,
+ });
