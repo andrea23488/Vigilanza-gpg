@@ -1,0 +1,96 @@
+diff --git a/App.js b/App.js
+index b755d94..d7f5be7 100644
+--- a/App.js
++++ b/App.js
+@@ -1,5 +1,8 @@
+ import { calcolaOreFiduciari } from './fiduciariOre';
+-import { calcolaEconomiaFiduciari } from './fiduciariEconomia';
++import {
++  calcolaEconomiaFiduciari,
++  stimaNettoFiduciari,
++} from './fiduciariEconomia';
+ import { supabase } from './supabase';
+ import {
+   creaProfiloVuoto,
+@@ -16,16 +19,22 @@ import {
+ 
+ // STIMA NETTO AD OGGI
+ // Per GPG manteniamo il comportamento storico invariato.
+-// Per Fiduciari, finché non introduciamo una fiscalità completa,
+-// usiamo una stima semplice e dichiarata, senza toccare il lordo.
++// Per Fiduciari il netto viene mostrato solo quando il motore dispone
++// delle informazioni fiscali/previdenziali necessarie.
+ const coefficienteNettoGpgAdOggi = 1860.00 / 2273.30;
+-const coefficienteNettoFiduciarioSemplificato = 0.78;
++const stimaNettoFiduciarioAdOggi = stimaNettoFiduciari({
++  economia: {
++    totaleDopoTrattenute:
++      maturatoFiduciarioImponibileAdOggi +
++      maturatoFiduciarioEsenteAdOggi -
++      trattenuteFiduciarioAdOggi,
++  },
++});
+ const nettoStimatoAdOggi =
+   stipendioTipoOperatore === 'fiduciario'
+-    ? (
+-        maturatoFiduciarioImponibileAdOggi *
+-        coefficienteNettoFiduciarioSemplificato
+-      ) + maturatoFiduciarioEsenteAdOggi - trattenuteFiduciarioAdOggi
++    ? stimaNettoFiduciarioAdOggi.disponibile
++      ? stimaNettoFiduciarioAdOggi.netto
++      : null
+     : Number(maturatoGpgAdOggi || 0) * coefficienteNettoGpgAdOggi;
+ 
+ 
+@@ -45,12 +54,14 @@ const nettoStimatoAdOggi =
+ // singolo cedolino non è possibile ricostruire una fiscalità completa.
+ const coefficienteNettoStimato = 1992.00 / 2577.16;
+ 
++const stimaNettoFiduciarioMese = stimaNettoFiduciari({
++  economia: economiaFiduciario,
++});
+ const nettoStimatoMese =
+   stipendioTipoOperatore === 'fiduciario'
+-    ? (
+-        economiaFiduciario.competenzeImponibili *
+-        coefficienteNettoFiduciarioSemplificato
+-      ) + economiaFiduciario.competenzeEsenti - economiaFiduciario.trattenute
++    ? stimaNettoFiduciarioMese.disponibile
++      ? stimaNettoFiduciarioMese.netto
++      : null
+     : maturatoMese * coefficienteNettoStimato;
+ const mediaNettaGiornata =
+   giornateStipendioMese.length > 0
+@@ -77,7 +88,9 @@ const giorniTrascorsi =
+   // ===== NETTO PREVISTO FINE MESE =====
+   const nettoPrevistoFineMese =
+     stipendioTipoOperatore === 'fiduciario'
+-      ? nettoStimatoMese
++      ? stimaNettoFiduciarioMese.disponibile
++        ? nettoStimatoMese
++        : null
+       : Number(previsioneFineMese || 0) * (1860.00 / 2273.30);
+ 
+ 
+@@ -97,7 +110,9 @@ const giorniTrascorsi =
+         marginTop: 2,
+       }}
+     >
+-      € {nettoStimatoAdOggi.toFixed(2)}
++      {stipendioTipoOperatore === 'fiduciario' && nettoStimatoAdOggi == null
++        ? 'Netto non disponibile'
++        : `€ ${Number(nettoStimatoAdOggi || 0).toFixed(2)}`}
+     </Text>
+           </>
+         ) : (
+@@ -118,7 +133,9 @@ const giorniTrascorsi =
+               marginTop: 2,
+             }}
+           >
+-            ≈ € {nettoPrevistoFineMese.toFixed(2)}
++            {stipendioTipoOperatore === 'fiduciario' && nettoPrevistoFineMese == null
++              ? 'Netto non disponibile'
++              : `≈ € ${Number(nettoPrevistoFineMese || 0).toFixed(2)}`}
+           </Text>
+         </View>
+ 
