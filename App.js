@@ -44,7 +44,10 @@ import {
   tariffaStraordinario30DaBase,
 } from './stipendioCalcoli';
 import { calcolaOreFiduciari } from './fiduciariOre';
-import { calcolaEconomiaFiduciari } from './fiduciariEconomia';
+import {
+  calcolaEconomiaFiduciari,
+  stimaNettoFiduciari,
+} from './fiduciariEconomia';
 import { supabase } from './supabase';
 import {
   creaProfiloVuoto,
@@ -6162,13 +6165,22 @@ const quotaTempoMese = Math.min(
   // Per i Fiduciari la quota esente non viene ridotta dal coefficiente e le
   // trattenute configurate vengono sottratte separatamente.
   const coefficienteNettoGpgAdOggi = 1860.00 / 2273.30;
-  const coefficienteNettoFiduciarioSemplificato = 0.78;
+  const stimaNettoFiduciarioAdOggi = stimaNettoFiduciari({
+    economia: {
+      totaleDopoTrattenute:
+        maturatoFiduciarioImponibileAdOggi +
+        maturatoFiduciarioEsenteAdOggi -
+        trattenuteFiduciarioAdOggi,
+    },
+  });
+
   const nettoStimatoAdOggi =
     stipendioTipoOperatore === 'fiduciario'
       ? (
-          maturatoFiduciarioImponibileAdOggi *
-          coefficienteNettoFiduciarioSemplificato
-        ) + maturatoFiduciarioEsenteAdOggi - trattenuteFiduciarioAdOggi
+          stimaNettoFiduciarioAdOggi.disponibile
+            ? stimaNettoFiduciarioAdOggi.netto
+            : null
+        )
       : Number(maturatoGpgAdOggi || 0) * coefficienteNettoGpgAdOggi;
 
 
@@ -6203,12 +6215,17 @@ const nettoBaseNumero =
 // singolo cedolino non è possibile ricostruire una fiscalità completa.
 const coefficienteNettoStimato = 1992.00 / 2577.16;
 
+  const stimaNettoFiduciarioMese = stimaNettoFiduciari({
+    economia: economiaFiduciario,
+  });
+
   const nettoStimatoMese =
     stipendioTipoOperatore === 'fiduciario'
       ? (
-          economiaFiduciario.competenzeImponibili *
-          coefficienteNettoFiduciarioSemplificato
-        ) + economiaFiduciario.competenzeEsenti - economiaFiduciario.trattenute
+          stimaNettoFiduciarioMese.disponibile
+            ? stimaNettoFiduciarioMese.netto
+            : null
+        )
       : maturatoMese * coefficienteNettoStimato;
   const mediaNettaGiornata =
     giornateStipendioMese.length > 0
@@ -9676,7 +9693,9 @@ if (screen === 'colleghi') {
         marginTop: 2,
       }}
     >
-      € {nettoStimatoAdOggi.toFixed(2)}
+      {nettoStimatoAdOggi == null
+        ? 'Netto non disponibile'
+        : `€ ${nettoStimatoAdOggi.toFixed(2)}`}
     </Text>
           </>
         ) : (
@@ -9767,7 +9786,9 @@ if (screen === 'colleghi') {
               marginTop: 2,
             }}
           >
-            ≈ € {nettoPrevistoFineMese.toFixed(2)}
+            {nettoPrevistoFineMese == null
+              ? 'Netto non disponibile'
+              : `≈ € ${nettoPrevistoFineMese.toFixed(2)}`}
           </Text>
         </View>
 
