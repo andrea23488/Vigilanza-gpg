@@ -243,6 +243,44 @@ const nettoRiconciliato = stimaNettoFiduciari({
 });
 assert.equal(nettoRiconciliato.netto, fixture.cedolinoReale.netto);
 
+
+// Regressione netto reale agosto 2026.
+// Il netto viene ricostruito esclusivamente dalle componenti documentate
+// del cedolino, senza coefficienti fissi o correttivi artificiali.
+const cedolino = fixture.cedolinoReale;
+
+const economiaNettoCedolino = {
+  totaleDopoTrattenute:
+    cedolino.totaleCompetenze -
+    fixture.riconciliazioneCedolino.voci
+      .filter((voce) => voce.natura === 'trattenuta')
+      .reduce((totale, voce) => totale + voce.importo, 0),
+};
+
+const trattenuteFiscaliCedolino =
+  cedolino.irpefMese +
+  cedolino.addizionali.totale;
+
+const nettoRiconciliatoCedolino = stimaNettoFiduciari({
+  economia: economiaNettoCedolino,
+  trattenutePrevidenziali: cedolino.contributi.totale,
+  trattenuteFiscali: trattenuteFiscaliCedolino,
+  altreTrattenute: cedolino.altreTrattenute,
+  detrazioni: cedolino.arrotondamentoAttuale,
+});
+
+assert.equal(
+  nettoRiconciliatoCedolino.disponibile,
+  true,
+  'Il netto deve essere disponibile quando sono presenti i dati fiscali e previdenziali'
+);
+
+assert.equal(
+  nettoRiconciliatoCedolino.netto,
+  cedolino.netto,
+  `Netto Fiduciari errato: atteso ${cedolino.netto}, ottenuto ${nettoRiconciliatoCedolino.netto}`
+);
+
 console.log('Regressione motore economico Fiduciari superata', {
   pagaBase: economiaAgosto.arrotondato.pagaBase,
   scatti: economiaAgosto.arrotondato.scattiAnzianita,

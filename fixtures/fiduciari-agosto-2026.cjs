@@ -82,7 +82,34 @@ module.exports = {
     },
     indennitaEsente20724: 57.18,
     totaleCompetenze: 1867.72,
-    netto: 1519,
+
+    // Sezione previdenziale/fiscale del cedolino reale
+    imponibilePrevidenziale: 1761.00,
+    contributi: {
+      ivs: 161.84,
+      altri: 10.03,
+      coasco: 2.56,
+      totale: 174.43,
+    },
+
+    redditoFiscale: 1191.25,
+    imponibileIrpef: 1191.25,
+    irpefLorda: 273.99,
+    irpefLordaConguaglio: 251.75,
+    detrazioni: 0,
+    irpefMese: 55.15,
+
+    addizionali: {
+      regionale: 28.87,
+      comunale: 9.73,
+      comunaleAccontoSaldo: 4.89,
+      totale: 43.49,
+    },
+
+    altreTrattenute: 26.55,
+    arrotondamentoAttuale: 0.88,
+
+    netto: 1519.00,
   },
   configurazioneEconomicaDiagnostica: {
     livello: 'D',
