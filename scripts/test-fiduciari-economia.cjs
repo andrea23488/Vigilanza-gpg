@@ -20,11 +20,15 @@ const {
   TABELLE_RETRIBUTIVE_FIDUCIARI,
   selezionaPagaBaseFiduciari,
   normalizzaVociManuali,
+  normalizzaRiconciliazionePayroll,
+  stimaNettoFiduciari,
   calcolaEconomiaFiduciari,
 } = caricaModulo('fiduciariEconomia.js', [
   'TABELLE_RETRIBUTIVE_FIDUCIARI',
   'selezionaPagaBaseFiduciari',
   'normalizzaVociManuali',
+  'normalizzaRiconciliazionePayroll',
+  'stimaNettoFiduciari',
   'calcolaEconomiaFiduciari',
 ]);
 const fixture = require('../fixtures/fiduciari-agosto-2026.cjs');
@@ -189,10 +193,55 @@ assert.equal(oreAgosto.ore.fisiche, 208.5);
 assert.equal(economiaAgosto.arrotondato.pagaBase, 1281.43);
 assert.equal(economiaAgosto.arrotondato.scattiAnzianita, 15);
 assert.equal(economiaAgosto.riposoLavorato.configurato, false);
-assert.ok(
-  economiaAgosto.arrotondato.lordoStimato !==
-    fixture.cedolinoReale.totaleCompetenze
+assert.equal(economiaAgosto.arrotondato.straordinari, 362.33);
+assert.equal(economiaAgosto.arrotondato.maggiorazioni, 54.33);
+assert.equal(economiaAgosto.arrotondato.altreCompetenze, 57.18);
+assert.equal(economiaAgosto.arrotondato.lordoStimato, 1770.27);
+
+const economiaRiconciliata = calcolaEconomiaFiduciari({
+  anno: fixture.annoTarget,
+  mese: fixture.meseTarget,
+  livello: fixture.configurazioneEconomicaDiagnostica.livello,
+  scattiAnzianita: fixture.configurazioneEconomicaDiagnostica.scattiAnzianita,
+  riepilogoOre: oreAgosto,
+  percentualiMaggiorazioni:
+    fixture.configurazioneEconomicaDiagnostica.percentualiMaggiorazioni,
+  vociManuali: fixture.configurazioneEconomicaDiagnostica.vociManuali,
+  riconciliazionePayroll: fixture.riconciliazioneCedolino,
+});
+assert.equal(economiaRiconciliata.arrotondato.straordinari, 414.22);
+assert.equal(economiaRiconciliata.arrotondato.maggiorazioni, 49.91);
+assert.equal(economiaRiconciliata.arrotondato.altreCompetenze, 107.16);
+assert.equal(
+  economiaRiconciliata.arrotondato.lordoStimato,
+  fixture.cedolinoReale.totaleCompetenze
 );
+assert.equal(economiaRiconciliata.arrotondato.trattenute, 49.98);
+assert.equal(economiaRiconciliata.arrotondato.totaleDopoTrattenute, 1817.74);
+assert.equal(economiaRiconciliata.riconciliazionePayroll.attiva, true);
+assert.equal(
+  economiaRiconciliata.riconciliazionePayroll.automatico.straordinari.totale,
+  33.5
+);
+
+const nettoSenzaDatiFiscali = stimaNettoFiduciari({
+  economia: economiaRiconciliata,
+});
+assert.equal(nettoSenzaDatiFiscali.disponibile, false);
+assert.equal(
+  nettoSenzaDatiFiscali.motivo,
+  'trattenute_fiscali_previdenziali_mancanti'
+);
+
+const trattenuteResidueReali =
+  economiaRiconciliata.arrotondato.totaleDopoTrattenute -
+  fixture.cedolinoReale.netto;
+const nettoRiconciliato = stimaNettoFiduciari({
+  economia: economiaRiconciliata,
+  trattenutePrevidenziali: trattenuteResidueReali,
+  trattenuteFiscali: 0,
+});
+assert.equal(nettoRiconciliato.netto, fixture.cedolinoReale.netto);
 
 console.log('Regressione motore economico Fiduciari superata', {
   pagaBase: economiaAgosto.arrotondato.pagaBase,
@@ -201,5 +250,7 @@ console.log('Regressione motore economico Fiduciari superata', {
   maggiorazioni: economiaAgosto.arrotondato.maggiorazioni,
   altreCompetenze: economiaAgosto.arrotondato.altreCompetenze,
   lordoStimato: economiaAgosto.arrotondato.lordoStimato,
+  lordoRiconciliato: economiaRiconciliata.arrotondato.lordoStimato,
+  totaleDopoTrattenute: economiaRiconciliata.arrotondato.totaleDopoTrattenute,
   cedolinoCompetenze: fixture.cedolinoReale.totaleCompetenze,
 });

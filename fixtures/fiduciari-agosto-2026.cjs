@@ -102,6 +102,34 @@ module.exports = {
       },
     ],
   },
+  riconciliazioneCedolino: {
+    straordinari: {
+      ferialeDiurno25: 32.80,
+      ferialeNotturno35: 4.99,
+      festivoDiurno50: 2.70,
+      festivoNotturno60: 2.18,
+    },
+    maggiorazioni: {
+      domenicaleDiurno: 13.30,
+      domenicaleNotturno: 6.65,
+      festivoDiurno: 0,
+      festivoNotturno: 6.67,
+    },
+    voci: [
+      {
+        id: 'ferie-cedolino',
+        descrizione: 'Ferie godute',
+        importo: 49.98,
+        natura: 'imponibile',
+      },
+      {
+        id: 'assenza-cedolino',
+        descrizione: 'Assenza',
+        importo: 49.98,
+        natura: 'trattenuta',
+      },
+    ],
+  },
   nonRiconciliabileSenzaDatiAggiuntivi: [
     'Differenza fra 208,50 ore calendario e 209,00 ore riconosciute dal cedolino',
     'Attribuzione aziendale delle 42,67 ore alle quattro categorie di straordinario',
