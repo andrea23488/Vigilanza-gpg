@@ -1,0 +1,113 @@
+diff --git a/App.js b/App.js
+index 897017b..0000000 100644
+--- a/App.js
++++ b/App.js
+@@ -27,7 +27,10 @@ import {
+   tariffaStraordinario30DaBase,
+ } from './stipendioCalcoli';
+ import { calcolaOreFiduciari } from './fiduciariOre';
+-import { calcolaEconomiaFiduciari } from './fiduciariEconomia';
++import {
++  calcolaEconomiaFiduciari,
++  stimaNettoFiduciari,
++} from './fiduciariEconomia';
+ import { supabase } from './supabase';
+ import {
+   creaProfiloVuoto,
+@@ -2450,18 +2453,25 @@
+-  // Stima netta semplificata: non sostituisce il calcolo fiscale personale.
+-  // Per i Fiduciari la quota esente non viene ridotta dal coefficiente e le
+-  // trattenute configurate vengono sottratte separatamente.
++  // Il netto Fiduciari non viene ricavato da un coefficiente fisso.
++  // Senza dati fiscali/previdenziali sufficienti il motore dichiara
++  // esplicitamente che il netto non e' determinabile.
+   const coefficienteNettoGpgAdOggi = 1860.00 / 2273.30;
+-  const coefficienteNettoFiduciarioSemplificato = 0.78;
++  const stimaNettoFiduciarioAdOggi = stimaNettoFiduciari({
++    economia: {
++      totaleDopoTrattenute:
++        maturatoFiduciarioImponibileAdOggi +
++        maturatoFiduciarioEsenteAdOggi -
++        trattenuteFiduciarioAdOggi,
++    },
++  });
+   const nettoStimatoAdOggi =
+     stipendioTipoOperatore === 'fiduciario'
+-      ? (
+-          maturatoFiduciarioImponibileAdOggi *
+-          coefficienteNettoFiduciarioSemplificato
+-        ) + maturatoFiduciarioEsenteAdOggi - trattenuteFiduciarioAdOggi
++      ? stimaNettoFiduciarioAdOggi.disponibile
++        ? stimaNettoFiduciarioAdOggi.netto
++        : null
+       : Number(maturatoGpgAdOggi || 0) * coefficienteNettoGpgAdOggi;
+
+
+@@ -2520,16 +2530,19 @@
+ // Il netto resta una stima: senza imponibili, detrazioni e conguagli del
+ // singolo cedolino non è possibile ricostruire una fiscalità completa.
+ const coefficienteNettoStimato = 1992.00 / 2577.16;
+
++  const stimaNettoFiduciarioMese = stimaNettoFiduciari({
++    economia: economiaFiduciario,
++  });
+   const nettoStimatoMese =
+     stipendioTipoOperatore === 'fiduciario'
+-      ? (
+-          economiaFiduciario.competenzeImponibili *
+-          coefficienteNettoFiduciarioSemplificato
+-        ) + economiaFiduciario.competenzeEsenti - economiaFiduciario.trattenute
++      ? stimaNettoFiduciarioMese.disponibile
++        ? stimaNettoFiduciarioMese.netto
++        : null
+       : maturatoMese * coefficienteNettoStimato;
+   const mediaNettaGiornata =
+     giornateStipendioMese.length > 0
+       ? maturatoMese / giornateStipendioMese.length
+@@ -2540,7 +2553,7 @@
+   // ===== NETTO PREVISTO FINE MESE =====
+   const nettoPrevistoFineMese =
+     stipendioTipoOperatore === 'fiduciario'
+-      ? nettoStimatoMese
++      ? (stimaNettoFiduciarioMese.disponibile ? nettoStimatoMese : null)
+       : Number(previsioneFineMese || 0) * (1860.00 / 2273.30);
+
+
+@@ -4300,11 +4313,20 @@
+         fontWeight: '900',
+         marginTop: 2,
+       }}
+     >
+-      € {nettoStimatoAdOggi.toFixed(2)}
++      {stipendioTipoOperatore === 'fiduciario' && nettoStimatoAdOggi == null
++        ? 'Netto non disponibile'
++        : `€ ${Number(nettoStimatoAdOggi || 0).toFixed(2)}`}
+     </Text>
++    {stipendioTipoOperatore === 'fiduciario' && nettoStimatoAdOggi == null ? (
++      <Text style={{ color: COLORS.muted, fontSize: 10, marginTop: 4 }}>
++        Servono dati fiscali e previdenziali per una stima attendibile.
++      </Text>
++    ) : null}
+           </>
+         ) : (
+           <View
+             style={{
+@@ -4470,11 +4492,20 @@
+               fontSize: 18,
+               fontWeight: '900',
+               marginTop: 2,
+             }}
+           >
+-            ≈ € {nettoPrevistoFineMese.toFixed(2)}
++            {stipendioTipoOperatore === 'fiduciario' && nettoPrevistoFineMese == null
++              ? 'Netto non disponibile'
++              : `≈ € ${Number(nettoPrevistoFineMese || 0).toFixed(2)}`}
+           </Text>
++          {stipendioTipoOperatore === 'fiduciario' && nettoPrevistoFineMese == null ? (
++            <Text style={{ color: COLORS.muted, fontSize: 10, marginTop: 4 }}>
++              Il lordo resta calcolato normalmente; il netto richiede dati fiscali e previdenziali.
++            </Text>
++          ) : null}
+         </View>
+
+
