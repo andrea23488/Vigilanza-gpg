@@ -48,6 +48,7 @@ import {
   calcolaEconomiaFiduciari,
   stimaNettoFiduciari,
   stimaNettoFiduciariDaProfilo,
+  calibraProfiloFiscaleFiduciari,
 } from './fiduciariEconomia';
 import { supabase } from './supabase';
 import {
@@ -1169,6 +1170,15 @@ export default function App() {
   const [stipendioAddizionaliFiduciario, setStipendioAddizionaliFiduciario] =
     useState('');
   const [stipendioAltreTrattenuteFiscaliFiduciario, setStipendioAltreTrattenuteFiscaliFiduciario] =
+    useState('');
+
+  // Dati leggibili del cedolino usati per calibrare automaticamente
+  // il profilo fiscale Fiduciario.
+  const [stipendioImponibilePrevidenzialeFiduciario, setStipendioImponibilePrevidenzialeFiduciario] =
+    useState('');
+  const [stipendioContributiCedolinoFiduciario, setStipendioContributiCedolinoFiduciario] =
+    useState('');
+  const [stipendioIrpefCedolinoFiduciario, setStipendioIrpefCedolinoFiduciario] =
     useState('');
 
 
@@ -2802,6 +2812,24 @@ if (dati.tariffaStraordinario != null) {
     }
     if (dati.altreTrattenuteFiscaliFiduciario != null) {
       setStipendioAltreTrattenuteFiscaliFiduciario(String(dati.altreTrattenuteFiscaliFiduciario));
+    }
+
+    if (dati.imponibilePrevidenzialeFiduciario != null) {
+      setStipendioImponibilePrevidenzialeFiduciario(
+        String(dati.imponibilePrevidenzialeFiduciario)
+      );
+    }
+
+    if (dati.contributiCedolinoFiduciario != null) {
+      setStipendioContributiCedolinoFiduciario(
+        String(dati.contributiCedolinoFiduciario)
+      );
+    }
+
+    if (dati.irpefCedolinoFiduciario != null) {
+      setStipendioIrpefCedolinoFiduciario(
+        String(dati.irpefCedolinoFiduciario)
+      );
     }
 
 
@@ -11853,7 +11881,7 @@ if (screen === 'configuraStipendio') {
                 fontSize: 12,
               }}
             >
-              PROFILO FISCALE · STIMA NETTO
+              CALIBRA STIMA NETTO
             </Text>
 
             <Text
@@ -11862,35 +11890,41 @@ if (screen === 'configuraStipendio') {
                 fontSize: 9,
                 lineHeight: 13,
                 marginTop: 6,
-                marginBottom: 8,
+                marginBottom: 10,
               }}
             >
-              Questi valori servono esclusivamente per stimare il netto.
-              Puoi ricavarli da un cedolino reale. Non modificano il calcolo
-              delle ore, degli straordinari o delle competenze lorde.
+              Prendi un tuo cedolino reale e copia questi valori.
+              L'app ricaverà automaticamente il profilo necessario
+              per stimare il netto dei mesi successivi.
             </Text>
 
             {[
               [
-                'Aliquota contributiva · %',
-                stipendioAliquotaContributivaFiduciario,
-                setStipendioAliquotaContributivaFiduciario,
-                'Es. 9,905',
+                'Imponibile previdenziale · €',
+                stipendioImponibilePrevidenzialeFiduciario,
+                setStipendioImponibilePrevidenzialeFiduciario,
+                'Es. 1761,00',
               ],
               [
-                'Aliquota fiscale calibrata · %',
-                stipendioAliquotaFiscaleFiduciario,
-                setStipendioAliquotaFiscaleFiduciario,
-                'Es. 3,476',
+                'Contributi totali · €',
+                stipendioContributiCedolinoFiduciario,
+                setStipendioContributiCedolinoFiduciario,
+                'Es. 174,43',
               ],
               [
-                'Addizionali mensili · €',
+                'IRPEF del mese · €',
+                stipendioIrpefCedolinoFiduciario,
+                setStipendioIrpefCedolinoFiduciario,
+                'Es. 55,15',
+              ],
+              [
+                'Addizionali totali · €',
                 stipendioAddizionaliFiduciario,
                 setStipendioAddizionaliFiduciario,
                 'Es. 43,49',
               ],
               [
-                'Altre trattenute fiscali · €',
+                'Altre trattenute · €',
                 stipendioAltreTrattenuteFiscaliFiduciario,
                 setStipendioAltreTrattenuteFiscaliFiduciario,
                 'Es. 26,55',
@@ -11924,16 +11958,70 @@ if (screen === 'configuraStipendio') {
               </View>
             ))}
 
+            <TouchableOpacity
+              onPress={() => {
+                const calibrazione = calibraProfiloFiscaleFiduciari({
+                  imponibilePrevidenziale:
+                    stipendioImponibilePrevidenzialeFiduciario,
+                  contributi:
+                    stipendioContributiCedolinoFiduciario,
+                  irpefMese:
+                    stipendioIrpefCedolinoFiduciario,
+                  addizionali:
+                    stipendioAddizionaliFiduciario,
+                  altreTrattenute:
+                    stipendioAltreTrattenuteFiscaliFiduciario,
+                });
+
+                if (!calibrazione.disponibile) {
+                  Alert.alert(
+                    'Dati incompleti',
+                    'Controlla imponibile previdenziale, contributi e IRPEF del mese.'
+                  );
+                  return;
+                }
+
+                setStipendioAliquotaContributivaFiduciario(
+                  String(calibrazione.aliquotaContributiva)
+                );
+                setStipendioAliquotaFiscaleFiduciario(
+                  String(calibrazione.aliquotaFiscale)
+                );
+
+                Alert.alert(
+                  'Calibrazione completata ✅',
+                  'Il profilo è stato ricavato dal cedolino. Ora salva la configurazione.'
+                );
+              }}
+              style={{
+                marginTop: 16,
+                backgroundColor: '#3154ff',
+                borderRadius: 12,
+                paddingVertical: 13,
+                alignItems: 'center',
+              }}
+            >
+              <Text
+                style={{
+                  color: 'white',
+                  fontWeight: '900',
+                  fontSize: 12,
+                }}
+              >
+                CALIBRA DAL CEDOLINO
+              </Text>
+            </TouchableOpacity>
+
             <Text
               style={{
                 color: '#FFD66B',
                 fontSize: 9,
                 lineHeight: 13,
-                marginTop: 12,
+                marginTop: 10,
               }}
             >
-              Senza un profilo fiscale calibrato l'app non mostra un netto
-              Fiduciari inventato con percentuali generiche.
+              La calibrazione serve solo alla stima del netto.
+              Ore, straordinari e competenze lorde non vengono modificati.
             </Text>
           </View>
         </View>
@@ -12178,6 +12266,9 @@ if (screen === 'configuraStipendio') {
                   aliquotaFiscaleFiduciario: stipendioAliquotaFiscaleFiduciario,
                   addizionaliFiduciario: stipendioAddizionaliFiduciario,
                   altreTrattenuteFiscaliFiduciario: stipendioAltreTrattenuteFiscaliFiduciario,
+                  imponibilePrevidenzialeFiduciario: stipendioImponibilePrevidenzialeFiduciario,
+                  contributiCedolinoFiduciario: stipendioContributiCedolinoFiduciario,
+                  irpefCedolinoFiduciario: stipendioIrpefCedolinoFiduciario,
                 })
               );
 
