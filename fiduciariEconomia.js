@@ -102,6 +102,120 @@ export function normalizzaRiconciliazionePayroll(riconciliazione = null) {
   return { straordinari, maggiorazioni, voci };
 }
 
+export function calibraProfiloFiscaleFiduciari({
+  imponibilePrevidenziale,
+  contributi,
+  irpefMese,
+  addizionali = 0,
+  altreTrattenute = 0,
+} = {}) {
+  const imponibile = nonNegativo(imponibilePrevidenziale);
+  const contributiNumero = nonNegativo(contributi);
+  const irpefNumero = nonNegativo(irpefMese);
+
+  if (imponibile <= 0) {
+    return {
+      disponibile: false,
+      motivo: 'imponibile_previdenziale_mancante',
+    };
+  }
+
+  const baseFiscale = Math.max(0, imponibile - contributiNumero);
+
+  if (baseFiscale <= 0) {
+    return {
+      disponibile: false,
+      motivo: 'base_fiscale_non_valida',
+    };
+  }
+
+  const aliquotaContributiva =
+    (contributiNumero / imponibile) * 100;
+
+  const aliquotaFiscale =
+    (irpefNumero / baseFiscale) * 100;
+
+  return {
+    disponibile: true,
+    aliquotaContributiva,
+    aliquotaFiscale,
+    addizionali: nonNegativo(addizionali),
+    altreTrattenute: nonNegativo(altreTrattenute),
+    riferimento: {
+      imponibilePrevidenziale: arrotondaImporto(imponibile),
+      contributi: arrotondaImporto(contributiNumero),
+      baseFiscale: arrotondaImporto(baseFiscale),
+      irpefMese: arrotondaImporto(irpefNumero),
+    },
+  };
+}
+
+export function stimaNettoFiduciariDaProfilo({
+  economia,
+  imponibilePrevidenziale,
+  aliquotaContributiva,
+  aliquotaFiscale,
+  addizionali = 0,
+  altreTrattenute = 0,
+  detrazioni = 0,
+} = {}) {
+  if (!economia) {
+    return { disponibile: false, motivo: 'economia_mancante' };
+  }
+
+  const basePrevidenziale = nonNegativo(
+    imponibilePrevidenziale,
+    economia.competenzeImponibili
+  );
+  const contributiva = numero(aliquotaContributiva, NaN);
+  const fiscale = numero(aliquotaFiscale, NaN);
+
+  if (!Number.isFinite(contributiva) || !Number.isFinite(fiscale)) {
+    return {
+      disponibile: false,
+      motivo: 'profilo_fiscale_mancante',
+      nota:
+        'Per stimare il netto servono un profilo contributivo e fiscale calibrato.',
+    };
+  }
+
+  const trattenutePrevidenziali =
+    basePrevidenziale * nonNegativo(contributiva) / 100;
+
+  const baseFiscale = Math.max(
+    0,
+    nonNegativo(economia.competenzeImponibili) -
+      trattenutePrevidenziali
+  );
+
+  const trattenuteFiscali =
+    baseFiscale * nonNegativo(fiscale) / 100 +
+    nonNegativo(addizionali);
+
+  const risultato = stimaNettoFiduciari({
+    economia,
+    trattenutePrevidenziali,
+    trattenuteFiscali,
+    altreTrattenute,
+    detrazioni,
+  });
+
+  if (!risultato.disponibile) return risultato;
+
+  return {
+    ...risultato,
+    stima: true,
+    componenti: {
+      ...risultato.componenti,
+      imponibilePrevidenziale: arrotondaImporto(basePrevidenziale),
+      baseFiscaleStimata: arrotondaImporto(baseFiscale),
+      aliquotaContributiva: contributiva,
+      aliquotaFiscale: fiscale,
+      addizionali: arrotondaImporto(addizionali),
+    },
+  };
+}
+
 export function stimaNettoFiduciari({
   economia,
   trattenutePrevidenziali,

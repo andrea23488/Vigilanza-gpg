@@ -22,6 +22,8 @@ const {
   normalizzaVociManuali,
   normalizzaRiconciliazionePayroll,
   stimaNettoFiduciari,
+  stimaNettoFiduciariDaProfilo,
+  calibraProfiloFiscaleFiduciari,
   calcolaEconomiaFiduciari,
 } = caricaModulo('fiduciariEconomia.js', [
   'TABELLE_RETRIBUTIVE_FIDUCIARI',
@@ -29,6 +31,8 @@ const {
   'normalizzaVociManuali',
   'normalizzaRiconciliazionePayroll',
   'stimaNettoFiduciari',
+  'stimaNettoFiduciariDaProfilo',
+  'calibraProfiloFiscaleFiduciari',
   'calcolaEconomiaFiduciari',
 ]);
 const fixture = require('../fixtures/fiduciari-agosto-2026.cjs');
@@ -255,6 +259,10 @@ const economiaNettoCedolino = {
     fixture.riconciliazioneCedolino.voci
       .filter((voce) => voce.natura === 'trattenuta')
       .reduce((totale, voce) => totale + voce.importo, 0),
+
+  // Base imponibile usata dal profilo fiscale calibrato.
+  // Nel caso reale coincide con l'imponibile previdenziale documentato.
+  competenzeImponibili: cedolino.imponibilePrevidenziale,
 };
 
 const trattenuteFiscaliCedolino =
@@ -279,6 +287,78 @@ assert.equal(
   nettoRiconciliatoCedolino.netto,
   cedolino.netto,
   `Netto Fiduciari errato: atteso ${cedolino.netto}, ottenuto ${nettoRiconciliatoCedolino.netto}`
+);
+
+
+// Calibrazione automatica dal cedolino reale.
+const profiloCalibrato = calibraProfiloFiscaleFiduciari({
+  imponibilePrevidenziale: cedolino.imponibilePrevidenziale,
+  contributi: cedolino.contributi.totale,
+  irpefMese: cedolino.irpefMese,
+  addizionali: cedolino.addizionali.totale,
+  altreTrattenute: cedolino.altreTrattenute,
+});
+
+assert.equal(
+  profiloCalibrato.disponibile,
+  true,
+  'La calibrazione fiscale dal cedolino deve essere disponibile'
+);
+
+const nettoDaCalibrazioneAutomatica = stimaNettoFiduciariDaProfilo({
+  economia: economiaNettoCedolino,
+  imponibilePrevidenziale: cedolino.imponibilePrevidenziale,
+  aliquotaContributiva: profiloCalibrato.aliquotaContributiva,
+  aliquotaFiscale: profiloCalibrato.aliquotaFiscale,
+  addizionali: profiloCalibrato.addizionali,
+  altreTrattenute: profiloCalibrato.altreTrattenute,
+  detrazioni: cedolino.arrotondamentoAttuale,
+});
+
+assert.equal(
+  nettoDaCalibrazioneAutomatica.disponibile,
+  true,
+  'Il netto da calibrazione automatica deve essere disponibile'
+);
+
+assert.equal(
+  nettoDaCalibrazioneAutomatica.netto,
+  cedolino.netto,
+  `Calibrazione automatica errata: atteso ${cedolino.netto}, ottenuto ${nettoDaCalibrazioneAutomatica.netto}`
+);
+
+// Regressione profilo fiscale calibrato.
+// Le aliquote vengono ricavate dalle componenti documentate del cedolino,
+// non da un coefficiente netto arbitrario.
+const aliquotaContributivaCedolino =
+  (cedolino.contributi.totale / cedolino.imponibilePrevidenziale) * 100;
+
+const baseFiscaleCalibrata =
+  cedolino.imponibilePrevidenziale - cedolino.contributi.totale;
+
+const aliquotaFiscaleCedolino =
+  (cedolino.irpefMese / baseFiscaleCalibrata) * 100;
+
+const nettoDaProfilo = stimaNettoFiduciariDaProfilo({
+  economia: economiaNettoCedolino,
+  imponibilePrevidenziale: cedolino.imponibilePrevidenziale,
+  aliquotaContributiva: aliquotaContributivaCedolino,
+  aliquotaFiscale: aliquotaFiscaleCedolino,
+  addizionali: cedolino.addizionali.totale,
+  altreTrattenute: cedolino.altreTrattenute,
+  detrazioni: cedolino.arrotondamentoAttuale,
+});
+
+assert.equal(
+  nettoDaProfilo.disponibile,
+  true,
+  'Il netto da profilo calibrato deve essere disponibile'
+);
+
+assert.equal(
+  nettoDaProfilo.netto,
+  cedolino.netto,
+  `Netto da profilo Fiduciari errato: atteso ${cedolino.netto}, ottenuto ${nettoDaProfilo.netto}`
 );
 
 console.log('Regressione motore economico Fiduciari superata', {

@@ -47,6 +47,7 @@ import { calcolaOreFiduciari } from './fiduciariOre';
 import {
   calcolaEconomiaFiduciari,
   stimaNettoFiduciari,
+  stimaNettoFiduciariDaProfilo,
 } from './fiduciariEconomia';
 import { supabase } from './supabase';
 import {
@@ -1157,6 +1158,18 @@ export default function App() {
     useState('0');
   const [stipendioTrattenuteFiduciario, setStipendioTrattenuteFiduciario] =
     useState('0');
+
+  // Profilo fiscale Fiduciario.
+  // Parametri persistenti ricavati da un cedolino reale di riferimento.
+  // Non sono importi fissi mensili: servono al motore per stimare il netto.
+  const [stipendioAliquotaContributivaFiduciario, setStipendioAliquotaContributivaFiduciario] =
+    useState('');
+  const [stipendioAliquotaFiscaleFiduciario, setStipendioAliquotaFiscaleFiduciario] =
+    useState('');
+  const [stipendioAddizionaliFiduciario, setStipendioAddizionaliFiduciario] =
+    useState('');
+  const [stipendioAltreTrattenuteFiscaliFiduciario, setStipendioAltreTrattenuteFiscaliFiduciario] =
+    useState('');
 
 
 
@@ -2777,6 +2790,19 @@ if (dati.tariffaStraordinario != null) {
     if (dati.altreImponibiliFiduciario != null) setStipendioAltreImponibiliFiduciario(String(dati.altreImponibiliFiduciario));
     if (dati.altreEsentiFiduciario != null) setStipendioAltreEsentiFiduciario(String(dati.altreEsentiFiduciario));
     if (dati.trattenuteFiduciario != null) setStipendioTrattenuteFiduciario(String(dati.trattenuteFiduciario));
+
+    if (dati.aliquotaContributivaFiduciario != null) {
+      setStipendioAliquotaContributivaFiduciario(String(dati.aliquotaContributivaFiduciario));
+    }
+    if (dati.aliquotaFiscaleFiduciario != null) {
+      setStipendioAliquotaFiscaleFiduciario(String(dati.aliquotaFiscaleFiduciario));
+    }
+    if (dati.addizionaliFiduciario != null) {
+      setStipendioAddizionaliFiduciario(String(dati.addizionaliFiduciario));
+    }
+    if (dati.altreTrattenuteFiscaliFiduciario != null) {
+      setStipendioAltreTrattenuteFiscaliFiduciario(String(dati.altreTrattenuteFiscaliFiduciario));
+    }
 
 
       } catch (error) {
@@ -6161,18 +6187,45 @@ const quotaTempoMese = Math.min(
       : maturatoGpgAdOggi;
 
 
-  // Stima netta semplificata: non sostituisce il calcolo fiscale personale.
-  // Per i Fiduciari la quota esente non viene ridotta dal coefficiente e le
-  // trattenute configurate vengono sottratte separatamente.
+  // Stima netta ad oggi.
+  // GPG mantiene il comportamento storico.
+  // Per i Fiduciari usiamo il profilo fiscale calibrato quando disponibile,
+  // applicandolo esclusivamente alle componenti già maturate.
   const coefficienteNettoGpgAdOggi = 1860.00 / 2273.30;
-  const stimaNettoFiduciarioAdOggi = stimaNettoFiduciari({
-    economia: {
-      totaleDopoTrattenute:
-        maturatoFiduciarioImponibileAdOggi +
-        maturatoFiduciarioEsenteAdOggi -
-        trattenuteFiduciarioAdOggi,
-    },
-  });
+
+  const economiaFiduciarioAdOggi = {
+    competenzeImponibili: maturatoFiduciarioImponibileAdOggi,
+    competenzeEsenti: maturatoFiduciarioEsenteAdOggi,
+    totaleDopoTrattenute:
+      maturatoFiduciarioImponibileAdOggi +
+      maturatoFiduciarioEsenteAdOggi -
+      trattenuteFiduciarioAdOggi,
+  };
+
+  const profiloFiscaleFiduciarioAdOggiDisponibile =
+    String(stipendioAliquotaContributivaFiduciario || '').trim() !== '' &&
+    String(stipendioAliquotaFiscaleFiduciario || '').trim() !== '';
+
+  const stimaNettoFiduciarioAdOggi =
+    profiloFiscaleFiduciarioAdOggiDisponibile
+      ? stimaNettoFiduciariDaProfilo({
+          economia: economiaFiduciarioAdOggi,
+          imponibilePrevidenziale:
+            maturatoFiduciarioImponibileAdOggi,
+          aliquotaContributiva:
+            stipendioAliquotaContributivaFiduciario,
+          aliquotaFiscale:
+            stipendioAliquotaFiscaleFiduciario,
+          addizionali:
+            numeroEconomico(stipendioAddizionaliFiduciario) *
+            quotaTempoMese,
+          altreTrattenute:
+            numeroEconomico(stipendioAltreTrattenuteFiscaliFiduciario) *
+            quotaTempoMese,
+        })
+      : stimaNettoFiduciari({
+          economia: economiaFiduciarioAdOggi,
+        });
 
   const nettoStimatoAdOggi =
     stipendioTipoOperatore === 'fiduciario'
@@ -6215,9 +6268,27 @@ const nettoBaseNumero =
 // singolo cedolino non è possibile ricostruire una fiscalità completa.
 const coefficienteNettoStimato = 1992.00 / 2577.16;
 
-  const stimaNettoFiduciarioMese = stimaNettoFiduciari({
-    economia: economiaFiduciario,
-  });
+  const profiloFiscaleFiduciarioDisponibile =
+    String(stipendioAliquotaContributivaFiduciario || '').trim() !== '' &&
+    String(stipendioAliquotaFiscaleFiduciario || '').trim() !== '';
+
+  const stimaNettoFiduciarioMese = profiloFiscaleFiduciarioDisponibile
+    ? stimaNettoFiduciariDaProfilo({
+        economia: economiaFiduciario,
+        imponibilePrevidenziale:
+          economiaFiduciario.imponibilePrevidenzialeTeorico,
+        aliquotaContributiva:
+          stipendioAliquotaContributivaFiduciario,
+        aliquotaFiscale:
+          stipendioAliquotaFiscaleFiduciario,
+        addizionali:
+          stipendioAddizionaliFiduciario,
+        altreTrattenute:
+          stipendioAltreTrattenuteFiscaliFiduciario,
+      })
+    : stimaNettoFiduciari({
+        economia: economiaFiduciario,
+      });
 
   const nettoStimatoMese =
     stipendioTipoOperatore === 'fiduciario'
@@ -11766,6 +11837,105 @@ if (screen === 'configuraStipendio') {
               />
             </View>
           ))}
+
+          <View
+            style={{
+              marginTop: 22,
+              paddingTop: 18,
+              borderTopWidth: 1,
+              borderTopColor: 'rgba(111,234,255,0.20)',
+            }}
+          >
+            <Text
+              style={{
+                color: '#6FEAFF',
+                fontWeight: '900',
+                fontSize: 12,
+              }}
+            >
+              PROFILO FISCALE · STIMA NETTO
+            </Text>
+
+            <Text
+              style={{
+                color: '#8FA5CC',
+                fontSize: 9,
+                lineHeight: 13,
+                marginTop: 6,
+                marginBottom: 8,
+              }}
+            >
+              Questi valori servono esclusivamente per stimare il netto.
+              Puoi ricavarli da un cedolino reale. Non modificano il calcolo
+              delle ore, degli straordinari o delle competenze lorde.
+            </Text>
+
+            {[
+              [
+                'Aliquota contributiva · %',
+                stipendioAliquotaContributivaFiduciario,
+                setStipendioAliquotaContributivaFiduciario,
+                'Es. 9,905',
+              ],
+              [
+                'Aliquota fiscale calibrata · %',
+                stipendioAliquotaFiscaleFiduciario,
+                setStipendioAliquotaFiscaleFiduciario,
+                'Es. 3,476',
+              ],
+              [
+                'Addizionali mensili · €',
+                stipendioAddizionaliFiduciario,
+                setStipendioAddizionaliFiduciario,
+                'Es. 43,49',
+              ],
+              [
+                'Altre trattenute fiscali · €',
+                stipendioAltreTrattenuteFiscaliFiduciario,
+                setStipendioAltreTrattenuteFiscaliFiduciario,
+                'Es. 26,55',
+              ],
+            ].map(([label, value, setter, placeholder]) => (
+              <View key={label} style={{ marginTop: 10 }}>
+                <Text
+                  style={{
+                    color: '#dfe6ff',
+                    fontSize: 10,
+                    fontWeight: '700',
+                  }}
+                >
+                  {label}
+                </Text>
+
+                <TextInput
+                  value={value}
+                  onChangeText={setter}
+                  keyboardType="decimal-pad"
+                  placeholder={placeholder}
+                  placeholderTextColor="#7184aa"
+                  style={{
+                    backgroundColor: '#091936',
+                    color: 'white',
+                    borderRadius: 12,
+                    padding: 11,
+                    marginTop: 5,
+                  }}
+                />
+              </View>
+            ))}
+
+            <Text
+              style={{
+                color: '#FFD66B',
+                fontSize: 9,
+                lineHeight: 13,
+                marginTop: 12,
+              }}
+            >
+              Senza un profilo fiscale calibrato l'app non mostra un netto
+              Fiduciari inventato con percentuali generiche.
+            </Text>
+          </View>
         </View>
       ) : null}
 
@@ -12004,6 +12174,10 @@ if (screen === 'configuraStipendio') {
                   altreImponibiliFiduciario: stipendioAltreImponibiliFiduciario,
                   altreEsentiFiduciario: stipendioAltreEsentiFiduciario,
                   trattenuteFiduciario: stipendioTrattenuteFiduciario,
+                  aliquotaContributivaFiduciario: stipendioAliquotaContributivaFiduciario,
+                  aliquotaFiscaleFiduciario: stipendioAliquotaFiscaleFiduciario,
+                  addizionaliFiduciario: stipendioAddizionaliFiduciario,
+                  altreTrattenuteFiscaliFiduciario: stipendioAltreTrattenuteFiscaliFiduciario,
                 })
               );
 
