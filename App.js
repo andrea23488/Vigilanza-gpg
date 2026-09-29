@@ -1176,6 +1176,8 @@ export default function App() {
   // il profilo fiscale Fiduciario.
   const [stipendioImponibilePrevidenzialeFiduciario, setStipendioImponibilePrevidenzialeFiduciario] =
     useState('');
+  const [stipendioImponibileFiscaleFiduciario, setStipendioImponibileFiscaleFiduciario] =
+    useState('');
   const [stipendioContributiCedolinoFiduciario, setStipendioContributiCedolinoFiduciario] =
     useState('');
   const [stipendioIrpefCedolinoFiduciario, setStipendioIrpefCedolinoFiduciario] =
@@ -2817,6 +2819,12 @@ if (dati.tariffaStraordinario != null) {
     if (dati.imponibilePrevidenzialeFiduciario != null) {
       setStipendioImponibilePrevidenzialeFiduciario(
         String(dati.imponibilePrevidenzialeFiduciario)
+      );
+    }
+
+    if (dati.imponibileFiscaleFiduciario != null) {
+      setStipendioImponibileFiscaleFiduciario(
+        String(dati.imponibileFiscaleFiduciario)
       );
     }
 
@@ -6234,12 +6242,26 @@ const quotaTempoMese = Math.min(
     String(stipendioAliquotaContributivaFiduciario || '').trim() !== '' &&
     String(stipendioAliquotaFiscaleFiduciario || '').trim() !== '';
 
+  const rapportoImponibileFiscaleFiduciario =
+    numeroEconomico(stipendioImponibilePrevidenzialeFiduciario) > 0
+      ? numeroEconomico(stipendioImponibileFiscaleFiduciario) /
+        numeroEconomico(stipendioImponibilePrevidenzialeFiduciario)
+      : 0;
+
+  const imponibileFiscaleFiduciarioAdOggi =
+    rapportoImponibileFiscaleFiduciario > 0
+      ? maturatoFiduciarioImponibileAdOggi *
+        rapportoImponibileFiscaleFiduciario
+      : 0;
+
   const stimaNettoFiduciarioAdOggi =
     profiloFiscaleFiduciarioAdOggiDisponibile
       ? stimaNettoFiduciariDaProfilo({
           economia: economiaFiduciarioAdOggi,
           imponibilePrevidenziale:
             maturatoFiduciarioImponibileAdOggi,
+          imponibileFiscale:
+            imponibileFiscaleFiduciarioAdOggi,
           aliquotaContributiva:
             stipendioAliquotaContributivaFiduciario,
           aliquotaFiscale:
@@ -6300,11 +6322,19 @@ const coefficienteNettoStimato = 1992.00 / 2577.16;
     String(stipendioAliquotaContributivaFiduciario || '').trim() !== '' &&
     String(stipendioAliquotaFiscaleFiduciario || '').trim() !== '';
 
+  const imponibileFiscaleFiduciarioMese =
+    rapportoImponibileFiscaleFiduciario > 0
+      ? Number(economiaFiduciario.imponibilePrevidenzialeTeorico || 0) *
+        rapportoImponibileFiscaleFiduciario
+      : 0;
+
   const stimaNettoFiduciarioMese = profiloFiscaleFiduciarioDisponibile
     ? stimaNettoFiduciariDaProfilo({
         economia: economiaFiduciario,
         imponibilePrevidenziale:
           economiaFiduciario.imponibilePrevidenzialeTeorico,
+        imponibileFiscale:
+          imponibileFiscaleFiduciarioMese,
         aliquotaContributiva:
           stipendioAliquotaContributivaFiduciario,
         aliquotaFiscale:
@@ -11967,6 +11997,12 @@ if (screen === 'configuraStipendio') {
                 'Es. 1761,00',
               ],
               [
+                'Imponibile fiscale / IRPEF · €',
+                stipendioImponibileFiscaleFiduciario,
+                setStipendioImponibileFiscaleFiduciario,
+                'Es. 1191,25',
+              ],
+              [
                 'Contributi totali · €',
                 stipendioContributiCedolinoFiduciario,
                 setStipendioContributiCedolinoFiduciario,
@@ -12024,6 +12060,8 @@ if (screen === 'configuraStipendio') {
                 const calibrazione = calibraProfiloFiscaleFiduciari({
                   imponibilePrevidenziale:
                     stipendioImponibilePrevidenzialeFiduciario,
+                  imponibileFiscale:
+                    stipendioImponibileFiscaleFiduciario,
                   contributi:
                     stipendioContributiCedolinoFiduciario,
                   irpefMese:
@@ -12328,6 +12366,7 @@ if (screen === 'configuraStipendio') {
                   addizionaliFiduciario: stipendioAddizionaliFiduciario,
                   altreTrattenuteFiscaliFiduciario: stipendioAltreTrattenuteFiscaliFiduciario,
                   imponibilePrevidenzialeFiduciario: stipendioImponibilePrevidenzialeFiduciario,
+                  imponibileFiscaleFiduciario: stipendioImponibileFiscaleFiduciario,
                   contributiCedolinoFiduciario: stipendioContributiCedolinoFiduciario,
                   irpefCedolinoFiduciario: stipendioIrpefCedolinoFiduciario,
                 })
