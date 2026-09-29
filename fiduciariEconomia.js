@@ -104,6 +104,7 @@ export function normalizzaRiconciliazionePayroll(riconciliazione = null) {
 
 export function calibraProfiloFiscaleFiduciari({
   imponibilePrevidenziale,
+  imponibileFiscale,
   contributi,
   irpefMese,
   addizionali = 0,
@@ -120,7 +121,12 @@ export function calibraProfiloFiscaleFiduciari({
     };
   }
 
-  const baseFiscale = Math.max(0, imponibile - contributiNumero);
+  const imponibileFiscaleNumero = nonNegativo(imponibileFiscale);
+
+  const baseFiscale =
+    imponibileFiscaleNumero > 0
+      ? imponibileFiscaleNumero
+      : Math.max(0, imponibile - contributiNumero);
 
   if (baseFiscale <= 0) {
     return {
@@ -153,6 +159,7 @@ export function calibraProfiloFiscaleFiduciari({
 export function stimaNettoFiduciariDaProfilo({
   economia,
   imponibilePrevidenziale,
+  imponibileFiscale,
   aliquotaContributiva,
   aliquotaFiscale,
   addizionali = 0,
@@ -182,11 +189,18 @@ export function stimaNettoFiduciariDaProfilo({
   const trattenutePrevidenziali =
     basePrevidenziale * nonNegativo(contributiva) / 100;
 
-  const baseFiscale = Math.max(
+  const baseFiscaleDaEconomia = Math.max(
     0,
     nonNegativo(economia.competenzeImponibili) -
       trattenutePrevidenziali
   );
+
+  const baseFiscaleRiferimento = nonNegativo(imponibileFiscale);
+
+  const baseFiscale =
+    baseFiscaleRiferimento > 0
+      ? baseFiscaleRiferimento
+      : baseFiscaleDaEconomia;
 
   const trattenuteFiscali =
     baseFiscale * nonNegativo(fiscale) / 100 +

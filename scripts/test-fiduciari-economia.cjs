@@ -293,6 +293,7 @@ assert.equal(
 // Calibrazione automatica dal cedolino reale.
 const profiloCalibrato = calibraProfiloFiscaleFiduciari({
   imponibilePrevidenziale: cedolino.imponibilePrevidenziale,
+  imponibileFiscale: cedolino.imponibileIrpef,
   contributi: cedolino.contributi.totale,
   irpefMese: cedolino.irpefMese,
   addizionali: cedolino.addizionali.totale,
@@ -308,6 +309,7 @@ assert.equal(
 const nettoDaCalibrazioneAutomatica = stimaNettoFiduciariDaProfilo({
   economia: economiaNettoCedolino,
   imponibilePrevidenziale: cedolino.imponibilePrevidenziale,
+  imponibileFiscale: cedolino.imponibileIrpef,
   aliquotaContributiva: profiloCalibrato.aliquotaContributiva,
   aliquotaFiscale: profiloCalibrato.aliquotaFiscale,
   addizionali: profiloCalibrato.addizionali,
