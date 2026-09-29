@@ -9793,9 +9793,70 @@ if (screen === 'colleghi') {
       }}
     >
       {nettoStimatoAdOggi == null
-        ? 'Netto non disponibile'
+        ? 'Da configurare'
         : `€ ${nettoStimatoAdOggi.toFixed(2)}`}
     </Text>
+
+    {stipendioTipoOperatore === 'fiduciario' &&
+     !profiloFiscaleFiduciarioAdOggiDisponibile ? (
+      <View
+        style={{
+          marginTop: 14,
+          padding: 14,
+          borderRadius: 16,
+          backgroundColor: 'rgba(49,84,255,0.10)',
+          borderWidth: 1,
+          borderColor: 'rgba(111,134,255,0.40)',
+        }}
+      >
+        <Text
+          style={{
+            color: '#FFFFFF',
+            fontSize: 13,
+            fontWeight: '900',
+          }}
+        >
+          Calibra la stima del netto
+        </Text>
+
+        <Text
+          style={{
+            color: '#9FB2D9',
+            fontSize: 11,
+            lineHeight: 16,
+            marginTop: 5,
+          }}
+        >
+          Usa una tua busta paga una sola volta. L'app ricaverà il tuo
+          profilo e lo userà automaticamente per le stime successive.
+        </Text>
+
+        <TouchableOpacity
+          onPress={() => {
+            setMostraImportiCalcolo(true);
+            setScreen('configuraStipendio');
+          }}
+          style={{
+            marginTop: 11,
+            backgroundColor: '#3154ff',
+            borderRadius: 12,
+            paddingVertical: 11,
+            paddingHorizontal: 14,
+            alignItems: 'center',
+          }}
+        >
+          <Text
+            style={{
+              color: '#FFFFFF',
+              fontSize: 11,
+              fontWeight: '900',
+            }}
+          >
+            CONFIGURA STIMA NETTO
+          </Text>
+        </TouchableOpacity>
+      </View>
+    ) : null}
           </>
         ) : (
           <View
