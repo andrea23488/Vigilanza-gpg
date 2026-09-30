@@ -1,0 +1,1614 @@
+diff --git a/AgendaPersonaleModal.js b/AgendaPersonaleModal.js
+new file mode 100644
+index 0000000..6f3272e
+--- /dev/null
++++ b/AgendaPersonaleModal.js
+@@ -0,0 +1,211 @@
++import React, { useEffect, useMemo, useState } from 'react';
++import {
++  KeyboardAvoidingView,
++  Modal,
++  Platform,
++  SafeAreaView,
++  ScrollView,
++  Switch,
++  Text,
++  TextInput,
++  TouchableOpacity,
++  View,
++} from 'react-native';
++import { Ionicons } from '@expo/vector-icons';
++import {
++  PROMEMORIA_RAPIDI_MINUTI,
++  normalizzaPromemoria,
++} from './agendaPersonale';
++import { etichettaPromemoria } from './promemoriaPersonali';
++
++const VIOLA = '#B68CFF';
++const VIOLA_CHIARO = '#DCC8FF';
++const SFONDO = '#081326';
++
++const pad2 = (n) => String(n).padStart(2, '0');
++const dataTesto = (anno, mese, giorno) => `${pad2(giorno)}/${pad2(mese)}/${anno}`;
++
++function parseData(testo) {
++  const match = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(String(testo || '').trim());
++  if (!match) return null;
++  const giorno = Number(match[1]);
++  const mese = Number(match[2]);
++  const anno = Number(match[3]);
++  const data = new Date(anno, mese - 1, giorno, 12, 0, 0);
++  if (data.getFullYear() !== anno || data.getMonth() !== mese - 1 || data.getDate() !== giorno) return null;
++  return { anno, mese, giorno };
++}
++
++function Campo({ label, value, onChangeText, placeholder, multiline = false, keyboardType }) {
++  return (
++    <View style={{ marginBottom: 14 }}>
++      <Text style={{ color: '#8FA5CC', fontSize: 10, fontWeight: '900', letterSpacing: 0.8, marginBottom: 7 }}>
++        {label}
++      </Text>
++      <TextInput
++        value={value}
++        onChangeText={onChangeText}
++        placeholder={placeholder}
++        placeholderTextColor="#5E7595"
++        multiline={multiline}
++        keyboardType={keyboardType}
++        style={{
++          minHeight: multiline ? 88 : 50,
++          borderRadius: 16,
++          borderWidth: 1,
++          borderColor: 'rgba(182,140,255,0.34)',
++          backgroundColor: 'rgba(19,31,55,0.92)',
++          color: '#FFFFFF',
++          paddingHorizontal: 14,
++          paddingVertical: multiline ? 12 : 0,
++          textAlignVertical: multiline ? 'top' : 'center',
++          fontSize: 15,
++          fontWeight: '700',
++        }}
++      />
++    </View>
++  );
++}
++
++export function SceltaAgendaModal({ visible, onClose, onTurno, onPersonale }) {
++  return (
++    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
++      <TouchableOpacity activeOpacity={1} onPress={onClose} style={{ flex: 1, backgroundColor: 'rgba(2,8,18,0.72)', justifyContent: 'flex-end' }}>
++        <TouchableOpacity activeOpacity={1} style={{ backgroundColor: '#09172B', borderTopLeftRadius: 30, borderTopRightRadius: 30, paddingHorizontal: 18, paddingTop: 10, paddingBottom: Platform.OS === 'ios' ? 34 : 22, borderWidth: 1, borderColor: 'rgba(111,232,255,0.18)' }}>
++          <View style={{ width: 44, height: 4, borderRadius: 2, backgroundColor: '#314766', alignSelf: 'center', marginBottom: 18 }} />
++          <Text style={{ color: '#FFFFFF', fontSize: 22, fontWeight: '900' }}>Cosa vuoi aggiungere?</Text>
++          <Text style={{ color: '#8198B8', fontSize: 12, marginTop: 5, marginBottom: 17 }}>Lavoro e vita personale, nello stesso calendario.</Text>
++
++          <TouchableOpacity onPress={onTurno} activeOpacity={0.82} style={{ minHeight: 82, borderRadius: 22, padding: 16, flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(21,78,104,0.55)', borderWidth: 1, borderColor: 'rgba(92,234,255,0.55)', marginBottom: 11 }}>
++            <View style={{ width: 48, height: 48, borderRadius: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(92,234,255,0.12)' }}><Text style={{ fontSize: 23 }}>🛡️</Text></View>
++            <View style={{ flex: 1, marginLeft: 13 }}><Text style={{ color: '#FFFFFF', fontSize: 16, fontWeight: '900' }}>Turno di lavoro</Text><Text style={{ color: '#8CCCDD', fontSize: 11, marginTop: 4 }}>Usa l'inserimento turni già presente</Text></View>
++            <Ionicons name="chevron-forward" size={20} color="#69E7FF" />
++          </TouchableOpacity>
++
++          <TouchableOpacity onPress={onPersonale} activeOpacity={0.82} style={{ minHeight: 82, borderRadius: 22, padding: 16, flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(78,49,122,0.56)', borderWidth: 1, borderColor: 'rgba(182,140,255,0.62)' }}>
++            <View style={{ width: 48, height: 48, borderRadius: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(182,140,255,0.15)' }}><Text style={{ fontSize: 23 }}>📌</Text></View>
++            <View style={{ flex: 1, marginLeft: 13 }}><Text style={{ color: '#FFFFFF', fontSize: 16, fontWeight: '900' }}>Impegno personale</Text><Text style={{ color: '#C6ACEF', fontSize: 11, marginTop: 4 }}>Appuntamenti, famiglia, vita privata</Text></View>
++            <Ionicons name="chevron-forward" size={20} color={VIOLA_CHIARO} />
++          </TouchableOpacity>
++        </TouchableOpacity>
++      </TouchableOpacity>
++    </Modal>
++  );
++}
++
++export function ImpegnoPersonaleModal({ visible, evento, dataDefault, onClose, onSave, onDelete }) {
++  const [titolo, setTitolo] = useState('');
++  const [data, setData] = useState('');
++  const [inizio, setInizio] = useState('09:00');
++  const [fine, setFine] = useState('');
++  const [tuttoIlGiorno, setTuttoIlGiorno] = useState(false);
++  const [luogo, setLuogo] = useState('');
++  const [note, setNote] = useState('');
++  const [promemoria, setPromemoria] = useState([]);
++  const [errore, setErrore] = useState('');
++
++  useEffect(() => {
++    if (!visible) return;
++    const base = evento || dataDefault || {};
++    setTitolo(evento?.titolo || '');
++    setData(dataTesto(base.anno, base.mese, base.giorno));
++    setInizio(evento?.inizio || '09:00');
++    setFine(evento?.fine || '');
++    setTuttoIlGiorno(evento?.tuttoIlGiorno === true);
++    setLuogo(evento?.luogo || '');
++    setNote(evento?.note || '');
++    setPromemoria(normalizzaPromemoria(evento?.promemoria || []));
++    setErrore('');
++  }, [visible, evento, dataDefault]);
++
++  const modifica = Boolean(evento?.id);
++  const dataParsed = useMemo(() => parseData(data), [data]);
++
++  const togglePromemoria = (minuti) => {
++    setPromemoria((correnti) => {
++      if (correnti.includes(minuti)) return correnti.filter((x) => x !== minuti);
++      if (correnti.length >= 2) return [correnti[1], minuti];
++      return normalizzaPromemoria([...correnti, minuti]);
++    });
++  };
++
++  const salva = () => {
++    if (!titolo.trim()) { setErrore('Inserisci un titolo.'); return; }
++    if (!dataParsed) { setErrore('Inserisci una data valida in formato GG/MM/AAAA.'); return; }
++    if (!tuttoIlGiorno && !/^([01]\d|2[0-3]):[0-5]\d$/.test(inizio)) { setErrore('Inserisci un orario di inizio valido.'); return; }
++    if (!tuttoIlGiorno && fine && !/^([01]\d|2[0-3]):[0-5]\d$/.test(fine)) { setErrore('Inserisci un orario di fine valido.'); return; }
++    onSave({
++      ...(evento || {}),
++      ...dataParsed,
++      titolo: titolo.trim(),
++      inizio,
++      fine,
++      tuttoIlGiorno,
++      luogo,
++      note,
++      promemoria,
++    });
++  };
++
++  return (
++    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
++      <KeyboardAvoidingView style={{ flex: 1, backgroundColor: SFONDO }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
++        <SafeAreaView style={{ flex: 1 }}>
++        <View style={{ paddingHorizontal: 18, paddingTop: 12, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: 'rgba(182,140,255,0.18)', flexDirection: 'row', alignItems: 'center' }}>
++          <TouchableOpacity onPress={onClose} style={{ width: 42, height: 42, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: '#14223A' }}><Ionicons name="close" size={23} color="#D7E3F4" /></TouchableOpacity>
++          <View style={{ flex: 1, marginLeft: 12 }}><Text style={{ color: VIOLA, fontSize: 10, fontWeight: '900', letterSpacing: 1.1 }}>AGENDA PERSONALE</Text><Text style={{ color: '#FFFFFF', fontSize: 20, fontWeight: '900', marginTop: 2 }}>{modifica ? 'Modifica impegno' : 'Nuovo impegno'}</Text></View>
++        </View>
++
++        <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: 18, paddingBottom: 44 }}>
++          <View style={{ padding: 16, borderRadius: 24, backgroundColor: 'rgba(46,31,78,0.64)', borderWidth: 1, borderColor: 'rgba(182,140,255,0.36)', marginBottom: 18 }}>
++            <Text style={{ color: '#FFFFFF', fontSize: 15, fontWeight: '900' }}>📌 Il tuo tempo, separato dal lavoro</Text>
++            <Text style={{ color: '#AFA1C8', fontSize: 11, lineHeight: 16, marginTop: 5 }}>Gli impegni restano sul dispositivo e non vengono condivisi con colleghi o Centro Notifiche.</Text>
++          </View>
++
++          <Campo label="TITOLO *" value={titolo} onChangeText={setTitolo} placeholder="Es. Dentista" />
++          <Campo label="DATA" value={data} onChangeText={setData} placeholder="GG/MM/AAAA" keyboardType="numbers-and-punctuation" />
++
++          <View style={{ minHeight: 58, borderRadius: 17, paddingHorizontal: 14, marginBottom: 14, flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(19,31,55,0.92)', borderWidth: 1, borderColor: 'rgba(182,140,255,0.28)' }}>
++            <View style={{ flex: 1 }}><Text style={{ color: '#FFFFFF', fontSize: 14, fontWeight: '900' }}>Tutto il giorno</Text><Text style={{ color: '#7890AE', fontSize: 10, marginTop: 2 }}>Nasconde gli orari e usa le 09:00 come riferimento promemoria</Text></View>
++            <Switch value={tuttoIlGiorno} onValueChange={setTuttoIlGiorno} trackColor={{ false: '#31435D', true: '#7655A9' }} thumbColor={tuttoIlGiorno ? VIOLA_CHIARO : '#D7E0EA'} />
++          </View>
++
++          {!tuttoIlGiorno && (
++            <View style={{ flexDirection: 'row', gap: 10 }}>
++              <View style={{ flex: 1 }}><Campo label="INIZIO" value={inizio} onChangeText={setInizio} placeholder="09:00" keyboardType="numbers-and-punctuation" /></View>
++              <View style={{ flex: 1 }}><Campo label="FINE (FACOLTATIVA)" value={fine} onChangeText={setFine} placeholder="10:00" keyboardType="numbers-and-punctuation" /></View>
++            </View>
++          )}
++
++          <Campo label="LUOGO (FACOLTATIVO)" value={luogo} onChangeText={setLuogo} placeholder="Es. EUR" />
++          <Campo label="NOTE (FACOLTATIVE)" value={note} onChangeText={setNote} placeholder="Aggiungi una nota…" multiline />
++
++          <Text style={{ color: '#8FA5CC', fontSize: 10, fontWeight: '900', letterSpacing: 0.8, marginBottom: 8 }}>PROMEMORIA · MAX 2</Text>
++          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 }}>
++            {PROMEMORIA_RAPIDI_MINUTI.map((minuti) => {
++              const attivo = promemoria.includes(minuti);
++              return (
++                <TouchableOpacity key={minuti} onPress={() => togglePromemoria(minuti)} style={{ paddingHorizontal: 12, minHeight: 38, borderRadius: 13, alignItems: 'center', justifyContent: 'center', backgroundColor: attivo ? 'rgba(130,91,190,0.48)' : '#13223A', borderWidth: 1, borderColor: attivo ? VIOLA : '#2A3C57' }}>
++                  <Text style={{ color: attivo ? '#FFFFFF' : '#9BAFC8', fontSize: 11, fontWeight: '800' }}>{etichettaPromemoria(minuti)}</Text>
++                </TouchableOpacity>
++              );
++            })}
++          </View>
++
++          {!!errore && <Text style={{ color: '#FF8295', fontSize: 12, fontWeight: '800', marginBottom: 12 }}>{errore}</Text>}
++
++          <TouchableOpacity onPress={salva} activeOpacity={0.84} style={{ minHeight: 54, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: '#6F4FA8', borderWidth: 1, borderColor: VIOLA, shadowColor: VIOLA, shadowOpacity: 0.28, shadowRadius: 12 }}>
++            <Text style={{ color: '#FFFFFF', fontSize: 14, fontWeight: '900', letterSpacing: 0.5 }}>SALVA IMPEGNO</Text>
++          </TouchableOpacity>
++
++          {modifica && (
++            <TouchableOpacity onPress={() => onDelete(evento)} style={{ minHeight: 50, marginTop: 12, borderRadius: 17, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(115,31,53,0.28)', borderWidth: 1, borderColor: 'rgba(255,102,132,0.42)' }}>
++              <Text style={{ color: '#FF8295', fontWeight: '900' }}>ELIMINA IMPEGNO</Text>
++            </TouchableOpacity>
++          )}
++        </ScrollView>
++        </SafeAreaView>
++      </KeyboardAvoidingView>
++    </Modal>
++  );
++}
+diff --git a/App.js b/App.js
+index eb00e15..0e2a37c 100644
+--- a/App.js
++++ b/App.js
+@@ -110,6 +110,20 @@ import {
+ import * as ImagePicker from 'expo-image-picker';
+ 
+ import AsyncStorage from '@react-native-async-storage/async-storage';
++import {
++  caricaImpegniPersonali,
++  impegniDelGiorno,
++  rimuoviImpegnoPersonale,
++  upsertImpegnoPersonale,
++} from './agendaPersonale';
++import {
++  cancellaPromemoriaImpegno,
++  programmaPromemoriaImpegno,
++} from './promemoriaPersonali';
++import {
++  ImpegnoPersonaleModal,
++  SceltaAgendaModal,
++} from './AgendaPersonaleModal';
+ import {
+   getIsPaired,
+   getIsWatchAppInstalled,
+@@ -136,6 +150,12 @@ export default function App() {
+   const [erroreBiometria, setErroreBiometria] = useState('');
+   const richiestaBiometriaRef = useRef(false);
+   const [screen, setScreen] = useState("home");
++  const [impegniPersonali, setImpegniPersonali] = useState([]);
++  const [filtroAgenda, setFiltroAgenda] = useState('tutto');
++  const [giornoAgendaSelezionato, setGiornoAgendaSelezionato] = useState(() => new Date().getDate());
++  const [sceltaAgendaVisibile, setSceltaAgendaVisibile] = useState(false);
++  const [editorPersonaleVisibile, setEditorPersonaleVisibile] = useState(false);
++  const [impegnoPersonaleInModifica, setImpegnoPersonaleInModifica] = useState(null);
+   const [schedaPostoLuogo, setSchedaPostoLuogo] = useState('');
+   const passatempoScrollRef = React.useRef(null);
+   const editScreenScrollRef = React.useRef(null);
+@@ -150,6 +170,14 @@ export default function App() {
+   const watchUserIdRef = useRef(null);
+   const [mostraTornaSu, setMostraTornaSu] = useState(false);
+ 
++  useEffect(() => {
++    let attivo = true;
++    caricaImpegniPersonali(AsyncStorage, utenteAutenticato?.id || 'locale').then((lista) => {
++      if (attivo) setImpegniPersonali(lista);
++    });
++    return () => { attivo = false; };
++  }, [utenteAutenticato?.id]);
++
+ 
+   useEffect(() => {
+     let attivo = true;
+@@ -201,19 +229,87 @@ export default function App() {
+     setScreen('edit');
+   }
+ 
+-  function apriGiornoCalendario(g, recordsGiorno = []) {
+-    const presenti = Array.isArray(recordsGiorno)
+-      ? recordsGiorno
+-      : [];
++  function apriGiornoCalendario(g) {
++    setGiornoAgendaSelezionato(Number(g));
++  }
++
++  function apriSceltaAgenda(g = giornoAgendaSelezionato) {
++    setGiorno(Number(g));
++    setGiornoAgendaSelezionato(Number(g));
++    setSceltaAgendaVisibile(true);
++  }
++
++  function nuovoImpegnoPersonale(g = giornoAgendaSelezionato) {
++    setSceltaAgendaVisibile(false);
++    setImpegnoPersonaleInModifica(null);
++    setGiornoAgendaSelezionato(Number(g));
++    setEditorPersonaleVisibile(true);
++  }
++
++  function modificaImpegnoPersonale(evento) {
++    setImpegnoPersonaleInModifica(evento);
++    setEditorPersonaleVisibile(true);
++  }
+ 
+-    if (presenti.length === 0) {
+-      nuovoGiorno(g);
++  async function salvaImpegnoPersonale(input) {
++    const precedente = impegnoPersonaleInModifica;
++    const base = precedente ? { ...precedente, ...input } : input;
++    const risultato = await upsertImpegnoPersonale(AsyncStorage, impegniPersonali, base, utenteAutenticato?.id || 'locale');
++    if (!risultato.ok) {
++      Alert.alert('Impegno non salvato', risultato.errori[0] || 'Controlla i dati inseriti.');
+       return;
+     }
+ 
+-    setGiorno(Number(g));
+-    setEditingId(null);
+-    setScreen('giornoTurni');
++    let eventoSalvato = risultato.evento;
++    try {
++      const notificationIds = await programmaPromemoriaImpegno(eventoSalvato);
++      const aggiornato = await upsertImpegnoPersonale(
++        AsyncStorage,
++        risultato.impegni,
++        { ...eventoSalvato, notificationIds },
++        utenteAutenticato?.id || 'locale'
++      );
++      if (aggiornato.ok) {
++        eventoSalvato = aggiornato.evento;
++        setImpegniPersonali(aggiornato.impegni);
++      } else {
++        setImpegniPersonali(risultato.impegni);
++      }
++    } catch (error) {
++      console.warn('Agenda personale: promemoria non programmato.', error);
++      setImpegniPersonali(risultato.impegni);
++      Alert.alert('Impegno salvato', 'L’impegno è stato salvato, ma il promemoria non è stato programmato.');
++    }
++
++    setGiornoAgendaSelezionato(Number(eventoSalvato.giorno));
++    setImpegnoPersonaleInModifica(null);
++    setEditorPersonaleVisibile(false);
++  }
++
++  function eliminaImpegnoPersonaleConConferma(evento) {
++    Alert.alert(
++      'Elimina impegno',
++      `Vuoi eliminare “${evento?.titolo || 'questo impegno'}”?`,
++      [
++        { text: 'Annulla', style: 'cancel' },
++        {
++          text: 'Elimina',
++          style: 'destructive',
++          onPress: async () => {
++            await cancellaPromemoriaImpegno(evento);
++            const prossimi = await rimuoviImpegnoPersonale(
++              AsyncStorage,
++              impegniPersonali,
++              evento.id,
++              utenteAutenticato?.id || 'locale'
++            );
++            setImpegniPersonali(prossimi);
++            setImpegnoPersonaleInModifica(null);
++            setEditorPersonaleVisibile(false);
++          },
++        },
++      ]
++    );
+   }
+ 
+   function modificaGiorno(
+@@ -232,6 +328,7 @@ export default function App() {
+ 
+   function mesePrecedente() {
+     setEditingId(null);
++    setGiornoAgendaSelezionato(1);
+ 
+     if (
+       mese === 0
+@@ -252,6 +349,7 @@ export default function App() {
+ 
+   function meseSuccessivo() {
+     setEditingId(null);
++    setGiornoAgendaSelezionato(1);
+ 
+     if (
+       mese === 11
+@@ -274,6 +372,7 @@ export default function App() {
+     const oggiReale = new Date();
+ 
+     setEditingId(null);
++    setGiornoAgendaSelezionato(oggiReale.getDate());
+     setMese(oggiReale.getMonth());
+     setAnno(oggiReale.getFullYear());
+     setScreen('home');
+@@ -290,217 +389,127 @@ export default function App() {
+     screen ===
+     'calendar'
+   ) {
++    const impegniMese = impegniPersonali.filter(
++      (x) => Number(x.anno) === Number(anno) && Number(x.mese) === Number(mese + 1)
++    );
++    const turniGiornoAgenda = turniMese
++      .filter((t) => Number(t.giorno) === Number(giornoAgendaSelezionato))
++      .map((record) => ({ tipoAgenda: 'lavoro', record, ordine: record.inizio || '00:00' }));
++    const personaliGiornoAgenda = impegniDelGiorno(
++      impegniPersonali,
++      anno,
++      mese + 1,
++      giornoAgendaSelezionato
++    ).map((evento) => ({
++      tipoAgenda: 'personale',
++      evento,
++      ordine: evento.tuttoIlGiorno ? '00:00' : evento.inizio || '23:59',
++    }));
++    const timelineAgenda = [
++      ...(filtroAgenda === 'personale' ? [] : turniGiornoAgenda),
++      ...(filtroAgenda === 'lavoro' ? [] : personaliGiornoAgenda),
++    ].sort((a, b) => a.ordine.localeCompare(b.ordine));
++
+     return (
+       <Screen>
+-        <Back
+-          onPress={
+-            tornaHome
+-          }
+-        />
++        <Back onPress={tornaHome} />
+ 
+-        <Text
+-          style={
+-            styles.title
+-          }
+-        >
+-          Calendario
+-        </Text>
++        <Text style={styles.title}>Agenda</Text>
++        <Text style={styles.subtitle}>Lavoro e vita personale, in un solo calendario</Text>
+ 
+-        <Text
+-          style={
+-            styles.subtitle
+-          }
+-        >
+-          Tocca un giorno per inserire il servizio
+-        </Text>
+-
+-        <View
+-          style={
+-            styles.monthBox
+-          }
+-        >
+-          <TouchableOpacity
+-            onPress={
+-              mesePrecedente
+-            }
+-          >
+-            <Text
+-              style={
+-                styles.arrow
+-              }
+-            >
+-              ‹
+-            </Text>
+-          </TouchableOpacity>
+-
+-          <View>
+-            <Text
+-              style={
+-                styles.month
+-              }
+-            >
+-              {MESI[mese]}
+-            </Text>
+-
+-            <Text
+-              style={
+-                styles.year
+-              }
+-            >
+-              {anno}
+-            </Text>
+-          </View>
++        <View style={styles.monthBox}>
++          <TouchableOpacity onPress={mesePrecedente}><Text style={styles.arrow}>‹</Text></TouchableOpacity>
++          <View><Text style={styles.month}>{MESI[mese]}</Text><Text style={styles.year}>{anno}</Text></View>
++          <TouchableOpacity onPress={meseSuccessivo}><Text style={styles.arrow}>›</Text></TouchableOpacity>
++        </View>
+ 
+-          <TouchableOpacity
+-            onPress={
+-              meseSuccessivo
+-            }
+-          >
+-            <Text
+-              style={
+-                styles.arrow
+-              }
+-            >
+-              ›
+-            </Text>
+-          </TouchableOpacity>
++        <View style={{ flexDirection: 'row', backgroundColor: '#0B1930', borderRadius: 16, padding: 4, marginBottom: 12, borderWidth: 1, borderColor: '#203755' }}>
++          {[
++            ['tutto', 'Tutto'], ['lavoro', 'Lavoro'], ['personale', 'Personale'],
++          ].map(([id, label]) => {
++            const attivo = filtroAgenda === id;
++            return (
++              <TouchableOpacity key={id} onPress={() => setFiltroAgenda(id)} style={{ flex: 1, minHeight: 38, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: attivo ? (id === 'personale' ? 'rgba(130,91,190,0.48)' : 'rgba(40,126,158,0.42)') : 'transparent', borderWidth: attivo ? 1 : 0, borderColor: id === 'personale' ? '#B68CFF' : '#5CEAFF' }}>
++                <Text style={{ color: attivo ? '#FFFFFF' : '#7F96B5', fontSize: 11, fontWeight: '900' }}>{label}</Text>
++              </TouchableOpacity>
++            );
++          })}
+         </View>
+ 
+         <Calendar
+-          anno={
+-            anno
+-          }
+-          mese={
+-            mese
+-          }
+-          records={
+-            turniMese
+-          }
+-          onPress={(
+-            g,
+-            recordsGiorno
+-          ) => {
+-            apriGiornoCalendario(g, recordsGiorno);
+-          }}
++          anno={anno}
++          mese={mese}
++          records={turniMese}
++          impegniPersonali={impegniMese}
++          filtroAgenda={filtroAgenda}
++          giornoSelezionato={giornoAgendaSelezionato}
++          onPress={(g) => apriGiornoCalendario(g)}
+         />
+ 
+-      <View
+-        style={{
+-          flexDirection: 'row',
+-          alignItems: 'center',
+-          justifyContent: 'space-between',
+-          backgroundColor: '#09172A',
+-          borderWidth: 1,
+-          borderColor: '#1D3558',
+-          borderRadius: 18,
+-          paddingVertical: 10,
+-          paddingHorizontal: 10,
+-          marginTop: 10,
+-          marginBottom: 14,
+-        }}
+-      >
+-        <View style={{ alignItems: 'center', flex: 1 }}>
+-          <Ionicons name="sunny" size={16} color="#20EDF2" />
+-          <Text style={{
+-            color: '#AFC0D7',
+-            fontSize: 8,
+-            fontWeight: '800',
+-            marginTop: 3
+-          }}>
+-            Mattina
+-          </Text>
++        <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 10, marginBottom: 14, gap: 14 }}>
++          <View style={{ flexDirection: 'row', alignItems: 'center' }}><View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#5CEAFF', marginRight: 6 }} /><Text style={{ color: '#8FA5CC', fontSize: 10, fontWeight: '800' }}>Lavoro</Text></View>
++          <View style={{ flexDirection: 'row', alignItems: 'center' }}><View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#B68CFF', marginRight: 6 }} /><Text style={{ color: '#8FA5CC', fontSize: 10, fontWeight: '800' }}>Personale</Text></View>
+         </View>
+ 
+-        <View style={{ alignItems: 'center', flex: 1 }}>
+-          <Ionicons name="sunny-outline" size={16} color="#FF9D3D" />
+-          <Text style={{
+-            color: '#AFC0D7',
+-            fontSize: 8,
+-            fontWeight: '800',
+-            marginTop: 3
+-          }}>
+-            Serale
+-          </Text>
+-        </View>
+-
+-        <View style={{ alignItems: 'center', flex: 1 }}>
+-          <Ionicons name="moon" size={15} color="#A77CFF" />
+-          <Text style={{
+-            color: '#AFC0D7',
+-            fontSize: 8,
+-            fontWeight: '800',
+-            marginTop: 3
+-          }}>
+-            Notturno
+-          </Text>
+-        </View>
+-
+-        <View style={{ alignItems: 'center', flex: 1 }}>
+-          <View style={{
+-            backgroundColor: '#2B3B57',
+-            borderRadius: 8,
+-            paddingHorizontal: 5,
+-            paddingVertical: 2,
+-          }}>
+-            <Text style={{
+-              color: '#D0DCF0',
+-              fontSize: 8,
+-              fontWeight: '900'
+-            }}>
+-              RIP
+-            </Text>
++        <View style={{ backgroundColor: '#09172A', borderWidth: 1, borderColor: '#203755', borderRadius: 22, padding: 14, marginBottom: 14 }}>
++          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
++            <View style={{ flex: 1 }}>
++              <Text style={{ color: '#FFFFFF', fontSize: 16, fontWeight: '900' }}>{giornoAgendaSelezionato} {MESI[mese]}</Text>
++              <Text style={{ color: '#738AA8', fontSize: 10, fontWeight: '800', marginTop: 3 }}>TIMELINE DELLA GIORNATA</Text>
++            </View>
++            <TouchableOpacity onPress={() => apriSceltaAgenda(giornoAgendaSelezionato)} style={{ width: 42, height: 42, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(92,234,255,0.12)', borderWidth: 1, borderColor: 'rgba(92,234,255,0.46)' }}><Ionicons name="add" size={25} color="#69E7FF" /></TouchableOpacity>
+           </View>
+ 
+-          <Text style={{
+-            color: '#AFC0D7',
+-            fontSize: 8,
+-            fontWeight: '800',
+-            marginTop: 3
+-          }}>
+-            Riposo
+-          </Text>
++          {timelineAgenda.length === 0 ? (
++            <View style={{ paddingVertical: 22, alignItems: 'center' }}><Text style={{ fontSize: 24 }}>✦</Text><Text style={{ color: '#FFFFFF', fontSize: 13, fontWeight: '900', marginTop: 7 }}>Giornata libera</Text><Text style={{ color: '#7187A5', fontSize: 10, marginTop: 4 }}>Aggiungi un turno o un impegno personale</Text></View>
++          ) : timelineAgenda.map((item) => {
++            if (item.tipoAgenda === 'lavoro') {
++              const record = item.record;
++              return (
++                <TouchableOpacity key={`lavoro-${record.id}`} onPress={() => modificaGiorno(record)} activeOpacity={0.82} style={{ minHeight: 66, borderRadius: 17, padding: 12, marginBottom: 8, flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(17,54,72,0.58)', borderWidth: 1, borderColor: 'rgba(92,234,255,0.30)' }}>
++                  <View style={{ width: 38, height: 38, borderRadius: 13, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(92,234,255,0.10)' }}><Text style={{ fontSize: 17 }}>🛡️</Text></View>
++                  <View style={{ flex: 1, marginLeft: 11 }}><Text style={{ color: '#74E7F4', fontSize: 11, fontWeight: '900' }}>{record.tipo === 'turno' ? `${formattaOra(record.inizio)}–${formattaOra(record.fine)}` : nomeTipo(record.tipo)}</Text><Text numberOfLines={1} style={{ color: '#FFFFFF', fontSize: 13, fontWeight: '800', marginTop: 3 }}>{record.tipo === 'turno' ? (record.indirizzo_servizio || record.luogo || 'Servizio') : nomeTipo(record.tipo)}</Text></View>
++                  <Ionicons name="chevron-forward" size={18} color="#5CEAFF" />
++                </TouchableOpacity>
++              );
++            }
++            const evento = item.evento;
++            return (
++              <TouchableOpacity key={`personale-${evento.id}`} onPress={() => modificaImpegnoPersonale(evento)} activeOpacity={0.82} style={{ minHeight: 66, borderRadius: 17, padding: 12, marginBottom: 8, flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(67,43,102,0.60)', borderWidth: 1, borderColor: 'rgba(182,140,255,0.36)' }}>
++                <View style={{ width: 38, height: 38, borderRadius: 13, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(182,140,255,0.12)' }}><Text style={{ fontSize: 17 }}>📌</Text></View>
++                <View style={{ flex: 1, marginLeft: 11 }}><Text style={{ color: '#CDB2FF', fontSize: 11, fontWeight: '900' }}>{evento.tuttoIlGiorno ? 'TUTTO IL GIORNO' : `${evento.inizio}${evento.fine ? `–${evento.fine}` : ''}`}</Text><Text numberOfLines={1} style={{ color: '#FFFFFF', fontSize: 13, fontWeight: '800', marginTop: 3 }}>{evento.titolo}{evento.luogo ? ` · ${evento.luogo}` : ''}</Text></View>
++                <Ionicons name="chevron-forward" size={18} color="#CDB2FF" />
++              </TouchableOpacity>
++            );
++          })}
+         </View>
+-      </View>
+-
+-
+-
+-        <View
+-          style={
+-            styles.stats
+-          }
+-        >
+-          <Stat
+-            label="ORE"
+-            value={`${statistiche.ore}h`}
+-          />
+ 
+-          <Stat
+-            label="EXTRA"
+-            value={`${statistiche.extraOre}h`}
+-          />
++        <TouchableOpacity onPress={() => apriSceltaAgenda(giornoAgendaSelezionato)} activeOpacity={0.84} style={{ minHeight: 52, borderRadius: 18, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#102743', borderWidth: 1, borderColor: '#2E587F', marginBottom: 14 }}>
++          <Ionicons name="add-circle-outline" size={20} color="#69E7FF" /><Text style={{ color: '#FFFFFF', fontSize: 12, fontWeight: '900', marginLeft: 8 }}>AGGIUNGI ALLA GIORNATA</Text>
++        </TouchableOpacity>
+ 
+-          <Stat
+-            label="NOTTI"
+-            value={`${statistiche.notti}`}
+-          />
++        <View style={styles.stats}>
++          <Stat label="ORE" value={`${statistiche.ore}h`} />
++          <Stat label="EXTRA" value={`${statistiche.extraOre}h`} />
++          <Stat label="NOTTI" value={`${statistiche.notti}`} />
+         </View>
+ 
+-        <TouchableOpacity
+-          style={
+-            styles.syncButton
+-          }
+-          onPress={() =>
+-            caricaTurni()
+-          }
+-        >
+-          <Text
+-            style={
+-              styles.syncText
+-            }
+-          >
+-            ↻ Aggiorna calendario
+-          </Text>
+-        </TouchableOpacity>
++        <TouchableOpacity style={styles.syncButton} onPress={() => caricaTurni()}><Text style={styles.syncText}>↻ Aggiorna calendario</Text></TouchableOpacity>
++
++        <SceltaAgendaModal
++          visible={sceltaAgendaVisibile}
++          onClose={() => setSceltaAgendaVisibile(false)}
++          onTurno={() => { setSceltaAgendaVisibile(false); nuovoGiorno(giornoAgendaSelezionato); }}
++          onPersonale={() => nuovoImpegnoPersonale(giornoAgendaSelezionato)}
++        />
++        <ImpegnoPersonaleModal
++          visible={editorPersonaleVisibile}
++          evento={impegnoPersonaleInModifica}
++          dataDefault={{ anno, mese: mese + 1, giorno: giornoAgendaSelezionato }}
++          onClose={() => { setEditorPersonaleVisibile(false); setImpegnoPersonaleInModifica(null); }}
++          onSave={salvaImpegnoPersonale}
++          onDelete={eliminaImpegnoPersonaleConConferma}
++        />
+       </Screen>
+     );
+   }
+@@ -520,535 +529,47 @@ function Calendar({
+   anno,
+   mese,
+   records,
++  impegniPersonali = [],
++  filtroAgenda = 'tutto',
++  giornoSelezionato,
+   onPress,
+ }) {
+-  const giorni =
+-    new Date(
+-      anno,
+-      mese + 1,
+-      0
+-    ).getDate();
+-
+-  let primo =
+-    new Date(
+-      anno,
+-      mese,
+-      1
+-    ).getDay();
+-
+-  primo =
+-    primo === 0
+-      ? 6
+-      : primo - 1;
+-
+-  const celle = [];
+-
+-  for (
+-    let i = 0;
+-    i < primo;
+-    i++
+-  ) {
+-    celle.push(null);
+-  }
+-
+-  for (
+-    let i = 1;
+-    i <= giorni;
+-    i++
+-  ) {
+-    celle.push(i);
+-  }
++  const giorni = new Date(anno, mese + 1, 0).getDate();
++  let primo = new Date(anno, mese, 1).getDay();
++  primo = primo === 0 ? 6 : primo - 1;
++  const celle = [...Array(primo).fill(null), ...Array.from({ length: giorni }, (_, i) => i + 1)];
++  const oggi = new Date();
+ 
+   return (
+-    <View
+-      style={
+-        styles.calendar
+-      }
+-    >
+-      <View
+-        style={
+-          styles.week
+-        }
+-      >
+-        {[
+-          'L',
+-          'M',
+-          'M',
+-          'G',
+-          'V',
+-          'S',
+-          'D',
+-        ].map(
+-          (
+-            d,
+-            index
+-          ) => (
+-            <Text
+-              key={`week-${index}`}
+-              style={
+-                styles.weekText
+-              }
+-            >
+-              {d}
+-            </Text>
+-          )
+-        )}
++    <View style={styles.calendar}>
++      <View style={styles.week}>
++        {['L', 'M', 'M', 'G', 'V', 'S', 'D'].map((d, index) => <Text key={`week-${index}`} style={styles.weekText}>{d}</Text>)}
+       </View>
+-
+-      <View
+-        style={
+-          styles.grid
+-        }
+-      >
+-        {celle.map(
+-          (
+-            day,
+-            index
+-          ) => {
+-            if (!day) {
+-              return (
+-                <View
+-                  key={`vuoto-${index}`}
+-                  style={
+-                    styles.calendarDay
+-                  }
+-                />
+-              );
+-            }
+-
+-            const recordsGiorno =
+-              records.filter(
+-                (r) =>
+-                  Number(
+-                    r.giorno
+-                  ) ===
+-                  Number(
+-                    day
+-                  )
+-              ).sort((a, b) =>
+-                String(a?.inizio || '99:99').localeCompare(
+-                  String(b?.inizio || '99:99')
+-                )
+-              );
+-
+-            const record =
+-              recordsGiorno.find((r) => r.tipo === 'turno') ||
+-              recordsGiorno[0] ||
+-              null;
+-
+-            const tipoRiposo =
+-            !record ||
+-            record.tipo === 'riposo';
+-
+-          const tipoFerie =
+-            record?.tipo === 'ferie';
+-
+-          const tipoMalattia =
+-            record?.tipo === 'malattia';
+-
+-          const tipoPermesso =
+-            record?.tipo === 'permesso';
+-
+-          const tipoCongedo80 =
+-            record?.tipo === 'congedo80';
+-
+-          const tipoCongedo30 =
+-            record?.tipo === 'congedo30';
+-
+-          const tipoLegge104 =
+-            record?.tipo === 'legge104';
+-
+-          const tipoAssenzaSpeciale =
+-            tipoFerie ||
+-            tipoMalattia ||
+-            tipoPermesso ||
+-            tipoCongedo80 ||
+-            tipoCongedo30 ||
+-            tipoLegge104;
+-
+-          const etichettaAssenzaSpeciale =
+-            tipoFerie
+-              ? 'FER'
+-              : tipoMalattia
+-              ? 'MAL'
+-              : tipoPermesso
+-              ? 'PER'
+-              : tipoCongedo80
+-              ? 'C80'
+-              : tipoCongedo30
+-              ? 'C30'
+-              : tipoLegge104
+-              ? '104'
+-              : '';
+-
+-          const oraInizio =
+-            record?.inizio
+-              ? Number(String(record.inizio).split(':')[0])
+-              : null;
+-
+-          const turnoNotte =
+-            record &&
+-            record.tipo === 'turno' &&
+-            oraInizio !== null &&
+-            (oraInizio >= 20 || oraInizio < 5);
+-
+-          const turnoMattina =
+-            record &&
+-            record.tipo === 'turno' &&
+-            oraInizio !== null &&
+-            oraInizio >= 5 &&
+-            oraInizio < 13;
+-
+-          const turnoSerale =
+-            record &&
+-            record.tipo === 'turno' &&
+-            !turnoNotte &&
+-            !turnoMattina;
+-
+-          const colore =
+-            turnoNotte
+-              ? '#A77CFF'
+-              : turnoMattina
+-              ? '#20EDF2'
+-              : turnoSerale
+-              ? '#FF9D3D'
+-              : '#B8C7DF';
+-
+-          const sfondo =
+-            turnoNotte
+-              ? '#1B1740'
+-              : turnoMattina
+-              ? '#07333D'
+-              : turnoSerale
+-              ? '#362318'
+-              : '#17243A';
+-
+-          const bordo =
+-            turnoNotte
+-              ? '#6847E8'
+-              : turnoMattina
+-              ? '#0A8293'
+-              : turnoSerale
+-              ? '#915327'
+-              : '#30415F';
+-
+-          const icona =
+-            turnoNotte
+-              ? 'moon'
+-              : turnoMattina
+-              ? 'sunny'
+-              : turnoSerale
+-              ? 'sunny-outline'
+-              : null;
+-
+-          const oggiCalendario = new Date();
+-
+-          const eOggi =
+-            Number(day) === oggiCalendario.getDate() &&
+-            Number(mese) === oggiCalendario.getMonth() &&
+-            Number(anno) === oggiCalendario.getFullYear();
+-
+-          const prossimiTurni = records
+-            .filter((r) => {
+-              if (
+-                r.tipo !== 'turno' ||
+-                !r.inizio
+-              ) {
+-                return false;
+-              }
+-
+-              const [h, m] = String(r.inizio)
+-                .split(':')
+-                .map(Number);
+-
+-              const dataTurno = new Date(
+-                anno,
+-                mese,
+-                Number(r.giorno),
+-                h,
+-                m,
+-                0
+-              );
+-
+-              return dataTurno > oggiCalendario;
+-            })
+-            .sort((a, b) => {
+-              const [ha, ma] = String(a.inizio).split(':').map(Number);
+-              const [hb, mb] = String(b.inizio).split(':').map(Number);
+-
+-              const da = new Date(
+-                anno,
+-                mese,
+-                Number(a.giorno),
+-                ha,
+-                ma,
+-                0
+-              );
+-
+-              const db = new Date(
+-                anno,
+-                mese,
+-                Number(b.giorno),
+-                hb,
+-                mb,
+-                0
+-              );
+-
+-              return da - db;
+-            });
+-
+-          const prossimoTurno =
+-            prossimiTurni.length > 0
+-              ? prossimiTurni[0]
+-              : null;
+-
+-          const eProssimo =
+-            !eOggi &&
+-            prossimoTurno &&
+-            Number(day) === Number(prossimoTurno.giorno);
++      <View style={styles.grid}>
++        {celle.map((day, index) => {
++          if (!day) return <View key={`vuoto-${index}`} style={styles.calendarDay} />;
++          const recordsGiorno = records.filter((r) => Number(r.giorno) === Number(day));
++          const personaliGiorno = impegniPersonali.filter((x) => Number(x.giorno) === Number(day));
++          const mostraLavoro = filtroAgenda !== 'personale' && recordsGiorno.length > 0;
++          const mostraPersonale = filtroAgenda !== 'lavoro' && personaliGiorno.length > 0;
++          const eOggi = Number(day) === oggi.getDate() && Number(mese) === oggi.getMonth() && Number(anno) === oggi.getFullYear();
++          const selezionato = Number(day) === Number(giornoSelezionato);
+ 
+           return (
+-            <TouchableOpacity
+-              key={`giorno-${day}`}
+-              activeOpacity={0.72}
+-              onPress={() =>
+-                onPress(
+-                  day,
+-                  recordsGiorno
+-                )
+-              }
+-              style={{
+-                width: '14.285%',
+-                aspectRatio: 0.82,
+-                padding: 2.5,
+-              }}
+-            >
+-              <View
+-                style={{
+-                  flex: 1,
+-                  borderRadius: 14,
+-                  borderWidth:
+-                    eOggi
+-                      ? 2.5
+-                      : eProssimo
+-                      ? 2
+-                      : 1,
+-                  borderColor:
+-                    eOggi
+-                      ? '#6FE8FF'
+-                      : eProssimo
+-                      ? '#FFD166'
+-                      : record
+-                      ? bordo
+-                      : '#26354D',
+-                  backgroundColor:
+-                    eOggi
+-                      ? '#10395A'
+-                      : eProssimo
+-                      ? '#3A3018'
+-                      : record
+-                      ? sfondo
+-                      : '#111D32',
+-                  alignItems: 'center',
+-                  justifyContent: 'center',
+-                  paddingHorizontal: 2,
+-
+-                  shadowColor:
+-                    eOggi
+-                      ? '#5EDBFF'
+-                      : eProssimo
+-                      ? '#FFD166'
+-                      : record
+-                      ? colore
+-                      : '#000000',
+-                  shadowOpacity:
+-                    eOggi
+-                      ? 0.75
+-                      : eProssimo
+-                      ? 0.50
+-                      : record
+-                      ? 0.20
+-                      : 0.04,
+-                  shadowRadius:
+-                    eOggi
+-                      ? 16
+-                      : eProssimo
+-                      ? 12
+-                      : record
+-                      ? 7
+-                      : 2,
+-                  shadowOffset: {
+-                    width: 0,
+-                    height: 3,
+-                  },
+-                }}
+-              >
+-                <Text
+-                  style={{
+-                    color: '#FFFFFF',
+-                    fontSize: 15,
+-                    fontWeight: '900',
+-                    marginBottom:
+-                      record ? 4 : 0,
+-                  }}
+-                >
+-                  {day}
+-                </Text>
+-
+-                {record && (
+-                  tipoRiposo ? (
+-                    <View
+-                      style={{
+-                        backgroundColor: '#2B3B57',
+-                        paddingHorizontal: 6,
+-                        paddingVertical: 2,
+-                        borderRadius: 10,
+-                      }}
+-                    >
+-                      <Text
+-                        style={{
+-                          color: '#D0DCF0',
+-                          fontSize: 8,
+-                          fontWeight: '900',
+-                        }}
+-                      >
+-                        RIP
+-                      </Text>
+-                    </View>
+-                  ) : tipoAssenzaSpeciale ? (
+-                    <View
+-                      style={{
+-                        backgroundColor: 'rgba(90,120,255,0.18)',
+-                        borderWidth: 1,
+-                        borderColor: 'rgba(130,160,255,0.45)',
+-                        paddingHorizontal: 6,
+-                        paddingVertical: 2,
+-                        borderRadius: 10,
+-                      }}
+-                    >
+-                      <Text
+-                        style={{
+-                          color: '#DCE5FF',
+-                          fontSize: 8,
+-                          fontWeight: '900',
+-                        }}
+-                      >
+-                        {etichettaAssenzaSpeciale}
+-                      </Text>
+-                    </View>
+-                  ) : (
+-                    Platform.OS === 'android' ? (
+-                      <View
+-                        style={{
+-                          width: '94%',
+-                          alignItems: 'center',
+-                          justifyContent: 'center',
+-                          backgroundColor: 'rgba(0,0,0,0.18)',
+-                          paddingHorizontal: 1,
+-                          paddingVertical: 3,
+-                          borderRadius: 8,
+-                        }}
+-                      >
+-                        <Text
+-                          numberOfLines={1}
+-                          adjustsFontSizeToFit
+-                          minimumFontScale={0.72}
+-                          style={{
+-                            width: '100%',
+-                            color: colore,
+-                            fontSize: 7.5,
+-                            fontWeight: '900',
+-                            textAlign: 'center',
+-                          }}
+-                        >
+-                          {`${String(record.inizio || '').slice(0, 2)}-${String(record.fine || '').slice(0, 2)}`}
+-                        </Text>
+-                      </View>
+-                    ) : (
+-                      <View
+-                        style={{
+-                          flexDirection: 'row',
+-                          alignItems: 'center',
+-                          justifyContent: 'center',
+-                          backgroundColor: 'rgba(0,0,0,0.18)',
+-                          paddingHorizontal: 4,
+-                          paddingVertical: 2,
+-                          borderRadius: 10,
+-                        }}
+-                      >
+-                        <Ionicons
+-                          name={icona}
+-                          size={10}
+-                          color={colore}
+-                          style={{
+-                            marginRight: 2,
+-                          }}
+-                        />
+-
+-                        <View
+-                          style={{
+-                            alignItems: 'center',
+-                            justifyContent: 'center',
+-                          }}
+-                        >
+-                          <Text
+-                            style={{
+-                              color: colore,
+-                              fontSize: 8.5,
+-                              fontWeight: '900',
+-                              lineHeight: 10,
+-                            }}
+-                          >
+-                            {formattaOra(record.inizio)}
+-                          </Text>
+-
+-                          <Text
+-                            style={{
+-                              color: colore,
+-                              fontSize: 8,
+-                              fontWeight: '900',
+-                              lineHeight: 9,
+-                            }}
+-                          >
+-                            {formattaOra(record.fine)}
+-                          </Text>
+-                        </View>
+-                      </View>
+-                    )
+-                  )
+-                )}
+-
+-                {recordsGiorno.length > 1 && (
+-                  <View
+-                    style={{
+-                      position: 'absolute',
+-                      top: 3,
+-                      right: 3,
+-                      minWidth: 15,
+-                      height: 15,
+-                      paddingHorizontal: 3,
+-                      borderRadius: 8,
+-                      backgroundColor: '#FFFFFF',
+-                      alignItems: 'center',
+-                      justifyContent: 'center',
+-                    }}
+-                  >
+-                    <Text
+-                      style={{
+-                        color: '#071A2F',
+-                        fontSize: 8,
+-                        fontWeight: '900',
+-                      }}
+-                    >
+-                      {recordsGiorno.length}
+-                    </Text>
+-                  </View>
++            <TouchableOpacity key={`giorno-${day}`} activeOpacity={0.72} onPress={() => onPress(day, recordsGiorno)} style={{ width: '14.285%', aspectRatio: 0.92, padding: 2.5 }}>
++              <View style={{ flex: 1, borderRadius: 14, borderWidth: selezionato ? 2 : 1, borderColor: selezionato ? '#8DEEFF' : eOggi ? '#4D7897' : '#26354D', backgroundColor: selezionato ? '#10324C' : '#111D32', alignItems: 'center', justifyContent: 'center', shadowColor: selezionato ? '#5EDBFF' : '#000000', shadowOpacity: selezionato ? 0.34 : 0.04, shadowRadius: selezionato ? 10 : 2, shadowOffset: { width: 0, height: 3 } }}>
++                <Text style={{ color: '#FFFFFF', fontSize: 14, fontWeight: '900' }}>{day}</Text>
++                <View style={{ minHeight: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 5, gap: 4 }}>
++                  {mostraLavoro && <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: '#5CEAFF', shadowColor: '#5CEAFF', shadowOpacity: 0.55, shadowRadius: 4 }} />}
++                  {mostraPersonale && <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: '#B68CFF', shadowColor: '#B68CFF', shadowOpacity: 0.55, shadowRadius: 4 }} />}
++                </View>
++                {(recordsGiorno.length + personaliGiorno.length) > 2 && (
++                  <Text style={{ position: 'absolute', right: 5, top: 4, color: '#7F96B5', fontSize: 7, fontWeight: '900' }}>+{recordsGiorno.length + personaliGiorno.length - 2}</Text>
+                 )}
+               </View>
+             </TouchableOpacity>
+           );
+-          }
+-        )}
++        })}
+       </View>
+     </View>
+   );
+diff --git a/agendaPersonale.js b/agendaPersonale.js
+new file mode 100644
+index 0000000..fff7de9
+--- /dev/null
++++ b/agendaPersonale.js
+@@ -0,0 +1,125 @@
++export const CHIAVE_IMPEGNI_PERSONALI = '@vigilanza_gpg_impegni_personali_v1';
++
++export function chiaveStorageAgenda(scope = 'locale') {
++  const sicuro = String(scope || 'locale').replace(/[^a-zA-Z0-9_-]/g, '_');
++  return `${CHIAVE_IMPEGNI_PERSONALI}:${sicuro}`;
++}
++export const PROMEMORIA_RAPIDI_MINUTI = [60, 120, 180, 240, 1440];
++
++const pad2 = (n) => String(n).padStart(2, '0');
++
++export function chiaveDataAgenda(anno, mese, giorno) {
++  return `${Number(anno)}-${pad2(Number(mese))}-${pad2(Number(giorno))}`;
++}
++
++export function creaIdImpegnoPersonale() {
++  return `personale-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
++}
++
++export function normalizzaPromemoria(valori = []) {
++  return Array.from(
++    new Set(
++      (Array.isArray(valori) ? valori : [])
++        .map(Number)
++        .filter((v) => PROMEMORIA_RAPIDI_MINUTI.includes(v))
++    )
++  ).sort((a, b) => a - b).slice(0, 2);
++}
++
++export function normalizzaImpegnoPersonale(input = {}) {
++  const tuttoIlGiorno = input.tuttoIlGiorno === true;
++  return {
++    id: String(input.id || creaIdImpegnoPersonale()),
++    titolo: String(input.titolo || '').trim(),
++    anno: Number(input.anno),
++    mese: Number(input.mese),
++    giorno: Number(input.giorno),
++    tuttoIlGiorno,
++    inizio: tuttoIlGiorno ? null : String(input.inizio || '').trim(),
++    fine: tuttoIlGiorno ? null : String(input.fine || '').trim() || null,
++    luogo: String(input.luogo || '').trim(),
++    note: String(input.note || '').trim(),
++    promemoria: normalizzaPromemoria(input.promemoria),
++    notificationIds: Array.isArray(input.notificationIds)
++      ? input.notificationIds.map(String).filter(Boolean)
++      : [],
++    creatoIl: input.creatoIl || new Date().toISOString(),
++    aggiornatoIl: new Date().toISOString(),
++  };
++}
++
++export function validaImpegnoPersonale(input = {}) {
++  const evento = normalizzaImpegnoPersonale(input);
++  const errori = [];
++  if (!evento.titolo) errori.push('Inserisci un titolo.');
++  const data = new Date(evento.anno, evento.mese - 1, evento.giorno, 12, 0, 0, 0);
++  if (
++    !Number.isInteger(evento.anno) ||
++    !Number.isInteger(evento.mese) ||
++    !Number.isInteger(evento.giorno) ||
++    data.getFullYear() !== evento.anno ||
++    data.getMonth() !== evento.mese - 1 ||
++    data.getDate() !== evento.giorno
++  ) {
++    errori.push('Data non valida.');
++  }
++  const oraValida = (v) => /^([01]\d|2[0-3]):[0-5]\d$/.test(String(v || ''));
++  if (!evento.tuttoIlGiorno && !oraValida(evento.inizio)) {
++    errori.push('Ora di inizio non valida.');
++  }
++  if (!evento.tuttoIlGiorno && evento.fine && !oraValida(evento.fine)) {
++    errori.push('Ora di fine non valida.');
++  }
++  return { valido: errori.length === 0, errori, evento };
++}
++
++export function ordinaImpegniPersonali(impegni = []) {
++  return [...(Array.isArray(impegni) ? impegni : [])].sort((a, b) => {
++    const ka = `${chiaveDataAgenda(a.anno, a.mese, a.giorno)}-${a.tuttoIlGiorno ? '00:00' : a.inizio || '23:59'}-${a.id}`;
++    const kb = `${chiaveDataAgenda(b.anno, b.mese, b.giorno)}-${b.tuttoIlGiorno ? '00:00' : b.inizio || '23:59'}-${b.id}`;
++    return ka.localeCompare(kb);
++  });
++}
++
++export function impegniDelGiorno(impegni = [], anno, mese, giorno) {
++  return ordinaImpegniPersonali(impegni).filter(
++    (x) => Number(x.anno) === Number(anno) && Number(x.mese) === Number(mese) && Number(x.giorno) === Number(giorno)
++  );
++}
++
++export async function caricaImpegniPersonali(storage, scope = 'locale') {
++  if (!storage?.getItem) return [];
++  try {
++    const raw = await storage.getItem(chiaveStorageAgenda(scope));
++    if (!raw) return [];
++    const parsed = JSON.parse(raw);
++    if (!Array.isArray(parsed)) return [];
++    return ordinaImpegniPersonali(parsed.map(normalizzaImpegnoPersonale));
++  } catch (error) {
++    console.warn('Agenda personale: impossibile caricare gli impegni.', error);
++    return [];
++  }
++}
++
++export async function salvaImpegniPersonali(storage, impegni = [], scope = 'locale') {
++  const normalizzati = ordinaImpegniPersonali(impegni.map(normalizzaImpegnoPersonale));
++  await storage.setItem(chiaveStorageAgenda(scope), JSON.stringify(normalizzati));
++  return normalizzati;
++}
++
++export async function upsertImpegnoPersonale(storage, impegni, input, scope = 'locale') {
++  const { valido, errori, evento } = validaImpegnoPersonale(input);
++  if (!valido) return { ok: false, errori, impegni: ordinaImpegniPersonali(impegni) };
++  const altri = (Array.isArray(impegni) ? impegni : []).filter((x) => String(x.id) !== String(evento.id));
++  const prossimi = await salvaImpegniPersonali(storage, [...altri, evento], scope);
++  return { ok: true, evento, impegni: prossimi, errori: [] };
++}
++
++export async function rimuoviImpegnoPersonale(storage, impegni, id, scope = 'locale') {
++  const prossimi = await salvaImpegniPersonali(
++    storage,
++    (Array.isArray(impegni) ? impegni : []).filter((x) => String(x.id) !== String(id)),
++    scope
++  );
++  return prossimi;
++}
+diff --git a/app.json b/app.json
+index 414999c..4089809 100644
+--- a/app.json
++++ b/app.json
+@@ -59,6 +59,12 @@
+         {
+           "faceIDPermission": "Vigilanza GPG usa Face ID per proteggere l’accesso alla tua sessione quando scegli di abilitarlo."
+         }
++      ],
++      [
++        "expo-notifications",
++        {
++          "defaultChannel": "agenda-personale"
++        }
+       ]
+     ],
+     "scheme": "vigilanzagpg"
+diff --git a/promemoriaPersonali.js b/promemoriaPersonali.js
+new file mode 100644
+index 0000000..105637d
+--- /dev/null
++++ b/promemoriaPersonali.js
+@@ -0,0 +1,95 @@
++import * as Notifications from 'expo-notifications';
++import { Platform } from 'react-native';
++
++const pad2 = (n) => String(n).padStart(2, '0');
++
++export function dataInizioImpegno(evento) {
++  if (!evento) return null;
++  const ora = evento.tuttoIlGiorno ? '09:00' : evento.inizio;
++  const match = /^([01]\d|2[0-3]):([0-5]\d)$/.exec(String(ora || ''));
++  if (!match) return null;
++  const data = new Date(
++    Number(evento.anno),
++    Number(evento.mese) - 1,
++    Number(evento.giorno),
++    Number(match[1]),
++    Number(match[2]),
++    0,
++    0
++  );
++  return Number.isNaN(data.getTime()) ? null : data;
++}
++
++export function calcolaDatePromemoria(evento, adesso = new Date()) {
++  const inizio = dataInizioImpegno(evento);
++  if (!inizio) return [];
++  return (Array.isArray(evento.promemoria) ? evento.promemoria : [])
++    .map(Number)
++    .filter((minuti) => Number.isFinite(minuti) && minuti > 0)
++    .map((minuti) => ({ minuti, data: new Date(inizio.getTime() - minuti * 60 * 1000) }))
++    .filter(({ data }) => data.getTime() > adesso.getTime())
++    .sort((a, b) => a.data - b.data);
++}
++
++export async function preparaNotifichePersonali() {
++  const permessi = await Notifications.getPermissionsAsync();
++  let stato = permessi.status;
++  if (stato !== 'granted') {
++    const richiesta = await Notifications.requestPermissionsAsync();
++    stato = richiesta.status;
++  }
++  if (stato !== 'granted') return false;
++
++  if (Platform.OS === 'android') {
++    await Notifications.setNotificationChannelAsync('agenda-personale', {
++      name: 'Agenda personale',
++      importance: Notifications.AndroidImportance.DEFAULT,
++      vibrationPattern: [0, 180, 120, 180],
++    });
++  }
++  return true;
++}
++
++export async function cancellaPromemoriaImpegno(evento) {
++  const ids = Array.isArray(evento?.notificationIds) ? evento.notificationIds : [];
++  await Promise.all(
++    ids.map((id) => Notifications.cancelScheduledNotificationAsync(String(id)).catch(() => null))
++  );
++}
++
++export async function programmaPromemoriaImpegno(evento, adesso = new Date()) {
++  await cancellaPromemoriaImpegno(evento);
++  if (!evento?.promemoria?.length) return [];
++  const autorizzato = await preparaNotifichePersonali();
++  if (!autorizzato) return [];
++
++  const date = calcolaDatePromemoria(evento, adesso);
++  const ids = [];
++  for (const voce of date) {
++    const id = await Notifications.scheduleNotificationAsync({
++      content: {
++        title: evento.titolo,
++        body: evento.luogo ? `📌 ${evento.luogo}` : 'Hai un impegno personale in agenda.',
++        data: { tipo: 'agenda_personale', eventoId: evento.id },
++        sound: true,
++      },
++      trigger: {
++        type: Notifications.SchedulableTriggerInputTypes.DATE,
++        date: voce.data,
++        ...(Platform.OS === 'android' ? { channelId: 'agenda-personale' } : {}),
++      },
++    });
++    ids.push(id);
++  }
++  return ids;
++}
++
++export function etichettaPromemoria(minuti) {
++  if (Number(minuti) === 1440) return 'Giorno precedente';
++  return `${Number(minuti) / 60} ${Number(minuti) === 60 ? 'ora' : 'ore'} prima`;
++}
++
++export function descriviDataPromemoria(data) {
++  if (!(data instanceof Date) || Number.isNaN(data.getTime())) return '';
++  return `${pad2(data.getDate())}/${pad2(data.getMonth() + 1)} ${pad2(data.getHours())}:${pad2(data.getMinutes())}`;
++}
+diff --git a/scripts/test-agenda-personale.cjs b/scripts/test-agenda-personale.cjs
+new file mode 100644
+index 0000000..7d88bca
+--- /dev/null
++++ b/scripts/test-agenda-personale.cjs
+@@ -0,0 +1,82 @@
++const assert = require('node:assert/strict');
++const fs = require('node:fs');
++const vm = require('node:vm');
++
++function caricaModulo(percorso, nomi, extra = {}) {
++  const file = fs.readFileSync(percorso, 'utf8');
++  const sorgente = file
++    .replace(/^import .*;$/gm, '')
++    .replaceAll('export async function ', 'async function ')
++    .replaceAll('export function ', 'function ')
++    .replaceAll('export const ', 'const ') +
++    `\nmodule.exports = { ${nomi.join(', ')} };`;
++  const sandbox = {
++    module: { exports: {} }, exports: {}, Date, Set, Map, Math, JSON,
++    console: { warn() {}, log() {} }, process: { env: { EXPO_OS: 'ios' } },
++    Platform: { OS: 'ios' },
++    ...extra,
++  };
++  vm.runInNewContext(sorgente, sandbox);
++  return sandbox.module.exports;
++}
++
++const agenda = caricaModulo('agendaPersonale.js', [
++  'CHIAVE_IMPEGNI_PERSONALI', 'chiaveStorageAgenda', 'normalizzaPromemoria', 'normalizzaImpegnoPersonale',
++  'validaImpegnoPersonale', 'impegniDelGiorno', 'caricaImpegniPersonali',
++  'salvaImpegniPersonali', 'upsertImpegnoPersonale', 'rimuoviImpegnoPersonale',
++]);
++
++const memoria = new Map();
++const storage = {
++  async getItem(k) { return memoria.has(k) ? memoria.get(k) : null; },
++  async setItem(k, v) { memoria.set(k, v); },
++};
++
++(async () => {
++  const base = { id: 'a', titolo: 'Dentista', anno: 2026, mese: 10, giorno: 3, inizio: '17:30', fine: '18:30', promemoria: [60, 1440] };
++  assert.equal(agenda.chiaveStorageAgenda('utente@example.com'), '@vigilanza_gpg_impegni_personali_v1:utente_example_com');
++  assert.equal(agenda.validaImpegnoPersonale(base).valido, true);
++  assert.equal(agenda.validaImpegnoPersonale({ ...base, titolo: '' }).valido, false);
++  assert.deepEqual(Array.from(agenda.normalizzaPromemoria([60, 60, 120, 180])), [60, 120]);
++
++  let lista = [];
++  let risultato = await agenda.upsertImpegnoPersonale(storage, lista, base);
++  assert.equal(risultato.ok, true);
++  lista = risultato.impegni;
++  risultato = await agenda.upsertImpegnoPersonale(storage, lista, { ...base, titolo: 'Dentista controllo' });
++  lista = risultato.impegni;
++  assert.equal(lista.length, 1);
++  assert.equal(lista[0].titolo, 'Dentista controllo');
++
++  risultato = await agenda.upsertImpegnoPersonale(storage, lista, { ...base, id: 'b', titolo: 'Palestra', inizio: '20:00' });
++  lista = risultato.impegni;
++  assert.equal(agenda.impegniDelGiorno(lista, 2026, 10, 3).length, 2);
++  assert.equal((await agenda.caricaImpegniPersonali(storage)).length, 2);
++  lista = await agenda.rimuoviImpegnoPersonale(storage, lista, 'a');
++  assert.equal(lista.length, 1);
++
++  const chiamate = { cancellate: [], programmate: [] };
++  const Notifications = {
++    SchedulableTriggerInputTypes: { DATE: 'date' }, AndroidImportance: { DEFAULT: 3 },
++    async getPermissionsAsync() { return { status: 'granted' }; },
++    async requestPermissionsAsync() { return { status: 'granted' }; },
++    async setNotificationChannelAsync() {},
++    async cancelScheduledNotificationAsync(id) { chiamate.cancellate.push(id); },
++    async scheduleNotificationAsync(payload) { chiamate.programmate.push(payload); return `n-${chiamate.programmate.length}`; },
++  };
++  const promemoria = caricaModulo('promemoriaPersonali.js', [
++    'dataInizioImpegno', 'calcolaDatePromemoria', 'cancellaPromemoriaImpegno',
++    'programmaPromemoriaImpegno', 'etichettaPromemoria',
++  ], { Notifications });
++
++  const evento = { ...base, notificationIds: ['vecchio-1'] };
++  const date = promemoria.calcolaDatePromemoria(evento, new Date(2026, 9, 1, 12, 0));
++  assert.equal(date.length, 2);
++  assert.equal(date[1].data.getTime(), new Date(2026, 9, 3, 16, 30).getTime());
++  const ids = await promemoria.programmaPromemoriaImpegno(evento, new Date(2026, 9, 1, 12, 0));
++  assert.deepEqual(chiamate.cancellate, ['vecchio-1']);
++  assert.deepEqual(Array.from(ids), ['n-1', 'n-2']);
++  assert.equal(chiamate.programmate.length, 2);
++
++  console.log('OK agenda personale: modello, persistenza e promemoria');
++})().catch((error) => { console.error(error); process.exitCode = 1; });
