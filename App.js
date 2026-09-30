@@ -50,6 +50,7 @@ import {
   stimaNettoFiduciariDaProfilo,
   calibraProfiloFiscaleFiduciari,
 } from './fiduciariEconomia';
+import { costruisciInputEconomiaFiduciari } from './fiduciariIntegrazione';
 import { supabase } from './supabase';
 import {
   creaProfiloVuoto,
@@ -5790,15 +5791,13 @@ const totaleCompetenzeStimate = vociCompetenzeGpg.totale;
     },
   ];
 
-  const economiaFiduciario = calcolaEconomiaFiduciari({
+  const inputEconomiaFiduciario = costruisciInputEconomiaFiduciari({
     anno,
     mese: mese + 1,
     livello: livelloFiduciarioCorrente,
     oreSettimanali: stipendioOreSettimanali,
-    pagaBasePersonalizzata:
-      stipendioProfiloCalcolo === 'personalizzato'
-        ? lordoBaseFiduciarioPersonalizzatoNumero
-        : 0,
+    profiloCalcolo: stipendioProfiloCalcolo,
+    pagaBasePersonalizzata: lordoBaseFiduciarioPersonalizzatoNumero,
     scattiAnzianita: stipendioScattiAnzianitaFiduciario,
     superminimo: stipendioSuperminimoFiduciario,
     riepilogoOre: riepilogoOreFiduciario,
@@ -5816,6 +5815,10 @@ const totaleCompetenzeStimate = vociCompetenzeGpg.totale;
     },
     vociManuali: vociManualiFiduciario,
   });
+
+  const economiaFiduciario = calcolaEconomiaFiduciari(
+    inputEconomiaFiduciario
+  );
 
   const lordoBaseFiduciario = economiaFiduciario.pagaBase;
   const pagaOrariaFiduciario = economiaFiduciario.pagaOraria;
