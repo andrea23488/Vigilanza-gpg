@@ -10695,7 +10695,7 @@ if (screen === 'colleghi') {
               {
                 app: Number(oreNotturneMese || 0),
                 ced: cedolinoNotturno,
-                tariffa: tariffaPiantonamentoNotturno,
+                tariffa: null,
               },
               {
                 app: Number(oreFestiveMese || 0),
@@ -10954,7 +10954,7 @@ if (screen === 'colleghi') {
                 app: Number(oreNotturneMese || 0),
                 value: cedolinoNotturno,
                 setValue: setCedolinoNotturno,
-                tariffa: tariffaPiantonamentoNotturno,
+                tariffa: null,
               },
               {
                 label: 'FESTIVI',
