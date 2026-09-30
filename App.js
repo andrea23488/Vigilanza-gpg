@@ -111,6 +111,20 @@ import * as ImagePicker from 'expo-image-picker';
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
+  caricaImpegniPersonali,
+  impegniDelGiorno,
+  rimuoviImpegnoPersonale,
+  upsertImpegnoPersonale,
+} from './agendaPersonale';
+import {
+  cancellaPromemoriaImpegno,
+  programmaPromemoriaImpegno,
+} from './promemoriaPersonali';
+import {
+  ImpegnoPersonaleModal,
+  SceltaAgendaModal,
+} from './AgendaPersonaleModal';
+import {
   getIsPaired,
   getIsWatchAppInstalled,
   updateApplicationContext,
@@ -746,6 +760,17 @@ export default function App() {
   const [erroreBiometria, setErroreBiometria] = useState('');
   const richiestaBiometriaRef = useRef(false);
   const [screen, setScreen] = useState("home");
+
+  // Agenda personale: separata dai turni di lavoro.
+  const [impegniPersonali, setImpegniPersonali] = useState([]);
+  const [filtroAgenda, setFiltroAgenda] = useState('tutto');
+  const [giornoAgendaSelezionato, setGiornoAgendaSelezionato] =
+    useState(() => new Date().getDate());
+  const [sceltaAgendaVisibile, setSceltaAgendaVisibile] = useState(false);
+  const [editorPersonaleVisibile, setEditorPersonaleVisibile] = useState(false);
+  const [impegnoPersonaleInModifica, setImpegnoPersonaleInModifica] =
+    useState(null);
+
   const [schedaPostoLuogo, setSchedaPostoLuogo] = useState('');
   const passatempoScrollRef = React.useRef(null);
   const editScreenScrollRef = React.useRef(null);
@@ -759,6 +784,30 @@ export default function App() {
   const tornaSuRef = useRef(null);
   const watchUserIdRef = useRef(null);
   const [mostraTornaSu, setMostraTornaSu] = useState(false);
+
+  useEffect(() => {
+    let attivo = true;
+
+    caricaImpegniPersonali(
+      AsyncStorage,
+      utenteAutenticato?.id || 'locale'
+    )
+      .then((lista) => {
+        if (attivo) {
+          setImpegniPersonali(lista);
+        }
+      })
+      .catch((error) => {
+        console.log('Errore caricamento agenda personale:', error);
+        if (attivo) {
+          setImpegniPersonali([]);
+        }
+      });
+
+    return () => {
+      attivo = false;
+    };
+  }, [utenteAutenticato?.id]);
 
   useEffect(() => {
     let attivo = true;
@@ -7342,19 +7391,146 @@ console.log("🕒 ORA REALE:", new Date().toString());
     setScreen('edit');
   }
 
-  function apriGiornoCalendario(g, recordsGiorno = []) {
-    const presenti = Array.isArray(recordsGiorno)
-      ? recordsGiorno
-      : [];
+  function apriGiornoCalendario(g) {
+    setGiorno(Number(g));
+    setGiornoAgendaSelezionato(Number(g));
+  }
 
-    if (presenti.length === 0) {
-      nuovoGiorno(g);
+  function apriSceltaAgenda(g = giornoAgendaSelezionato) {
+    setGiorno(Number(g));
+    setGiornoAgendaSelezionato(Number(g));
+    setSceltaAgendaVisibile(true);
+  }
+
+  function nuovoImpegnoPersonale(g = giornoAgendaSelezionato) {
+    setSceltaAgendaVisibile(false);
+    setImpegnoPersonaleInModifica(null);
+    setGiorno(Number(g));
+    setGiornoAgendaSelezionato(Number(g));
+    setEditorPersonaleVisibile(true);
+  }
+
+  function modificaImpegnoPersonale(evento) {
+    if (!evento) return;
+
+    setGiorno(Number(evento.giorno));
+    setGiornoAgendaSelezionato(Number(evento.giorno));
+    setImpegnoPersonaleInModifica(evento);
+    setEditorPersonaleVisibile(true);
+  }
+
+  async function salvaImpegnoPersonale(input) {
+    const precedente = impegnoPersonaleInModifica;
+    const base = precedente
+      ? { ...precedente, ...input }
+      : input;
+
+    // In modifica eliminiamo prima i vecchi reminder:
+    // evita notifiche duplicate dopo cambio ora/promemoria.
+    if (precedente) {
+      try {
+        await cancellaPromemoriaImpegno(precedente);
+      } catch (error) {
+        console.warn(
+          'Agenda personale: impossibile cancellare i vecchi promemoria.',
+          error
+        );
+      }
+    }
+
+    const risultato = await upsertImpegnoPersonale(
+      AsyncStorage,
+      impegniPersonali,
+      base,
+      utenteAutenticato?.id || 'locale'
+    );
+
+    if (!risultato.ok) {
+      Alert.alert(
+        'Impegno non salvato',
+        risultato.errori[0] || 'Controlla i dati inseriti.'
+      );
       return;
     }
 
-    setGiorno(Number(g));
-    setEditingId(null);
-    setScreen('giornoTurni');
+    let eventoSalvato = risultato.evento;
+
+    try {
+      const notificationIds =
+        await programmaPromemoriaImpegno(eventoSalvato);
+
+      const aggiornato = await upsertImpegnoPersonale(
+        AsyncStorage,
+        risultato.impegni,
+        {
+          ...eventoSalvato,
+          notificationIds,
+        },
+        utenteAutenticato?.id || 'locale'
+      );
+
+      if (aggiornato.ok) {
+        eventoSalvato = aggiornato.evento;
+        setImpegniPersonali(aggiornato.impegni);
+      } else {
+        setImpegniPersonali(risultato.impegni);
+      }
+    } catch (error) {
+      console.warn(
+        'Agenda personale: promemoria non programmato.',
+        error
+      );
+
+      setImpegniPersonali(risultato.impegni);
+
+      Alert.alert(
+        'Impegno salvato',
+        'L’impegno è stato salvato, ma il promemoria non è stato programmato.'
+      );
+    }
+
+    setGiorno(Number(eventoSalvato.giorno));
+    setGiornoAgendaSelezionato(Number(eventoSalvato.giorno));
+    setImpegnoPersonaleInModifica(null);
+    setEditorPersonaleVisibile(false);
+  }
+
+  function eliminaImpegnoPersonaleConConferma(evento) {
+    Alert.alert(
+      'Elimina impegno',
+      `Vuoi eliminare “${evento?.titolo || 'questo impegno'}”?`,
+      [
+        {
+          text: 'Annulla',
+          style: 'cancel',
+        },
+        {
+          text: 'Elimina',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await cancellaPromemoriaImpegno(evento);
+            } catch (error) {
+              console.warn(
+                'Agenda personale: errore cancellazione promemoria.',
+                error
+              );
+            }
+
+            const prossimi = await rimuoviImpegnoPersonale(
+              AsyncStorage,
+              impegniPersonali,
+              evento.id,
+              utenteAutenticato?.id || 'locale'
+            );
+
+            setImpegniPersonali(prossimi);
+            setImpegnoPersonaleInModifica(null);
+            setEditorPersonaleVisibile(false);
+          },
+        },
+      ]
+    );
   }
 
   function modificaGiorno(
@@ -7758,6 +7934,7 @@ console.log("🕒 ORA REALE:", new Date().toString());
   }
   function mesePrecedente() {
     setEditingId(null);
+    setGiornoAgendaSelezionato(1);
 
     if (
       mese === 0
@@ -7778,6 +7955,7 @@ console.log("🕒 ORA REALE:", new Date().toString());
 
   function meseSuccessivo() {
     setEditingId(null);
+    setGiornoAgendaSelezionato(1);
 
     if (
       mese === 11
@@ -7800,6 +7978,7 @@ console.log("🕒 ORA REALE:", new Date().toString());
     const oggiReale = new Date();
 
     setEditingId(null);
+    setGiornoAgendaSelezionato(oggiReale.getDate());
     setMese(oggiReale.getMonth());
     setAnno(oggiReale.getFullYear());
     setScreen('home');
@@ -25873,185 +26052,576 @@ if (screen === 'profiloCollega') {
     screen ===
     'calendar'
   ) {
+    const impegniMese = impegniPersonali.filter(
+      (x) =>
+        Number(x.anno) === Number(anno) &&
+        Number(x.mese) === Number(mese + 1)
+    );
+
+    const turniGiornoAgenda = turniMese
+      .filter(
+        (t) =>
+          Number(t.giorno) ===
+          Number(giornoAgendaSelezionato)
+      )
+      .map((record) => ({
+        tipoAgenda: 'lavoro',
+        record,
+        ordine:
+          record.tipo === 'turno'
+            ? record.inizio || '00:00'
+            : '00:00',
+      }));
+
+    const personaliGiornoAgenda = impegniDelGiorno(
+      impegniPersonali,
+      anno,
+      mese + 1,
+      giornoAgendaSelezionato
+    ).map((evento) => ({
+      tipoAgenda: 'personale',
+      evento,
+      ordine:
+        evento.tuttoIlGiorno
+          ? '00:00'
+          : evento.inizio || '23:59',
+    }));
+
+    const timelineAgenda = [
+      ...(filtroAgenda === 'personale'
+        ? []
+        : turniGiornoAgenda),
+      ...(filtroAgenda === 'lavoro'
+        ? []
+        : personaliGiornoAgenda),
+    ].sort((a, b) =>
+      String(a.ordine).localeCompare(
+        String(b.ordine)
+      )
+    );
+
     return (
       <Screen>
-        <Back
-          onPress={
-            tornaHome
-          }
-        />
+        <Back onPress={tornaHome} />
 
-        <Text
-          style={
-            styles.title
-          }
-        >
-          Calendario
+        <Text style={styles.title}>
+          Agenda
         </Text>
 
-        <Text
-          style={
-            styles.subtitle
-          }
-        >
-          Tocca un giorno per inserire il servizio
+        <Text style={styles.subtitle}>
+          Lavoro e vita personale, in un solo calendario
         </Text>
 
-        <View
-          style={
-            styles.monthBox
-          }
-        >
+        <View style={styles.monthBox}>
           <TouchableOpacity
-            onPress={
-              mesePrecedente
-            }
+            onPress={mesePrecedente}
           >
-            <Text
-              style={
-                styles.arrow
-              }
-            >
+            <Text style={styles.arrow}>
               ‹
             </Text>
           </TouchableOpacity>
 
           <View>
-            <Text
-              style={
-                styles.month
-              }
-            >
+            <Text style={styles.month}>
               {MESI[mese]}
             </Text>
 
-            <Text
-              style={
-                styles.year
-              }
-            >
+            <Text style={styles.year}>
               {anno}
             </Text>
           </View>
 
           <TouchableOpacity
-            onPress={
-              meseSuccessivo
-            }
+            onPress={meseSuccessivo}
           >
-            <Text
-              style={
-                styles.arrow
-              }
-            >
+            <Text style={styles.arrow}>
               ›
             </Text>
           </TouchableOpacity>
         </View>
 
-        <Calendar
-          anno={
-            anno
-          }
-          mese={
-            mese
-          }
-          records={
-            turniMese
-          }
-          onPress={(
-            g,
-            recordsGiorno
-          ) => {
-            apriGiornoCalendario(g, recordsGiorno);
+        {/* FILTRI AGENDA */}
+        <View
+          style={{
+            flexDirection: 'row',
+            backgroundColor: '#0B1930',
+            borderRadius: 16,
+            padding: 4,
+            marginBottom: 12,
+            borderWidth: 1,
+            borderColor: '#203755',
           }}
+        >
+          {[
+            ['tutto', 'Tutto'],
+            ['lavoro', 'Lavoro'],
+            ['personale', 'Personale'],
+          ].map(([id, label]) => {
+            const attivo =
+              filtroAgenda === id;
+
+            return (
+              <TouchableOpacity
+                key={id}
+                activeOpacity={0.82}
+                onPress={() =>
+                  setFiltroAgenda(id)
+                }
+                style={{
+                  flex: 1,
+                  minHeight: 38,
+                  borderRadius: 12,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  backgroundColor: attivo
+                    ? id === 'personale'
+                      ? 'rgba(130,91,190,0.48)'
+                      : 'rgba(40,126,158,0.42)'
+                    : 'transparent',
+                  borderWidth:
+                    attivo ? 1 : 0,
+                  borderColor:
+                    id === 'personale'
+                      ? '#B68CFF'
+                      : '#5CEAFF',
+                }}
+              >
+                <Text
+                  style={{
+                    color: attivo
+                      ? '#FFFFFF'
+                      : '#7F96B5',
+                    fontSize: 11,
+                    fontWeight: '900',
+                  }}
+                >
+                  {label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+
+        <Calendar
+          anno={anno}
+          mese={mese}
+          records={turniMese}
+          impegniPersonali={impegniMese}
+          filtroAgenda={filtroAgenda}
+          giornoSelezionato={
+            giornoAgendaSelezionato
+          }
+          onPress={(g) =>
+            apriGiornoCalendario(g)
+          }
         />
 
-      <View
-        style={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          backgroundColor: '#09172A',
-          borderWidth: 1,
-          borderColor: '#1D3558',
-          borderRadius: 18,
-          paddingVertical: 10,
-          paddingHorizontal: 10,
-          marginTop: 10,
-          marginBottom: 14,
-        }}
-      >
-        <View style={{ alignItems: 'center', flex: 1 }}>
-          <Ionicons name="sunny" size={16} color="#20EDF2" />
-          <Text style={{
-            color: '#AFC0D7',
-            fontSize: 8,
-            fontWeight: '800',
-            marginTop: 3
-          }}>
-            Mattina
-          </Text>
-        </View>
+        {/* LEGENDA */}
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            marginTop: 10,
+            marginBottom: 14,
+            gap: 18,
+          }}
+        >
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+            }}
+          >
+            <View
+              style={{
+                width: 8,
+                height: 8,
+                borderRadius: 4,
+                backgroundColor: '#5CEAFF',
+                marginRight: 6,
+              }}
+            />
 
-        <View style={{ alignItems: 'center', flex: 1 }}>
-          <Ionicons name="sunny-outline" size={16} color="#FF9D3D" />
-          <Text style={{
-            color: '#AFC0D7',
-            fontSize: 8,
-            fontWeight: '800',
-            marginTop: 3
-          }}>
-            Serale
-          </Text>
-        </View>
-
-        <View style={{ alignItems: 'center', flex: 1 }}>
-          <Ionicons name="moon" size={15} color="#A77CFF" />
-          <Text style={{
-            color: '#AFC0D7',
-            fontSize: 8,
-            fontWeight: '800',
-            marginTop: 3
-          }}>
-            Notturno
-          </Text>
-        </View>
-
-        <View style={{ alignItems: 'center', flex: 1 }}>
-          <View style={{
-            backgroundColor: '#2B3B57',
-            borderRadius: 8,
-            paddingHorizontal: 5,
-            paddingVertical: 2,
-          }}>
-            <Text style={{
-              color: '#D0DCF0',
-              fontSize: 8,
-              fontWeight: '900'
-            }}>
-              RIP
+            <Text
+              style={{
+                color: '#8FA5CC',
+                fontSize: 10,
+                fontWeight: '800',
+              }}
+            >
+              Lavoro
             </Text>
           </View>
 
-          <Text style={{
-            color: '#AFC0D7',
-            fontSize: 8,
-            fontWeight: '800',
-            marginTop: 3
-          }}>
-            Riposo
-          </Text>
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+            }}
+          >
+            <View
+              style={{
+                width: 8,
+                height: 8,
+                borderRadius: 4,
+                backgroundColor: '#B68CFF',
+                marginRight: 6,
+              }}
+            />
+
+            <Text
+              style={{
+                color: '#8FA5CC',
+                fontSize: 10,
+                fontWeight: '800',
+              }}
+            >
+              Personale
+            </Text>
+          </View>
         </View>
-      </View>
 
-
-
+        {/* TIMELINE GIORNALIERA */}
         <View
-          style={
-            styles.stats
-          }
+          style={{
+            backgroundColor: '#09172A',
+            borderWidth: 1,
+            borderColor: '#203755',
+            borderRadius: 22,
+            padding: 14,
+            marginBottom: 14,
+          }}
         >
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              marginBottom: 12,
+            }}
+          >
+            <View style={{ flex: 1 }}>
+              <Text
+                style={{
+                  color: '#FFFFFF',
+                  fontSize: 16,
+                  fontWeight: '900',
+                }}
+              >
+                {giornoAgendaSelezionato}{' '}
+                {MESI[mese]}
+              </Text>
+
+              <Text
+                style={{
+                  color: '#738AA8',
+                  fontSize: 10,
+                  fontWeight: '800',
+                  marginTop: 3,
+                }}
+              >
+                TIMELINE DELLA GIORNATA
+              </Text>
+            </View>
+
+            <TouchableOpacity
+              activeOpacity={0.82}
+              onPress={() =>
+                apriSceltaAgenda(
+                  giornoAgendaSelezionato
+                )
+              }
+              style={{
+                width: 42,
+                height: 42,
+                borderRadius: 14,
+                alignItems: 'center',
+                justifyContent: 'center',
+                backgroundColor:
+                  'rgba(92,234,255,0.12)',
+                borderWidth: 1,
+                borderColor:
+                  'rgba(92,234,255,0.46)',
+              }}
+            >
+              <Ionicons
+                name="add"
+                size={25}
+                color="#69E7FF"
+              />
+            </TouchableOpacity>
+          </View>
+
+          {timelineAgenda.length === 0 ? (
+            <View
+              style={{
+                paddingVertical: 22,
+                alignItems: 'center',
+              }}
+            >
+              <Ionicons
+                name="calendar-outline"
+                size={25}
+                color="#617895"
+              />
+
+              <Text
+                style={{
+                  color: '#FFFFFF',
+                  fontSize: 13,
+                  fontWeight: '900',
+                  marginTop: 8,
+                }}
+              >
+                Giornata libera
+              </Text>
+
+              <Text
+                style={{
+                  color: '#7187A5',
+                  fontSize: 10,
+                  marginTop: 4,
+                  textAlign: 'center',
+                }}
+              >
+                Aggiungi un turno o un impegno personale
+              </Text>
+            </View>
+          ) : (
+            timelineAgenda.map((item) => {
+              if (
+                item.tipoAgenda ===
+                'lavoro'
+              ) {
+                const record =
+                  item.record;
+
+                return (
+                  <TouchableOpacity
+                    key={`lavoro-${record.id}`}
+                    activeOpacity={0.82}
+                    onPress={() =>
+                      modificaGiorno(record)
+                    }
+                    style={{
+                      minHeight: 66,
+                      borderRadius: 17,
+                      padding: 12,
+                      marginBottom: 8,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      backgroundColor:
+                        'rgba(17,54,72,0.58)',
+                      borderWidth: 1,
+                      borderColor:
+                        'rgba(92,234,255,0.30)',
+                    }}
+                  >
+                    <View
+                      style={{
+                        width: 38,
+                        height: 38,
+                        borderRadius: 13,
+                        alignItems: 'center',
+                        justifyContent:
+                          'center',
+                        backgroundColor:
+                          'rgba(92,234,255,0.10)',
+                      }}
+                    >
+                      <Ionicons
+                        name="shield-checkmark-outline"
+                        size={19}
+                        color="#69E7FF"
+                      />
+                    </View>
+
+                    <View
+                      style={{
+                        flex: 1,
+                        marginLeft: 11,
+                      }}
+                    >
+                      <Text
+                        style={{
+                          color: '#74E7F4',
+                          fontSize: 11,
+                          fontWeight: '900',
+                        }}
+                      >
+                        {record.tipo ===
+                        'turno'
+                          ? `${formattaOra(
+                              record.inizio
+                            )}–${formattaOra(
+                              record.fine
+                            )}`
+                          : nomeTipo(
+                              record.tipo
+                            )}
+                      </Text>
+
+                      <Text
+                        numberOfLines={1}
+                        style={{
+                          color: '#FFFFFF',
+                          fontSize: 13,
+                          fontWeight: '800',
+                          marginTop: 3,
+                        }}
+                      >
+                        {record.tipo ===
+                        'turno'
+                          ? record.indirizzo_servizio ||
+                            record.luogo ||
+                            'Servizio'
+                          : nomeTipo(
+                              record.tipo
+                            )}
+                      </Text>
+                    </View>
+
+                    <Ionicons
+                      name="chevron-forward"
+                      size={18}
+                      color="#5CEAFF"
+                    />
+                  </TouchableOpacity>
+                );
+              }
+
+              const evento =
+                item.evento;
+
+              return (
+                <TouchableOpacity
+                  key={`personale-${evento.id}`}
+                  activeOpacity={0.82}
+                  onPress={() =>
+                    modificaImpegnoPersonale(
+                      evento
+                    )
+                  }
+                  style={{
+                    minHeight: 66,
+                    borderRadius: 17,
+                    padding: 12,
+                    marginBottom: 8,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    backgroundColor:
+                      'rgba(67,43,102,0.60)',
+                    borderWidth: 1,
+                    borderColor:
+                      'rgba(182,140,255,0.36)',
+                  }}
+                >
+                  <View
+                    style={{
+                      width: 38,
+                      height: 38,
+                      borderRadius: 13,
+                      alignItems: 'center',
+                      justifyContent:
+                        'center',
+                      backgroundColor:
+                        'rgba(182,140,255,0.12)',
+                    }}
+                  >
+                    <Ionicons
+                      name="calendar-outline"
+                      size={19}
+                      color="#CDB2FF"
+                    />
+                  </View>
+
+                  <View
+                    style={{
+                      flex: 1,
+                      marginLeft: 11,
+                    }}
+                  >
+                    <Text
+                      style={{
+                        color: '#CDB2FF',
+                        fontSize: 11,
+                        fontWeight: '900',
+                      }}
+                    >
+                      {evento.tuttoIlGiorno
+                        ? 'TUTTO IL GIORNO'
+                        : `${evento.inizio}${
+                            evento.fine
+                              ? `–${evento.fine}`
+                              : ''
+                          }`}
+                    </Text>
+
+                    <Text
+                      numberOfLines={1}
+                      style={{
+                        color: '#FFFFFF',
+                        fontSize: 13,
+                        fontWeight: '800',
+                        marginTop: 3,
+                      }}
+                    >
+                      {evento.titolo}
+                      {evento.luogo
+                        ? ` · ${evento.luogo}`
+                        : ''}
+                    </Text>
+                  </View>
+
+                  <Ionicons
+                    name="chevron-forward"
+                    size={18}
+                    color="#CDB2FF"
+                  />
+                </TouchableOpacity>
+              );
+            })
+          )}
+        </View>
+
+        <TouchableOpacity
+          activeOpacity={0.84}
+          onPress={() =>
+            apriSceltaAgenda(
+              giornoAgendaSelezionato
+            )
+          }
+          style={{
+            minHeight: 52,
+            borderRadius: 18,
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: '#102743',
+            borderWidth: 1,
+            borderColor: '#2E587F',
+            marginBottom: 14,
+          }}
+        >
+          <Ionicons
+            name="add-circle-outline"
+            size={20}
+            color="#69E7FF"
+          />
+
+          <Text
+            style={{
+              color: '#FFFFFF',
+              fontSize: 12,
+              fontWeight: '900',
+              marginLeft: 8,
+            }}
+          >
+            AGGIUNGI ALLA GIORNATA
+          </Text>
+        </TouchableOpacity>
+
+        {/* LE STATISTICHE LAVORATIVE RESTANO INVARIATE */}
+        <View style={styles.stats}>
           <Stat
             label="ORE"
             value={`${statistiche.ore}h`}
@@ -26069,21 +26639,68 @@ if (screen === 'profiloCollega') {
         </View>
 
         <TouchableOpacity
-          style={
-            styles.syncButton
-          }
+          style={styles.syncButton}
           onPress={() =>
             caricaTurni()
           }
         >
-          <Text
-            style={
-              styles.syncText
-            }
-          >
+          <Text style={styles.syncText}>
             ↻ Aggiorna calendario
           </Text>
         </TouchableOpacity>
+
+        <SceltaAgendaModal
+          visible={
+            sceltaAgendaVisibile
+          }
+          onClose={() =>
+            setSceltaAgendaVisibile(
+              false
+            )
+          }
+          onTurno={() => {
+            setSceltaAgendaVisibile(
+              false
+            );
+            nuovoGiorno(
+              giornoAgendaSelezionato
+            );
+          }}
+          onPersonale={() =>
+            nuovoImpegnoPersonale(
+              giornoAgendaSelezionato
+            )
+          }
+        />
+
+        <ImpegnoPersonaleModal
+          visible={
+            editorPersonaleVisibile
+          }
+          evento={
+            impegnoPersonaleInModifica
+          }
+          dataDefault={{
+            anno,
+            mese: mese + 1,
+            giorno:
+              giornoAgendaSelezionato,
+          }}
+          onClose={() => {
+            setEditorPersonaleVisibile(
+              false
+            );
+            setImpegnoPersonaleInModifica(
+              null
+            );
+          }}
+          onSave={
+            salvaImpegnoPersonale
+          }
+          onDelete={
+            eliminaImpegnoPersonaleConConferma
+          }
+        />
       </Screen>
     );
   }
@@ -30165,21 +30782,22 @@ function Calendar({
   anno,
   mese,
   records,
+  impegniPersonali = [],
+  filtroAgenda = 'tutto',
+  giornoSelezionato = null,
   onPress,
 }) {
-  const giorni =
-    new Date(
-      anno,
-      mese + 1,
-      0
-    ).getDate();
+  const giorni = new Date(
+    anno,
+    mese + 1,
+    0
+  ).getDate();
 
-  let primo =
-    new Date(
-      anno,
-      mese,
-      1
-    ).getDay();
+  let primo = new Date(
+    anno,
+    mese,
+    1
+  ).getDay();
 
   primo =
     primo === 0
@@ -30188,33 +30806,78 @@ function Calendar({
 
   const celle = [];
 
-  for (
-    let i = 0;
-    i < primo;
-    i++
-  ) {
+  for (let i = 0; i < primo; i++) {
     celle.push(null);
   }
 
-  for (
-    let i = 1;
-    i <= giorni;
-    i++
-  ) {
+  for (let i = 1; i <= giorni; i++) {
     celle.push(i);
   }
 
-  return (
-    <View
-      style={
-        styles.calendar
+  const oggiCalendario = new Date();
+
+  const prossimiTurni = records
+    .filter((r) => {
+      if (
+        r.tipo !== 'turno' ||
+        !r.inizio
+      ) {
+        return false;
       }
-    >
-      <View
-        style={
-          styles.week
-        }
-      >
+
+      const [h, m] = String(r.inizio)
+        .split(':')
+        .map(Number);
+
+      const dataTurno = new Date(
+        anno,
+        mese,
+        Number(r.giorno),
+        h,
+        m,
+        0
+      );
+
+      return dataTurno > oggiCalendario;
+    })
+    .sort((a, b) => {
+      const [ha, ma] = String(a.inizio)
+        .split(':')
+        .map(Number);
+
+      const [hb, mb] = String(b.inizio)
+        .split(':')
+        .map(Number);
+
+      const da = new Date(
+        anno,
+        mese,
+        Number(a.giorno),
+        ha,
+        ma,
+        0
+      );
+
+      const db = new Date(
+        anno,
+        mese,
+        Number(b.giorno),
+        hb,
+        mb,
+        0
+      );
+
+      return da - db;
+    });
+
+  const prossimoTurno =
+    prossimiTurni.length > 0
+      ? prossimiTurni[0]
+      : null;
+
+  return (
+    <View style={styles.calendar}>
+      <View style={styles.week}>
         {[
           'L',
           'M',
@@ -30223,67 +30886,72 @@ function Calendar({
           'V',
           'S',
           'D',
-        ].map(
-          (
-            d,
-            index
-          ) => (
-            <Text
-              key={`week-${index}`}
-              style={
-                styles.weekText
-              }
-            >
-              {d}
-            </Text>
-          )
-        )}
+        ].map((d, index) => (
+          <Text
+            key={`week-${index}`}
+            style={styles.weekText}
+          >
+            {d}
+          </Text>
+        ))}
       </View>
 
-      <View
-        style={
-          styles.grid
-        }
-      >
-        {celle.map(
-          (
-            day,
-            index
-          ) => {
-            if (!day) {
-              return (
-                <View
-                  key={`vuoto-${index}`}
-                  style={
-                    styles.calendarDay
-                  }
-                />
-              );
-            }
+      <View style={styles.grid}>
+        {celle.map((day, index) => {
+          if (!day) {
+            return (
+              <View
+                key={`vuoto-${index}`}
+                style={styles.calendarDay}
+              />
+            );
+          }
 
-            const recordsGiorno =
-              records.filter(
-                (r) =>
-                  Number(
-                    r.giorno
-                  ) ===
-                  Number(
-                    day
-                  )
-              ).sort((a, b) =>
-                String(a?.inizio || '99:99').localeCompare(
-                  String(b?.inizio || '99:99')
+          const recordsGiorno = records
+            .filter(
+              (r) =>
+                Number(r.giorno) ===
+                Number(day)
+            )
+            .sort((a, b) =>
+              String(
+                a?.inizio || '99:99'
+              ).localeCompare(
+                String(
+                  b?.inizio || '99:99'
                 )
-              );
+              )
+            );
 
-            const record =
-              recordsGiorno.find((r) => r.tipo === 'turno') ||
-              recordsGiorno[0] ||
-              null;
+          const personaliGiorno =
+            impegniPersonali.filter(
+              (x) =>
+                Number(x.giorno) ===
+                Number(day)
+            );
 
-            const tipoRiposo =
-            !record ||
-            record.tipo === 'riposo';
+          const mostraLavoro =
+            filtroAgenda !==
+              'personale' &&
+            recordsGiorno.length > 0;
+
+          const mostraPersonale =
+            filtroAgenda !==
+              'lavoro' &&
+            personaliGiorno.length > 0;
+
+          const record =
+            mostraLavoro
+              ? recordsGiorno.find(
+                  (r) =>
+                    r.tipo === 'turno'
+                ) ||
+                recordsGiorno[0] ||
+                null
+              : null;
+
+          const tipoRiposo =
+            record?.tipo === 'riposo';
 
           const tipoFerie =
             record?.tipo === 'ferie';
@@ -30328,14 +30996,19 @@ function Calendar({
 
           const oraInizio =
             record?.inizio
-              ? Number(String(record.inizio).split(':')[0])
+              ? Number(
+                  String(
+                    record.inizio
+                  ).split(':')[0]
+                )
               : null;
 
           const turnoNotte =
             record &&
             record.tipo === 'turno' &&
             oraInizio !== null &&
-            (oraInizio >= 20 || oraInizio < 5);
+            (oraInizio >= 20 ||
+              oraInizio < 5);
 
           const turnoMattina =
             record &&
@@ -30386,71 +31059,37 @@ function Calendar({
               ? 'sunny-outline'
               : null;
 
-          const oggiCalendario = new Date();
-
           const eOggi =
-            Number(day) === oggiCalendario.getDate() &&
-            Number(mese) === oggiCalendario.getMonth() &&
-            Number(anno) === oggiCalendario.getFullYear();
+            Number(day) ===
+              oggiCalendario.getDate() &&
+            Number(mese) ===
+              oggiCalendario.getMonth() &&
+            Number(anno) ===
+              oggiCalendario.getFullYear();
 
-          const prossimiTurni = records
-            .filter((r) => {
-              if (
-                r.tipo !== 'turno' ||
-                !r.inizio
-              ) {
-                return false;
-              }
-
-              const [h, m] = String(r.inizio)
-                .split(':')
-                .map(Number);
-
-              const dataTurno = new Date(
-                anno,
-                mese,
-                Number(r.giorno),
-                h,
-                m,
-                0
-              );
-
-              return dataTurno > oggiCalendario;
-            })
-            .sort((a, b) => {
-              const [ha, ma] = String(a.inizio).split(':').map(Number);
-              const [hb, mb] = String(b.inizio).split(':').map(Number);
-
-              const da = new Date(
-                anno,
-                mese,
-                Number(a.giorno),
-                ha,
-                ma,
-                0
-              );
-
-              const db = new Date(
-                anno,
-                mese,
-                Number(b.giorno),
-                hb,
-                mb,
-                0
-              );
-
-              return da - db;
-            });
-
-          const prossimoTurno =
-            prossimiTurni.length > 0
-              ? prossimiTurni[0]
-              : null;
+          const eSelezionato =
+            Number(day) ===
+            Number(giornoSelezionato);
 
           const eProssimo =
             !eOggi &&
             prossimoTurno &&
-            Number(day) === Number(prossimoTurno.giorno);
+            Number(day) ===
+              Number(
+                prossimoTurno.giorno
+              );
+
+          const soloPersonale =
+            mostraPersonale &&
+            !record;
+
+          const totaleElementi =
+            (mostraLavoro
+              ? recordsGiorno.length
+              : 0) +
+            (mostraPersonale
+              ? personaliGiorno.length
+              : 0);
 
           return (
             <TouchableOpacity
@@ -30472,56 +31111,87 @@ function Calendar({
                 style={{
                   flex: 1,
                   borderRadius: 14,
+
                   borderWidth:
-                    eOggi
+                    eSelezionato
                       ? 2.5
+                      : eOggi
+                      ? 2
                       : eProssimo
                       ? 2
                       : 1,
+
                   borderColor:
-                    eOggi
+                    eSelezionato
+                      ? '#FFFFFF'
+                      : eOggi
                       ? '#6FE8FF'
                       : eProssimo
                       ? '#FFD166'
                       : record
                       ? bordo
+                      : soloPersonale
+                      ? '#7651A8'
                       : '#26354D',
+
                   backgroundColor:
-                    eOggi
+                    eSelezionato
+                      ? record
+                        ? sfondo
+                        : soloPersonale
+                        ? '#261C3C'
+                        : '#17314A'
+                      : eOggi
                       ? '#10395A'
                       : eProssimo
                       ? '#3A3018'
                       : record
                       ? sfondo
+                      : soloPersonale
+                      ? '#211832'
                       : '#111D32',
+
                   alignItems: 'center',
                   justifyContent: 'center',
                   paddingHorizontal: 2,
 
                   shadowColor:
-                    eOggi
+                    eSelezionato
+                      ? '#FFFFFF'
+                      : eOggi
                       ? '#5EDBFF'
                       : eProssimo
                       ? '#FFD166'
                       : record
                       ? colore
+                      : soloPersonale
+                      ? '#B68CFF'
                       : '#000000',
+
                   shadowOpacity:
-                    eOggi
-                      ? 0.75
+                    eSelezionato
+                      ? 0.35
+                      : eOggi
+                      ? 0.65
                       : eProssimo
-                      ? 0.50
-                      : record
+                      ? 0.45
+                      : record ||
+                        soloPersonale
                       ? 0.20
                       : 0.04,
+
                   shadowRadius:
-                    eOggi
-                      ? 16
+                    eSelezionato
+                      ? 10
+                      : eOggi
+                      ? 14
                       : eProssimo
-                      ? 12
-                      : record
+                      ? 10
+                      : record ||
+                        soloPersonale
                       ? 7
                       : 2,
+
                   shadowOffset: {
                     width: 0,
                     height: 3,
@@ -30534,7 +31204,10 @@ function Calendar({
                     fontSize: 15,
                     fontWeight: '900',
                     marginBottom:
-                      record ? 4 : 0,
+                      record ||
+                      mostraPersonale
+                        ? 4
+                        : 0,
                   }}
                 >
                   {day}
@@ -30544,7 +31217,8 @@ function Calendar({
                   tipoRiposo ? (
                     <View
                       style={{
-                        backgroundColor: '#2B3B57',
+                        backgroundColor:
+                          '#2B3B57',
                         paddingHorizontal: 6,
                         paddingVertical: 2,
                         borderRadius: 10,
@@ -30563,9 +31237,11 @@ function Calendar({
                   ) : tipoAssenzaSpeciale ? (
                     <View
                       style={{
-                        backgroundColor: 'rgba(90,120,255,0.18)',
+                        backgroundColor:
+                          'rgba(90,120,255,0.18)',
                         borderWidth: 1,
-                        borderColor: 'rgba(130,160,255,0.45)',
+                        borderColor:
+                          'rgba(130,160,255,0.45)',
                         paddingHorizontal: 6,
                         paddingVertical: 2,
                         borderRadius: 10,
@@ -30578,104 +31254,212 @@ function Calendar({
                           fontWeight: '900',
                         }}
                       >
-                        {etichettaAssenzaSpeciale}
+                        {
+                          etichettaAssenzaSpeciale
+                        }
+                      </Text>
+                    </View>
+                  ) : Platform.OS ===
+                    'android' ? (
+                    <View
+                      style={{
+                        width: '94%',
+                        alignItems: 'center',
+                        justifyContent:
+                          'center',
+                        backgroundColor:
+                          'rgba(0,0,0,0.18)',
+                        paddingHorizontal: 1,
+                        paddingVertical: 3,
+                        borderRadius: 8,
+                      }}
+                    >
+                      <Text
+                        numberOfLines={1}
+                        adjustsFontSizeToFit
+                        minimumFontScale={
+                          0.72
+                        }
+                        style={{
+                          width: '100%',
+                          color,
+                          fontSize: 7.5,
+                          fontWeight: '900',
+                          textAlign:
+                            'center',
+                        }}
+                      >
+                        {`${String(
+                          record.inizio ||
+                            ''
+                        ).slice(
+                          0,
+                          2
+                        )}-${String(
+                          record.fine || ''
+                        ).slice(0, 2)}`}
                       </Text>
                     </View>
                   ) : (
-                    Platform.OS === 'android' ? (
+                    <View
+                      style={{
+                        flexDirection:
+                          'row',
+                        alignItems:
+                          'center',
+                        justifyContent:
+                          'center',
+                        backgroundColor:
+                          'rgba(0,0,0,0.18)',
+                        paddingHorizontal: 4,
+                        paddingVertical: 2,
+                        borderRadius: 10,
+                      }}
+                    >
+                      <Ionicons
+                        name={icona}
+                        size={10}
+                        color={colore}
+                        style={{
+                          marginRight: 2,
+                        }}
+                      />
+
                       <View
                         style={{
-                          width: '94%',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          backgroundColor: 'rgba(0,0,0,0.18)',
-                          paddingHorizontal: 1,
-                          paddingVertical: 3,
-                          borderRadius: 8,
+                          alignItems:
+                            'center',
+                          justifyContent:
+                            'center',
                         }}
                       >
                         <Text
-                          numberOfLines={1}
-                          adjustsFontSizeToFit
-                          minimumFontScale={0.72}
                           style={{
-                            width: '100%',
                             color: colore,
-                            fontSize: 7.5,
-                            fontWeight: '900',
-                            textAlign: 'center',
+                            fontSize: 8.5,
+                            fontWeight:
+                              '900',
+                            lineHeight: 10,
                           }}
                         >
-                          {`${String(record.inizio || '').slice(0, 2)}-${String(record.fine || '').slice(0, 2)}`}
+                          {formattaOra(
+                            record.inizio
+                          )}
+                        </Text>
+
+                        <Text
+                          style={{
+                            color: colore,
+                            fontSize: 8,
+                            fontWeight:
+                              '900',
+                            lineHeight: 9,
+                          }}
+                        >
+                          {formattaOra(
+                            record.fine
+                          )}
                         </Text>
                       </View>
-                    ) : (
-                      <View
-                        style={{
-                          flexDirection: 'row',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          backgroundColor: 'rgba(0,0,0,0.18)',
-                          paddingHorizontal: 4,
-                          paddingVertical: 2,
-                          borderRadius: 10,
-                        }}
-                      >
-                        <Ionicons
-                          name={icona}
-                          size={10}
-                          color={colore}
-                          style={{
-                            marginRight: 2,
-                          }}
-                        />
-
-                        <View
-                          style={{
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                          }}
-                        >
-                          <Text
-                            style={{
-                              color: colore,
-                              fontSize: 8.5,
-                              fontWeight: '900',
-                              lineHeight: 10,
-                            }}
-                          >
-                            {formattaOra(record.inizio)}
-                          </Text>
-
-                          <Text
-                            style={{
-                              color: colore,
-                              fontSize: 8,
-                              fontWeight: '900',
-                              lineHeight: 9,
-                            }}
-                          >
-                            {formattaOra(record.fine)}
-                          </Text>
-                        </View>
-                      </View>
-                    )
+                    </View>
                   )
                 )}
 
-                {recordsGiorno.length > 1 && (
+                {soloPersonale && (
                   <View
                     style={{
-                      position: 'absolute',
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      maxWidth: '92%',
+                      backgroundColor:
+                        'rgba(182,140,255,0.13)',
+                      borderWidth: 1,
+                      borderColor:
+                        'rgba(182,140,255,0.34)',
+                      paddingHorizontal: 5,
+                      paddingVertical: 3,
+                      borderRadius: 9,
+                    }}
+                  >
+                    <Ionicons
+                      name="calendar-outline"
+                      size={9}
+                      color="#CDB2FF"
+                    />
+
+                    <Text
+                      numberOfLines={1}
+                      style={{
+                        color: '#CDB2FF',
+                        fontSize: 7.5,
+                        fontWeight: '900',
+                        marginLeft: 2,
+                      }}
+                    >
+                      {personaliGiorno.length >
+                      1
+                        ? `${personaliGiorno.length} IMPEGNI`
+                        : 'IMPEGNO'}
+                    </Text>
+                  </View>
+                )}
+
+                {record &&
+                  mostraPersonale && (
+                    <View
+                      style={{
+                        position:
+                          'absolute',
+                        bottom: 4,
+                        left: 0,
+                        right: 0,
+                        flexDirection:
+                          'row',
+                        justifyContent:
+                          'center',
+                        alignItems:
+                          'center',
+                      }}
+                    >
+                      <View
+                        style={{
+                          width: 7,
+                          height: 7,
+                          borderRadius: 4,
+                          backgroundColor:
+                            '#B68CFF',
+                          borderWidth: 1,
+                          borderColor:
+                            '#E5D6FF',
+                          shadowColor:
+                            '#B68CFF',
+                          shadowOpacity:
+                            0.65,
+                          shadowRadius: 4,
+                        }}
+                      />
+                    </View>
+                  )}
+
+                {totaleElementi > 1 && (
+                  <View
+                    style={{
+                      position:
+                        'absolute',
                       top: 3,
                       right: 3,
                       minWidth: 15,
                       height: 15,
                       paddingHorizontal: 3,
                       borderRadius: 8,
-                      backgroundColor: '#FFFFFF',
-                      alignItems: 'center',
-                      justifyContent: 'center',
+                      backgroundColor:
+                        mostraPersonale
+                          ? '#B68CFF'
+                          : '#FFFFFF',
+                      alignItems:
+                        'center',
+                      justifyContent:
+                        'center',
                     }}
                   >
                     <Text
@@ -30685,15 +31469,14 @@ function Calendar({
                         fontWeight: '900',
                       }}
                     >
-                      {recordsGiorno.length}
+                      {totaleElementi}
                     </Text>
                   </View>
                 )}
               </View>
             </TouchableOpacity>
           );
-          }
-        )}
+        })}
       </View>
     </View>
   );
