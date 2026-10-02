@@ -363,6 +363,50 @@ assert.equal(
   `Netto da profilo Fiduciari errato: atteso ${cedolino.netto}, ottenuto ${nettoDaProfilo.netto}`
 );
 
+
+// Sesto giorno: indennità economica pari al 10% della paga oraria.
+const economiaSestoGiorno = calcolaEconomiaFiduciari({
+  anno: 2026,
+  mese: 8,
+  livello: fixture.configurazioneEconomicaDiagnostica.livello,
+  scattiAnzianita: 0,
+  riepilogoOre: {
+    ore: {
+      fisiche: 8,
+      ordinarie: 8,
+      straordinarie: 0,
+      notturne: 0,
+      domenicali: 0,
+      festive: 0,
+      riposoLavorato: 0,
+      sestoGiorno: 8,
+    },
+    straordinari: {
+      ferialeDiurno25: 0,
+      ferialeDiurno30: 0,
+      ferialeNotturno35: 0,
+      festivoDiurno50: 0,
+      festivoNotturno60: 0,
+      totale: 0,
+    },
+    maggiorazioni: {
+      domenicaleDiurno: 0,
+      domenicaleNotturno: 0,
+      festivoDiurno: 0,
+      festivoNotturno: 0,
+    },
+  },
+});
+
+assert.equal(economiaSestoGiorno.sestoGiorno.ore, 8);
+assert.equal(economiaSestoGiorno.sestoGiorno.percentuale, 10);
+assert.ok(
+  Math.abs(
+    economiaSestoGiorno.sestoGiorno.importo -
+    economiaSestoGiorno.pagaOraria * 8 * 0.10
+  ) < 1e-9
+);
+
 console.log('Regressione motore economico Fiduciari superata', {
   pagaBase: economiaAgosto.arrotondato.pagaBase,
   scatti: economiaAgosto.arrotondato.scattiAnzianita,

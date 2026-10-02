@@ -81,6 +81,84 @@ export function normalizzaVociManuali(voci = []) {
     .filter((voce) => voce.importo > 0);
 }
 
+
+function normalizzaCategorieOre(categorie = {}) {
+  return Object.fromEntries(
+    Object.entries(categorie || {}).map(([categoria, ore]) => [
+      categoria,
+      nonNegativo(ore),
+    ])
+  );
+}
+
+export function normalizzaRiconciliazionePayroll(riconciliazione = null) {
+  if (!riconciliazione || typeof riconciliazione !== 'object') return null;
+
+  const straordinari = riconciliazione.straordinari
+    ? normalizzaCategorieOre(riconciliazione.straordinari)
+    : null;
+
+  const maggiorazioni = riconciliazione.maggiorazioni
+    ? normalizzaCategorieOre(riconciliazione.maggiorazioni)
+    : null;
+
+  const voci = normalizzaVociManuali(riconciliazione.voci || []);
+
+  return {
+    straordinari,
+    maggiorazioni,
+    voci,
+  };
+}
+
+export function stimaNettoFiduciari({
+  economia,
+  trattenutePrevidenziali,
+  trattenuteFiscali,
+  altreTrattenute = 0,
+  detrazioni = 0,
+} = {}) {
+  if (!economia) {
+    return {
+      disponibile: false,
+      motivo: 'economia_mancante',
+    };
+  }
+
+  const previdenziali = numero(trattenutePrevidenziali, NaN);
+  const fiscali = numero(trattenuteFiscali, NaN);
+
+  if (!Number.isFinite(previdenziali) || !Number.isFinite(fiscali)) {
+    return {
+      disponibile: false,
+      motivo: 'trattenute_fiscali_previdenziali_mancanti',
+      nota:
+        'Il netto non viene stimato con un coefficiente fisso: servono almeno trattenute previdenziali e fiscali.',
+    };
+  }
+
+  const netto =
+    nonNegativo(economia.totaleDopoTrattenute) -
+    nonNegativo(previdenziali) -
+    nonNegativo(fiscali) -
+    nonNegativo(altreTrattenute) +
+    nonNegativo(detrazioni);
+
+  return {
+    disponibile: true,
+    netto: arrotondaImporto(netto),
+    componenti: {
+      competenzeDopoTrattenute: arrotondaImporto(
+        economia.totaleDopoTrattenute
+      ),
+      trattenutePrevidenziali: arrotondaImporto(previdenziali),
+      trattenuteFiscali: arrotondaImporto(fiscali),
+      altreTrattenute: arrotondaImporto(altreTrattenute),
+      detrazioni: arrotondaImporto(detrazioni),
+    },
+  };
+}
+
 function normalizzaCategorieOre(categorie = {}) {
   return Object.fromEntries(
     Object.entries(categorie || {}).map(([categoria, ore]) => [
@@ -322,6 +400,7 @@ export function calcolaEconomiaFiduciari({
   riepilogoOre,
   percentualiStraordinari = {},
   percentualiMaggiorazioni = {},
+  percentualeSestoGiorno = 10,
   configurazioneRiposoLavorato = {},
   regoleEventi = {},
   vociManuali = [],
@@ -361,6 +440,7 @@ export function calcolaEconomiaFiduciari({
 
   const percentualiExtra = {
     ferialeDiurno25: nonNegativo(percentualiStraordinari.ferialeDiurno25, 25),
+    ferialeDiurno30: nonNegativo(percentualiStraordinari.ferialeDiurno30, 30),
     ferialeNotturno35: nonNegativo(percentualiStraordinari.ferialeNotturno35, 35),
     festivoDiurno50: nonNegativo(percentualiStraordinari.festivoDiurno50, 50),
     festivoNotturno60: nonNegativo(percentualiStraordinari.festivoNotturno60, 60),
@@ -379,8 +459,8 @@ export function calcolaEconomiaFiduciari({
     .reduce((totale, voce) => totale + voce.importo, 0);
 
   const percentualiPremium = {
-    domenicaleDiurno: nonNegativo(percentualiMaggiorazioni.domenicaleDiurno),
-    domenicaleNotturno: nonNegativo(percentualiMaggiorazioni.domenicaleNotturno),
+    domenicaleDiurno: nonNegativo(percentualiMaggiorazioni.domenicaleDiurno, 15),
+    domenicaleNotturno: nonNegativo(percentualiMaggiorazioni.domenicaleNotturno, 20),
     festivoDiurno: nonNegativo(percentualiMaggiorazioni.festivoDiurno),
     festivoNotturno: nonNegativo(percentualiMaggiorazioni.festivoNotturno),
   };
@@ -396,6 +476,12 @@ export function calcolaEconomiaFiduciari({
   );
   const totaleMaggiorazioni = Object.values(dettagliMaggiorazioni)
     .reduce((totale, voce) => totale + voce.importo, 0);
+
+
+  const oreSestoGiorno = nonNegativo(riepilogoOre?.ore?.sestoGiorno);
+  const percentualeSesto = nonNegativo(percentualeSestoGiorno, 10);
+  const importoSestoGiorno =
+    oreSestoGiorno * pagaOraria * percentualeSesto / 100;
 
   const importoRiposoLavorato = calcolaRiposoLavorato(
     nonNegativo(ore.riposoLavorato),
@@ -433,7 +519,8 @@ export function calcolaEconomiaFiduciari({
   const trattenute = sommaVoci(vociVariabili, 'trattenuta');
   const competenzeImponibili =
     pagaBase + scatti + superminimoCalcolato +
-    totaleStraordinari + totaleMaggiorazioni + altreCompetenzeImponibili;
+    totaleStraordinari + totaleMaggiorazioni + importoSestoGiorno +
+    altreCompetenzeImponibili;
   const totaleCompetenze = competenzeImponibili + competenzeEsenti;
 
   return {
@@ -451,6 +538,11 @@ export function calcolaEconomiaFiduciari({
       dettagli: dettagliMaggiorazioni,
       totale: totaleMaggiorazioni,
     },
+    sestoGiorno: {
+      ore: oreSestoGiorno,
+      percentuale: percentualeSesto,
+      importo: importoSestoGiorno,
+    },
     riposoLavorato: {
       ore: nonNegativo(ore.riposoLavorato),
       configurato: importoRiposoLavorato > 0,
@@ -458,6 +550,16 @@ export function calcolaEconomiaFiduciari({
     },
     vociEventi,
     vociManuali: altreVoci,
+    riconciliazionePayroll: {
+      attiva: Boolean(riconciliazione),
+      straordinariDaPayroll: Boolean(riconciliazione?.straordinari),
+      maggiorazioniDaPayroll: Boolean(riconciliazione?.maggiorazioni),
+      voci: vociRiconciliazione,
+      automatico: {
+        straordinari: straordinariOreCalendario,
+        maggiorazioni: maggiorazioniOreCalendario,
+      },
+    },
     riconciliazionePayroll: {
       attiva: Boolean(riconciliazione),
       straordinariDaPayroll: Boolean(riconciliazione?.straordinari),
@@ -477,15 +579,22 @@ export function calcolaEconomiaFiduciari({
     imponibilePrevidenzialeTeorico: vociVariabili
       .filter((voce) => voce.imponibilePrevidenziale)
       .reduce((totale, voce) => totale + voce.importo, 0) +
-      pagaBase + scatti + superminimoCalcolato + totaleStraordinari + totaleMaggiorazioni,
+      pagaBase + scatti + superminimoCalcolato + totaleStraordinari +
+      totaleMaggiorazioni + importoSestoGiorno,
     imponibileFiscaleTeorico: vociVariabili
       .filter((voce) => voce.imponibileFiscale)
       .reduce((totale, voce) => totale + voce.importo, 0) +
-      pagaBase + scatti + superminimoCalcolato + totaleStraordinari + totaleMaggiorazioni,
+      pagaBase + scatti + superminimoCalcolato + totaleStraordinari +
+      totaleMaggiorazioni + importoSestoGiorno,
     diagnostica: {
       pagaBaseMancante: pagaBase <= 0,
       riposoLavoratoDaConfigurare:
         nonNegativo(ore.riposoLavorato) > 0 && importoRiposoLavorato <= 0,
+      sestoGiorno: {
+        ore: oreSestoGiorno,
+        percentuale: percentualeSesto,
+        importo: arrotondaImporto(importoSestoGiorno),
+      },
       eventiSenzaRegola: Object.keys(riepilogoOre?.eventi || {})
         .filter((tipo) => !regoleEventi[tipo]),
     },
@@ -495,6 +604,7 @@ export function calcolaEconomiaFiduciari({
       superminimo: arrotondaImporto(superminimoCalcolato),
       straordinari: arrotondaImporto(totaleStraordinari),
       maggiorazioni: arrotondaImporto(totaleMaggiorazioni),
+      sestoGiorno: arrotondaImporto(importoSestoGiorno),
       altreCompetenze: arrotondaImporto(
         altreCompetenzeImponibili + competenzeEsenti
       ),

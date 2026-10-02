@@ -161,6 +161,115 @@ assert.equal(eventiDistinti.eventi.permesso.length, 1);
 assert.equal(eventiDistinti.eventi.rol.length, 1);
 assert.equal(eventiDistinti.eventi.assenza.length, 1);
 
+
+// CCNL Fiduciari: progressione settimanale 40 / 48 / oltre 48 ore.
+const settimana40 = calcola([
+  turno(3, '07:00', '15:00'),
+  turno(4, '07:00', '15:00'),
+  turno(5, '07:00', '15:00'),
+  turno(6, '07:00', '15:00'),
+  turno(7, '07:00', '15:00'),
+]);
+assert.equal(settimana40.ore.fisiche, 40);
+assert.equal(settimana40.ore.straordinarie, 0);
+assert.equal(settimana40.straordinari.ferialeDiurno25, 0);
+assert.equal(settimana40.straordinari.ferialeDiurno30, 0);
+
+const settimana48 = calcola([
+  turno(3, '07:00', '15:00'),
+  turno(4, '07:00', '15:00'),
+  turno(5, '07:00', '15:00'),
+  turno(6, '07:00', '15:00'),
+  turno(7, '07:00', '15:00'),
+  turno(8, '07:00', '15:00'),
+]);
+assert.equal(settimana48.ore.fisiche, 48);
+assert.equal(settimana48.ore.straordinarie, 8);
+assert.equal(settimana48.straordinari.ferialeDiurno25, 8);
+assert.equal(settimana48.straordinari.ferialeDiurno30, 0);
+
+const settimana52 = calcola([
+  turno(3, '07:00', '15:00'),
+  turno(4, '07:00', '15:00'),
+  turno(5, '07:00', '15:00'),
+  turno(6, '07:00', '15:00'),
+  turno(7, '07:00', '15:00'),
+  turno(8, '07:00', '19:00'),
+]);
+assert.equal(settimana52.ore.fisiche, 52);
+assert.equal(settimana52.ore.straordinarie, 12);
+assert.equal(settimana52.straordinari.ferialeDiurno25, 8);
+assert.equal(settimana52.straordinari.ferialeDiurno30, 4);
+
+// Il segmento che attraversa la 48ª ora viene spezzato correttamente.
+const segmentiOltre48 = settimana52.segmenti.filter(
+  (segmento) => segmento.straordinario && segmento.oltre48
+);
+assert.equal(
+  segmentiOltre48.reduce((totale, segmento) => totale + segmento.minuti, 0),
+  240
+);
+
+// Notturno oltre 48h: resta +35%, non diventa feriale diurno +30%.
+const notteOltre48 = calcola([
+  turno(3, '07:00', '15:00'),
+  turno(4, '07:00', '15:00'),
+  turno(5, '07:00', '15:00'),
+  turno(6, '07:00', '15:00'),
+  turno(7, '07:00', '15:00'),
+  turno(8, '07:00', '15:00'),
+  turno(8, '22:00', '23:00'),
+]);
+assert.equal(notteOltre48.ore.fisiche, 49);
+assert.equal(notteOltre48.straordinari.ferialeDiurno25, 8);
+assert.equal(notteOltre48.straordinari.ferialeDiurno30, 0);
+assert.equal(notteOltre48.straordinari.ferialeNotturno35, 1);
+
+// Festivo oltre 48h: mantiene la categoria festiva +50%.
+const festivoOltre48 = calcola([
+  turno(10, '07:00', '15:00'),
+  turno(11, '07:00', '15:00'),
+  turno(12, '07:00', '15:00'),
+  turno(13, '07:00', '15:00'),
+  turno(14, '07:00', '15:00'),
+  turno(15, '07:00', '16:00'),
+]);
+assert.equal(festivoOltre48.ore.fisiche, 49);
+assert.equal(festivoOltre48.straordinari.ferialeDiurno30, 0);
+assert.equal(festivoOltre48.straordinari.festivoDiurno50, 9);
+
+// Sesto giorno: senza configurazione non deve produrre ore.
+const sestoGiornoNonConfigurato = calcola([
+  turno(8, '07:00', '15:00'),
+]);
+assert.equal(sestoGiornoNonConfigurato.ore.sestoGiorno, 0);
+
+// Configurazione esplicita: sabato = giorno ISO 6.
+const sestoGiornoConfigurato = calcola(
+  [turno(8, '07:00', '15:00')],
+  {
+    configurazioneSestoGiorno: {
+      abilitato: true,
+      modalita: 'giorno_settimana',
+      giornoSettimana: 6,
+    },
+  }
+);
+assert.equal(sestoGiornoConfigurato.ore.sestoGiorno, 8);
+
+// Configurazione incompleta/non valida: comportamento conservativo.
+const sestoGiornoNonValido = calcola(
+  [turno(8, '07:00', '15:00')],
+  {
+    configurazioneSestoGiorno: {
+      abilitato: true,
+      modalita: 'giorno_settimana',
+      giornoSettimana: 9,
+    },
+  }
+);
+assert.equal(sestoGiornoNonValido.ore.sestoGiorno, 0);
+
 console.log('Regressione motore ore Fiduciari superata', {
   fisiche: agosto.ore.fisiche,
   ordinarie: agosto.ore.ordinarie,

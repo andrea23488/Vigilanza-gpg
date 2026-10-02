@@ -218,8 +218,27 @@ function segmentaIntervallo(turno, intervallo, verificaFestivo) {
   return segmenti;
 }
 
+function creaVerificaSestoGiorno(configurazione = {}) {
+  const regola = configurazione.configurazioneSestoGiorno;
+  const giornoSettimana = Number(regola?.giornoSettimana);
+  const valida =
+    regola?.abilitato === true &&
+    regola?.modalita === 'giorno_settimana' &&
+    Number.isInteger(giornoSettimana) &&
+    giornoSettimana >= 1 &&
+    giornoSettimana <= 7;
+
+  return (timestamp) => {
+    if (!valida) return false;
+    const giornoUtc = new Date(timestamp).getUTCDay();
+    const giornoIso = giornoUtc === 0 ? 7 : giornoUtc;
+    return giornoIso === giornoSettimana;
+  };
+}
+
 export function segmentaTurniFiduciari(turni, configurazione = {}) {
   const verificaFestivo = creaVerificaFestivo(configurazione);
+  const verificaSestoGiorno = creaVerificaSestoGiorno(configurazione);
   const invalidi = [];
   const segmenti = [];
 
@@ -230,7 +249,15 @@ export function segmentaTurniFiduciari(turni, configurazione = {}) {
       invalidi.push(turno);
       return;
     }
-    segmenti.push(...segmentaIntervallo(turno, intervallo, verificaFestivo));
+
+    segmenti.push(
+      ...segmentaIntervallo(turno, intervallo, verificaFestivo).map(
+        (segmento) => ({
+          ...segmento,
+          sestoGiorno: verificaSestoGiorno(segmento.inizio),
+        })
+      )
+    );
   });
 
   return {
@@ -239,28 +266,49 @@ export function segmentaTurniFiduciari(turni, configurazione = {}) {
   };
 }
 
-function dividiPerStraordinario(segmento, minutiPrima, limiteMinuti) {
-  const minutiOrdinariDisponibili = Math.max(0, limiteMinuti - minutiPrima);
-  const minutiOrdinari = Math.min(segmento.minuti, minutiOrdinariDisponibili);
+function dividiSegmentoPerSoglie(
+  segmento,
+  minutiClassificazionePrima,
+  limiteOrdinario,
+  minutiSettimanaPrima,
+  limiteQuarantotto
+) {
   const parti = [];
+  let consumati = 0;
 
-  if (minutiOrdinari > 0) {
+  while (consumati < segmento.minuti) {
+    const classificazioneCorrente = minutiClassificazionePrima + consumati;
+    const settimanaCorrente = minutiSettimanaPrima + consumati;
+
+    let durata = segmento.minuti - consumati;
+
+    if (classificazioneCorrente < limiteOrdinario) {
+      durata = Math.min(
+        durata,
+        limiteOrdinario - classificazioneCorrente
+      );
+    }
+
+    if (settimanaCorrente < limiteQuarantotto) {
+      durata = Math.min(
+        durata,
+        limiteQuarantotto - settimanaCorrente
+      );
+    }
+
+    const inizio = segmento.inizio + consumati * 60000;
+    const fine = inizio + durata * 60000;
+
     parti.push({
       ...segmento,
-      fine: segmento.inizio + minutiOrdinari * 60000,
-      minuti: minutiOrdinari,
-      straordinario: false,
+      inizio,
+      fine,
+      minuti: durata,
+      straordinario: classificazioneCorrente >= limiteOrdinario,
+      oltre48: settimanaCorrente >= limiteQuarantotto,
     });
-  }
 
-  const minutiStraordinari = segmento.minuti - minutiOrdinari;
-  if (minutiStraordinari > 0) {
-    parti.push({
-      ...segmento,
-      inizio: segmento.fine - minutiStraordinari * 60000,
-      minuti: minutiStraordinari,
-      straordinario: true,
-    });
+    consumati += durata;
   }
 
   return parti;
@@ -271,22 +319,48 @@ function classificaStraordinario(segmenti, configurazione) {
     configurazione.modalitaStraordinario === 'giornaliera'
       ? 'giornaliera'
       : 'settimanale';
+
   const sogliaOre = modalita === 'giornaliera'
     ? Number(configurazione.sogliaGiornaliera || 7)
     : Number(configurazione.sogliaSettimanale || 40);
-  const limiteMinuti = Math.max(0, sogliaOre) * 60;
-  const cumulati = new Map();
+
+  const limiteOrdinario = Math.max(0, sogliaOre) * 60;
+  const limiteQuarantotto = 48 * 60;
+
+  const cumulatiClassificazione = new Map();
+  const cumulatiSettimana = new Map();
   const classificati = [];
 
   segmenti.forEach((segmento) => {
-    const chiave = modalita === 'giornaliera'
+    const chiaveClassificazione = modalita === 'giornaliera'
       ? segmento.data
       : segmento.settimana;
-    const minutiPrima = cumulati.get(chiave) || 0;
+
+    const minutiClassificazionePrima =
+      cumulatiClassificazione.get(chiaveClassificazione) || 0;
+
+    const minutiSettimanaPrima =
+      cumulatiSettimana.get(segmento.settimana) || 0;
+
     classificati.push(
-      ...dividiPerStraordinario(segmento, minutiPrima, limiteMinuti)
+      ...dividiSegmentoPerSoglie(
+        segmento,
+        minutiClassificazionePrima,
+        limiteOrdinario,
+        minutiSettimanaPrima,
+        limiteQuarantotto
+      )
     );
-    cumulati.set(chiave, minutiPrima + segmento.minuti);
+
+    cumulatiClassificazione.set(
+      chiaveClassificazione,
+      minutiClassificazionePrima + segmento.minuti
+    );
+
+    cumulatiSettimana.set(
+      segmento.settimana,
+      minutiSettimanaPrima + segmento.minuti
+    );
   });
 
   return classificati;
@@ -301,11 +375,13 @@ function creaContatori() {
     domenicali: 0,
     festive: 0,
     riposoLavorato: 0,
+    sestoGiorno: 0,
     domenicaleDiurno: 0,
     domenicaleNotturno: 0,
     festivoDiurno: 0,
     festivoNotturno: 0,
     straordinarioFerialeDiurno25: 0,
+    straordinarioFerialeDiurno30: 0,
     straordinarioFerialeNotturno35: 0,
     straordinarioFestivoDiurno50: 0,
     straordinarioFestivoNotturno60: 0,
@@ -332,6 +408,7 @@ function aggiungiSegmento(contatori, segmento) {
     ] += minuti;
   }
   if (segmento.riposoLavorato) contatori.riposoLavorato += minuti;
+  if (segmento.sestoGiorno) contatori.sestoGiorno += minuti;
 
   if (!segmento.straordinario) return;
   if (speciale && segmento.notturno) {
@@ -340,6 +417,8 @@ function aggiungiSegmento(contatori, segmento) {
     contatori.straordinarioFestivoDiurno50 += minuti;
   } else if (segmento.notturno) {
     contatori.straordinarioFerialeNotturno35 += minuti;
+  } else if (segmento.oltre48) {
+    contatori.straordinarioFerialeDiurno30 += minuti;
   } else {
     contatori.straordinarioFerialeDiurno25 += minuti;
   }
@@ -412,6 +491,7 @@ export function calcolaOreFiduciari({
       domenicali: ore.domenicali,
       festive: ore.festive,
       riposoLavorato: ore.riposoLavorato,
+      sestoGiorno: ore.sestoGiorno,
     },
     maggiorazioni: {
       domenicaleDiurno: ore.domenicaleDiurno,
@@ -421,6 +501,7 @@ export function calcolaOreFiduciari({
     },
     straordinari: {
       ferialeDiurno25: ore.straordinarioFerialeDiurno25,
+      ferialeDiurno30: ore.straordinarioFerialeDiurno30,
       ferialeNotturno35: ore.straordinarioFerialeNotturno35,
       festivoDiurno50: ore.straordinarioFestivoDiurno50,
       festivoNotturno60: ore.straordinarioFestivoNotturno60,
