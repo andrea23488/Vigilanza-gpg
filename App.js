@@ -120,6 +120,13 @@ import {
   cancellaPromemoriaImpegno,
   programmaPromemoriaImpegno,
 } from './promemoriaPersonali';
+
+import {
+  cancellaPromemoriaTurno,
+  etichettaPromemoriaTurno,
+  leggiPromemoriaTurno,
+  programmaPromemoriaTurno,
+} from './promemoriaTurni';
 import {
   ImpegnoPersonaleModal,
   SceltaAgendaModal,
@@ -2970,6 +2977,9 @@ if (dati.tariffaStraordinario != null) {
   const [postazioneTimelineDraft, setPostazioneTimelineDraft] =
     useState([]);
 
+  const [postazioneAttivitaInModificaId, setPostazioneAttivitaInModificaId] =
+    useState(null);
+
   const [postazioneOraNuova, setPostazioneOraNuova] =
     useState('');
 
@@ -3034,19 +3044,47 @@ if (dati.tariffaStraordinario != null) {
       return;
     }
 
-    const nuova = {
-      id: `attivita_${Date.now()}`,
-      ora,
-      testo,
-    };
+    if (postazioneAttivitaInModificaId) {
+      setPostazioneTimelineDraft(
+        ordinaTimelinePostazione(
+          postazioneTimelineDraft.map((item) =>
+            item.id === postazioneAttivitaInModificaId
+              ? { ...item, ora, testo }
+              : item
+          )
+        )
+      );
 
-    setPostazioneTimelineDraft(
-      ordinaTimelinePostazione([
-        ...postazioneTimelineDraft,
-        nuova,
-      ])
-    );
+      setPostazioneAttivitaInModificaId(null);
+    } else {
+      const nuova = {
+        id: `attivita_${Date.now()}`,
+        ora,
+        testo,
+      };
 
+      setPostazioneTimelineDraft(
+        ordinaTimelinePostazione([
+          ...postazioneTimelineDraft,
+          nuova,
+        ])
+      );
+    }
+
+    setPostazioneOraNuova('');
+    setPostazioneAttivitaNuova('');
+  };
+
+  const modificaAttivitaPostazione = (item) => {
+    if (!item) return;
+
+    setPostazioneAttivitaInModificaId(item.id);
+    setPostazioneOraNuova(item.ora || '');
+    setPostazioneAttivitaNuova(item.testo || '');
+  };
+
+  const annullaModificaAttivitaPostazione = () => {
+    setPostazioneAttivitaInModificaId(null);
     setPostazioneOraNuova('');
     setPostazioneAttivitaNuova('');
   };
@@ -3318,6 +3356,7 @@ if (dati.tariffaStraordinario != null) {
 
     setPostazioneOraNuova('');
     setPostazioneAttivitaNuova('');
+    setPostazioneAttivitaInModificaId(null);
 
     setPostazioneChiaviDraft(
       postazione?.chiavi || ''
@@ -4952,6 +4991,12 @@ const cambiaStatoDotazione = (id, stato) => {
 
   const [fine, setFine] =
     useState('14:00');
+
+  const [promemoriaTurnoMinuti, setPromemoriaTurnoMinuti] =
+    useState(0);
+
+  const [promemoriaTurnoPersonalizzato, setPromemoriaTurnoPersonalizzato] =
+    useState('');
 
   const [luogo, setLuogo] =
     useState('');
@@ -7361,6 +7406,9 @@ console.log("🕒 ORA REALE:", new Date().toString());
   ) {
     setEditingId(null);
 
+    setPromemoriaTurnoMinuti(0);
+    setPromemoriaTurnoPersonalizzato('');
+
     setGiorno(
       Number(g)
     );
@@ -7533,7 +7581,7 @@ console.log("🕒 ORA REALE:", new Date().toString());
     );
   }
 
-  function modificaGiorno(
+  async function modificaGiorno(
     record
   ) {
     if (
@@ -7597,6 +7645,32 @@ console.log("🕒 ORA REALE:", new Date().toString());
       record.riposo_lavorato ===
         true
     );
+
+    try {
+      const minutiPromemoria =
+        record.tipo === 'turno'
+          ? await leggiPromemoriaTurno(record.id)
+          : 0;
+
+      setPromemoriaTurnoMinuti(minutiPromemoria);
+
+      const preset = [30, 60, 120, 180];
+
+      setPromemoriaTurnoPersonalizzato(
+        minutiPromemoria > 0 &&
+        !preset.includes(Number(minutiPromemoria))
+          ? String(minutiPromemoria)
+          : ''
+      );
+    } catch (error) {
+      console.warn(
+        'Promemoria turno: impossibile leggere la configurazione.',
+        error
+      );
+
+      setPromemoriaTurnoMinuti(0);
+      setPromemoriaTurnoPersonalizzato('');
+    }
 
     setScreen('edit');
   }
@@ -7778,6 +7852,20 @@ console.log("🕒 ORA REALE:", new Date().toString());
         );
       }
 
+      if (salvato.tipo === 'turno') {
+        try {
+          await programmaPromemoriaTurno(
+            salvato,
+            promemoriaTurnoMinuti
+          );
+        } catch (error) {
+          console.warn(
+            'Promemoria turno: impossibile programmare la notifica.',
+            error
+          );
+        }
+      }
+
       setTurni(
         (
           precedenti
@@ -7897,6 +7985,15 @@ console.log("🕒 ORA REALE:", new Date().toString());
       const idDaEliminare = editingId;
 
       await eliminaTurnoUtente(idDaEliminare);
+
+      try {
+        await cancellaPromemoriaTurno(idDaEliminare);
+      } catch (error) {
+        console.warn(
+          'Promemoria turno: impossibile cancellare la notifica.',
+          error
+        );
+      }
 
       setTurni((precedenti) =>
         precedenti.filter(
@@ -19779,6 +19876,32 @@ if (screen === 'strumenti') {
                             <TouchableOpacity
                               activeOpacity={0.78}
                               onPress={() =>
+                                modificaAttivitaPostazione(item)
+                              }
+                              style={{
+                                width: 36,
+                                height: 36,
+                                marginLeft: 8,
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                borderRadius: 12,
+                                backgroundColor:
+                                  'rgba(22,72,96,0.58)',
+                                borderWidth: 1,
+                                borderColor:
+                                  'rgba(101,220,255,0.18)',
+                              }}
+                            >
+                              <Ionicons
+                                name="pencil-outline"
+                                size={16}
+                                color="#7FDBFF"
+                              />
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                              activeOpacity={0.78}
+                              onPress={() =>
                                 eliminaAttivitaPostazione(
                                   item.id
                                 )
@@ -19983,9 +20106,34 @@ if (screen === 'strumenti') {
                 marginLeft: 6,
               }}
             >
-              AGGIUNGI ATTIVITÀ
+              {postazioneAttivitaInModificaId
+                ? 'SALVA MODIFICHE'
+                : 'AGGIUNGI ATTIVITÀ'}
             </Text>
           </TouchableOpacity>
+
+          {postazioneAttivitaInModificaId ? (
+            <TouchableOpacity
+              activeOpacity={0.8}
+              onPress={annullaModificaAttivitaPostazione}
+              style={{
+                alignSelf: 'center',
+                marginTop: 10,
+                paddingVertical: 6,
+                paddingHorizontal: 12,
+              }}
+            >
+              <Text
+                style={{
+                  color: '#7890AE',
+                  fontSize: 10,
+                  fontWeight: '900',
+                }}
+              >
+                ANNULLA MODIFICA
+              </Text>
+            </TouchableOpacity>
+          ) : null}
 
           {postazioneAttivitaDraft ? (
             <View
@@ -27778,6 +27926,165 @@ if (screen === 'profiloCollega') {
               </Text>
             </TouchableOpacity>
           </>
+        )}
+
+        {tipo === 'turno' && (
+          <View
+            style={{
+              backgroundColor: '#0B1930',
+              borderRadius: 20,
+              borderWidth: 1,
+              borderColor: 'rgba(105,223,255,0.25)',
+              padding: 15,
+              marginBottom: 18,
+            }}
+          >
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                marginBottom: 12,
+              }}
+            >
+              <Ionicons
+                name="notifications-outline"
+                size={19}
+                color="#79DFFF"
+              />
+
+              <View style={{ flex: 1, marginLeft: 9 }}>
+                <Text
+                  style={{
+                    color: '#FFFFFF',
+                    fontSize: 13,
+                    fontWeight: '900',
+                  }}
+                >
+                  Avvisami prima del turno
+                </Text>
+
+                <Text
+                  style={{
+                    color: '#7890AE',
+                    fontSize: 10,
+                    marginTop: 2,
+                  }}
+                >
+                  {etichettaPromemoriaTurno(
+                    promemoriaTurnoMinuti
+                  )}
+                </Text>
+              </View>
+            </View>
+
+            <View
+              style={{
+                flexDirection: 'row',
+                flexWrap: 'wrap',
+                gap: 8,
+              }}
+            >
+              {[
+                [0, 'Nessuno'],
+                [30, '30 min'],
+                [60, '1 ora'],
+                [120, '2 ore'],
+                [180, '3 ore'],
+              ].map(([valore, label]) => {
+                const attivo =
+                  Number(promemoriaTurnoMinuti) ===
+                    Number(valore) &&
+                  !promemoriaTurnoPersonalizzato;
+
+                return (
+                  <TouchableOpacity
+                    key={String(valore)}
+                    activeOpacity={0.8}
+                    onPress={() => {
+                      setPromemoriaTurnoMinuti(
+                        Number(valore)
+                      );
+
+                      setPromemoriaTurnoPersonalizzato('');
+                    }}
+                    style={{
+                      paddingHorizontal: 12,
+                      paddingVertical: 9,
+                      borderRadius: 13,
+                      backgroundColor: attivo
+                        ? 'rgba(18,126,165,0.94)'
+                        : '#10213A',
+                      borderWidth: 1,
+                      borderColor: attivo
+                        ? '#79DFFF'
+                        : 'rgba(105,223,255,0.14)',
+                    }}
+                  >
+                    <Text
+                      style={{
+                        color: attivo
+                          ? '#FFFFFF'
+                          : '#AFC0D7',
+                        fontSize: 10,
+                        fontWeight: '900',
+                      }}
+                    >
+                      {label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            <View style={{ marginTop: 12 }}>
+              <Text
+                style={{
+                  color: '#7890AE',
+                  fontSize: 9,
+                  fontWeight: '900',
+                  marginBottom: 6,
+                }}
+              >
+                PERSONALIZZATO · MINUTI PRIMA
+              </Text>
+
+              <TextInput
+                value={promemoriaTurnoPersonalizzato}
+                onChangeText={(valore) => {
+                  const pulito = String(valore || '')
+                    .replace(/[^0-9]/g, '');
+
+                  setPromemoriaTurnoPersonalizzato(
+                    pulito
+                  );
+
+                  const minuti = Math.max(
+                    0,
+                    Math.min(
+                      10080,
+                      Number(pulito || 0)
+                    )
+                  );
+
+                  setPromemoriaTurnoMinuti(minuti);
+                }}
+                placeholder="Es. 90"
+                placeholderTextColor="#557087"
+                keyboardType="number-pad"
+                style={{
+                  minHeight: 48,
+                  color: '#FFFFFF',
+                  paddingHorizontal: 12,
+                  borderRadius: 14,
+                  backgroundColor: 'rgba(6,21,45,0.94)',
+                  borderWidth: 1,
+                  borderColor: 'rgba(83,151,188,0.29)',
+                  fontSize: 13,
+                  fontWeight: '900',
+                }}
+              />
+            </View>
+          </View>
         )}
 
         <TouchableOpacity
