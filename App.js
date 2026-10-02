@@ -6205,11 +6205,23 @@ const oreOrdinarieCompletateMaturato = Math.max(
   Number(extraCompletatoStipendio || 0)
 );
 
-const quotaTempoMese = Math.min(
-  1,
-  oreOrdinarieCompletateMaturato /
-    Math.max(1, oreMensiliContrattualiMaturato)
-);
+const indiceMeseSelezionato =
+  Number(anno) * 12 + Number(mese);
+
+const indiceMeseCorrente =
+  adessoMaturato.getFullYear() * 12 +
+  adessoMaturato.getMonth();
+
+const quotaTempoMese =
+  indiceMeseSelezionato < indiceMeseCorrente
+    ? 1
+    : indiceMeseSelezionato > indiceMeseCorrente
+      ? 0
+      : Math.min(
+          1,
+          oreOrdinarieCompletateMaturato /
+            Math.max(1, oreMensiliContrattualiMaturato)
+        );
 
 // ===== GPG: componenti realmente maturate =====
 
