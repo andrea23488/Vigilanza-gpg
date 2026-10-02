@@ -1,0 +1,674 @@
+From dc6696e3a04eee7e2f184d418b0709277914903b Mon Sep 17 00:00:00 2001
+From: Codex <codex@openai.com>
+Date: Thu, 1 Oct 2026 21:40:16 +0000
+Subject: [PATCH] Completa regole CCNL Fiduciari
+
+---
+ fiduciariEconomia.js                | 119 ++++++++++++++++++++++++++--
+ fiduciariOre.js                     |  98 +++++++++++++++--------
+ fixtures/fiduciari-agosto-2026.cjs  |  28 +++++++
+ scripts/test-fiduciari-economia.cjs |  92 +++++++++++++++++++--
+ scripts/test-fiduciari-ore.cjs      |  74 +++++++++++++++++
+ 5 files changed, 364 insertions(+), 47 deletions(-)
+
+diff --git a/fiduciariEconomia.js b/fiduciariEconomia.js
+index 28db415..aa99d3d 100644
+--- a/fiduciariEconomia.js
++++ b/fiduciariEconomia.js
+@@ -81,6 +81,66 @@ export function normalizzaVociManuali(voci = []) {
+     .filter((voce) => voce.importo > 0);
+ }
+ 
++function normalizzaCategorieOre(categorie = {}) {
++  return Object.fromEntries(
++    Object.entries(categorie || {}).map(([categoria, ore]) => [
++      categoria,
++      nonNegativo(ore),
++    ])
++  );
++}
++
++export function normalizzaRiconciliazionePayroll(riconciliazione = null) {
++  if (!riconciliazione || typeof riconciliazione !== 'object') return null;
++  const straordinari = riconciliazione.straordinari
++    ? normalizzaCategorieOre(riconciliazione.straordinari)
++    : null;
++  const maggiorazioni = riconciliazione.maggiorazioni
++    ? normalizzaCategorieOre(riconciliazione.maggiorazioni)
++    : null;
++  const voci = normalizzaVociManuali(riconciliazione.voci || []);
++  return { straordinari, maggiorazioni, voci };
++}
++
++export function stimaNettoFiduciari({
++  economia,
++  trattenutePrevidenziali,
++  trattenuteFiscali,
++  altreTrattenute = 0,
++  detrazioni = 0,
++} = {}) {
++  if (!economia) {
++    return { disponibile: false, motivo: 'economia_mancante' };
++  }
++  const previdenziali = numero(trattenutePrevidenziali, NaN);
++  const fiscali = numero(trattenuteFiscali, NaN);
++  if (!Number.isFinite(previdenziali) || !Number.isFinite(fiscali)) {
++    return {
++      disponibile: false,
++      motivo: 'trattenute_fiscali_previdenziali_mancanti',
++      nota:
++        'Il netto non viene stimato con un coefficiente fisso: servono almeno trattenute previdenziali e fiscali.',
++    };
++  }
++  const netto =
++    nonNegativo(economia.totaleDopoTrattenute) -
++    nonNegativo(previdenziali) -
++    nonNegativo(fiscali) -
++    nonNegativo(altreTrattenute) +
++    nonNegativo(detrazioni);
++  return {
++    disponibile: true,
++    netto: arrotondaImporto(netto),
++    componenti: {
++      competenzeDopoTrattenute: arrotondaImporto(economia.totaleDopoTrattenute),
++      trattenutePrevidenziali: arrotondaImporto(previdenziali),
++      trattenuteFiscali: arrotondaImporto(fiscali),
++      altreTrattenute: arrotondaImporto(altreTrattenute),
++      detrazioni: arrotondaImporto(detrazioni),
++    },
++  };
++}
++
+ function calcolaVoceEvento(tipo, eventi, regola, pagaOraria) {
+   if (!regola || !Array.isArray(eventi) || eventi.length === 0) return null;
+ 
+@@ -134,9 +194,11 @@ export function calcolaEconomiaFiduciari({
+   riepilogoOre,
+   percentualiStraordinari = {},
+   percentualiMaggiorazioni = {},
++  percentualeSestoGiorno = 10,
+   configurazioneRiposoLavorato = {},
+   regoleEventi = {},
+   vociManuali = [],
++  riconciliazionePayroll = null,
+   tabelle,
+ }) {
+   const tabella = selezionaPagaBaseFiduciari({
+@@ -159,12 +221,20 @@ export function calcolaEconomiaFiduciari({
+     nonNegativo(scattiAnzianita) +
+     (superminimoInPagaOraria ? nonNegativo(superminimo) : 0);
+   const pagaOraria = baseOraria / Math.max(1, nonNegativo(divisore, 173));
+-  const straordinariOre = riepilogoOre?.straordinari || {};
+-  const maggiorazioniOre = riepilogoOre?.maggiorazioni || {};
++  const riconciliazione = normalizzaRiconciliazionePayroll(
++    riconciliazionePayroll
++  );
++  const straordinariOreCalendario = riepilogoOre?.straordinari || {};
++  const maggiorazioniOreCalendario = riepilogoOre?.maggiorazioni || {};
++  const straordinariOre =
++    riconciliazione?.straordinari || straordinariOreCalendario;
++  const maggiorazioniOre =
++    riconciliazione?.maggiorazioni
++    : maggiorazioniOreCalendario;
+  const ore = riepilogoOre?.ore || {};
+ 
+   const percentualiExtra = {
+     ferialeDiurno25: nonNegativo(percentualiStraordinari.ferialeDiurno25, 25),
++    ferialeDiurno30: nonNegativo(percentualiStraordinari.ferialeDiurno30, 30),
+     ferialeNotturno35: nonNegativo(percentualiStraordinari.ferialeNotturno35, 35),
+     festivoDiurno50: nonNegativo(percentualiStraordinari.festivoDiurno50, 50),
+     festivoNotturno60: nonNegativo(percentualiStraordinari.festivoNotturno60, 60),
+@@ -183,8 +253,8 @@ export function calcolaEconomiaFiduciari({
+     .reduce((totale, voce) => totale + voce.importo, 0);
+ 
+   const percentualiPremium = {
+-    domenicaleDiurno: nonNegativo(percentualiMaggiorazioni.domenicaleDiurno),
+-    domenicaleNotturno: nonNegativo(percentualiMaggiorazioni.domenicaleNotturno),
++    domenicaleDiurno: nonNegativo(percentualiMaggiorazioni.domenicaleDiurno, 15),
++    domenicaleNotturno: nonNegativo(percentualiMaggiorazioni.domenicaleNotturno, 20),
+     festivoDiurno: nonNegativo(percentualiMaggiorazioni.festivoDiurno),
+     festivoNotturno: nonNegativo(percentualiMaggiorazioni.festivoNotturno),
+   };
+@@ -200,6 +270,10 @@ export function calcolaEconomiaFiduciari({
+   );
+   const totaleMaggiorazioni = Object.values(dettagliMaggiorazioni)
+     .reduce((totale, voce) => totale + voce.importo, 0);
++  const oreSestoGiorno = nonNegativo(ore.sestoGiorno);
++  const percentualeSesto = nonNegativo(percentualeSestoGiorno, 10);
++  const importoSestoGiorno =
++    oreSestoGiorno * pagaOraria * percentualeSesto / 100;
+ 
+   const importoRiposoLavorato = calcolaRiposoLavorato(
+     nonNegativo(ore.riposoLavorato),
+@@ -215,7 +289,12 @@ export function calcolaEconomiaFiduciari({
+     ))
+     .filter(Boolean);
+   const altreVoci = normalizzaVociManuali(vociManuali);
+-  const vociVariabili = [...vociEventi, ...altreVoci];
++  const vociRiconciliazione = riconciliazione?.voci || [];
++  const vociVariabili = [
++    ...vociEventi,
++    ...altreVoci,
++    ...vociRiconciliazione,
++  ];
+   if (importoRiposoLavorato > 0) {
+     vociVariabili.push({
+       id: 'riposo-lavorato',
+@@ -232,7 +311,8 @@ export function calcolaEconomiaFiduciari({
+   const trattenute = sommaVoci(vociVariabili, 'trattenuta');
+   const competenzeImponibili =
+     pagaBase + scatti + superminimoCalcolato +
+-    totaleStraordinari + totaleMaggiorazioni + altreCompetenzeImponibili;
++    totaleStraordinari + totaleMaggiorazioni + importoSestoGiorno +
++    altreCompetenzeImponibili;
+   const totaleCompetenze = competenzeImponibili + competenzeEsenti;
+ 
+   return {
+@@ -250,6 +330,11 @@ export function calcolaEconomiaFiduciari({
+       dettagli: dettagliMaggiorazioni,
+       totale: totaleMaggiorazioni,
+     },
++    sestoGiorno: {
++      ore: oreSestoGiorno,
++      percentuale: percentualeSesto,
++      importo: importoSestoGiorno,
++    },
+     riposoLavorato: {
+       ore: nonNegativo(ore.riposoLavorato),
+       configurato: importoRiposoLavorato > 0,
+@@ -257,6 +342,16 @@ export function calcolaEconomiaFiduciari({
+     },
+     vociEventi,
+     vociManuali: altreVoci,
++    riconciliazionePayroll: {
++      attiva: Boolean(riconciliazione),
++      straordinariDaPayroll: Boolean(riconciliazione?.straordinari),
++      maggiorazioniDaPayroll: Boolean(riconciliazione?.maggiorazioni),
++      voci: vociRiconciliazione,
++      automatico: {
++        straordinari: straordinariOreCalendario,
++        maggiorazioni: maggiorazioniOreCalendario,
++      },
++    },
+     altreCompetenzeImponibili,
+     competenzeEsenti,
+     trattenute,
+@@ -266,15 +361,22 @@ export function calcolaEconomiaFiduciari({
+     imponibilePrevidenzialeTeorico: vociVariabili
+       .filter((voce) => voce.imponibilePrevidenziale)
+       .reduce((totale, voce) => totale + voce.importo, 0) +
+-      pagaBase + scatti + superminimoCalcolato + totaleStraordinari + totaleMaggiorazioni,
++      pagaBase + scatti + superminimoCalcolato + totaleStraordinari +
++      totaleMaggiorazioni + importoSestoGiorno,
+     imponibileFiscaleTeorico: vociVariabili
+       .filter((voce) => voce.imponibileFiscale)
+       .reduce((totale, voce) => totale + voce.importo, 0) +
+-      pagaBase + scatti + superminimoCalcolato + totaleStraordinari + totaleMaggiorazioni,
++      pagaBase + scatti + superminimoCalcolato + totaleStraordinari +
++      totaleMaggiorazioni + importoSestoGiorno,
+     diagnostica: {
+       pagaBaseMancante: pagaBase <= 0,
+       riposoLavoratoDaConfigurare:
+         nonNegativo(ore.riposoLavorato) > 0 && importoRiposoLavorato <= 0,
++      sestoGiorno: {
++        ore: oreSestoGiorno,
++        percentuale: percentualeSesto,
++        importo: arrotondaImporto(importoSestoGiorno),
++      },
+       eventiSenzaRegola: Object.keys(riepilogoOre?.eventi || {})
+         .filter((tipo) => !regoleEventi[tipo]),
+     },
+@@ -284,6 +386,7 @@ export function calcolaEconomiaFiduciari({
+       superminimo: arrotondaImporto(superminimoCalcolato),
+       straordinari: arrotondaImporto(totaleStraordinari),
+       maggiorazioni: arrotondaImporto(totaleMaggiorazioni),
++      sestoGiorno: arrotondaImporto(importoSestoGiorno),
+       altreCompetenze: arrotondaImporto(
+         altreCompetenzeImponibili + competenzeEsenti
+       ),
+diff --git a/fiduciariOre.js b/fiduciariOre.js
+index 8656560..6857f7a 100644
+--- a/fiduciariOre.js
++++ b/fiduciariOre.js
+@@ -218,8 +218,26 @@ function segmentaIntervallo(turno, intervallo, verificaFestivo) {
+   return segmenti;
+ }
+ 
++function creaVerificaSestoGiorno(configurazione = {}) {
++  const regola = configurazione.configurazioneSestoGiorno;
++  const giornoSettimana = Number(regola?.giornoSettimana);
++  const valida =
++    regola?.abilitato === true &&
++    regola?.modalita === 'giorno_settimana' &&
++    Number.isInteger(giornoSettimana) &&
++    giornoSettimana >= 1 &&
++    giornoSettimana <= 7;
++
++  return (timestamp) => {
++    if (!valida) return false;
++    const giornoUtc = new Date(timestamp).getUTCDay();
++    return (giornoUtc === 0 ? 7 : giornoU]c) === giornoSettimana;
++  };
++}
++
+ export function segmentaTurniFiduciari(turni, configurazione = {}) {
+   const verificaFestivo = creaVerificaFestivo(configurazione);
++  const verificaSestoGiorno = creaVerificaSestoGiorno(configurazione);
+   const invalidi = [];
+   const segmenti = [];
+ 
+@@ -230,7 +248,14 @@ export function segmentaTurniFiduciari(turni, configurazione = {}) {
+       invalidi.push(turno);
+       return;
+     }
+-    segmenti.push(...segmentaIntervallo(turno, intervallo, verificaFestivo));
++    segmenti.push(
++      ...segmentaIntervallo(turno, intervallo, verificaFestivo).map(
++        (segmento) => ({
++          ...segmento,
++          sestoGiorno: verificaSestoGiorno(segmento.inizio),
++        })
++      )
++    );
+   });
+ 
+   return {
+@@ -239,33 +264,6 @@ export function segmentaTurniFiduciari(turni, configurazione = {}) {
+   };
+ }
+ 
+-function dividiPerStraordinario(segmento, minutiPrima, limiteMinuti) {
+-  const minutiOrdinariDisponibili = Math.max(0, limiteMinuti - minutiPrima);
+-  const minutiOrdinari = Math.min(segmento.minuti, minutiOrdinariDisponibili);
+-  const parti = [];
+-
+-  if (minutiOrdinari > 0) {
+-    parti.push({
+-      ...segmento,
+-      fine: segmento.inizio + minutiOrdinari * 60000,
+-      minuti: minutiOrdinari,
+-      straordinario: false,
+-    });
+-  }
+-
+-  const minutiStraordinari = segmento.minuti - minutiOrdinari;
+-  if (minutiStraordinari > 0) {
+-    parti.push({
+-      ...segmento,
+-      inizio: segmento.fine - minutiStraordinari * 60000,
+-      minuti: minutiStraordinari,
+-      straordinario: true,
+-    });
+-  }
+-
+-  return parti;
+-}
+-
+ function classificaStraordinario(segmenti, configurazione) {
+   const modalita =
+     configurazione.modalitaStraordinario === 'giornaliera'
+@@ -275,18 +273,43 @@ function classificaStraordinario(segmenti, configurazione) {
+     ? Number(configurazione.sogliaGiornaliera || 7)
+     : Number(configurazione.sogliaSettimanale || 40);
+   const limiteMinuti = Math.max(0, sogliaOre) * 60;
+-  const cumulati = new Map();
++  const cumulatiSoglia = new Map();
++  const cumulatiSettimana = new Map();
+   const classificati = [];
+ 
+   segmenti.forEach((segmento) => {
+     const chiave = modalita === 'giornaliera'
+       ? segmento.data
+       : segmento.settimana;
+-    const minutiPrima = cumulati.get(chiave) || 0;
+-    classificati.push(
+-      ...dividiPerStraordinario(segmento, minutiPrima, limiteMinuti)
+-    );
+-    cumulati.set(chiave, minutiPrima + segmento.minuti);
++    let minutiPrimaSoglia = cumulatiSoglia.get(chiave) || 0;
++    let minutiPrimaSettimana = cumulatiSettimana.get(segmento.settimana) || 0;
++    let cursore = segmento.inizio;
++    let rimanenti = segmento.minuti;
++
++    while (rimanenti > 0) {
++      const aSogliaStraordinario = Math.max(0, limiteMinuti - minutiPrimaSoglia);
++      const aSogliaQuarantanove = Math.max(0, 48 * 60 - minutiPrimaSettimana);
++      const durata = Math.min(
++        rimanenti,
++        aSogliaStraordinario || rimanenti,
++        aSogliaQuarantanove || rimanenti
++      );
++      classificati.push({
++        ...segmento,
++        inizio: cursore,
++        fine: cursore + durata * 60000,
++        minuti: durata,
++        straordinario: minutiPrimaSoglia >= limiteMinuti,
++        dallaQuarantanovesimaOra: minutiPrimaSettimana >= 48 * 60,
++      });
++      cursore += durata * 60000;
++      rimanenti -= durata;
++      minutiPrimaSoglia += durata;
++      minutiPrimaSettimana += durata;
++    }
++
++    cumulatiSoglia.set(chiave, minutiPrimaSoglia);
++    cumulatiSettimana.set(segmento.settimana, minutiPrimaSettimana);
+   });
+ 
+   return classificati;
+@@ -301,11 +324,13 @@ function creaContatori() {
+     domenicali: 0,
+     festive: 0,
+     riposoLavorato: 0,
++    sestoGiorno: 0,
+     domenicaleDiurno: 0,
+     domenicaleNotturno: 0,
+     festivoDiurno: 0,
+     festivoNotturno: 0,
+     straordinarioFerialeDiurno25: 0,
++    straordinarioFerialeDiurno30: 0,
+     straordinarioFerialeNotturno35: 0,
+     straordinarioFestivoDiurno50: 0,
+     straordinarioFestivoNotturno60: 0,
+@@ -332,6 +357,7 @@ function aggiungiSegmento(contatori, segmento) {
+     ] += minuti;
+   }
+   if (segmento.riposoLavorato) contatori.riposoLavorato += minuti;
++  if (segmento.sestoGiorno) contatori.sestoGiorno += minuti;
+ 
+   if (!segmento.straordinario) return;
+   if (speciale && segmento.notturno) {
+@@ -340,6 +366,8 @@ function aggiungiSegmento(contatori, segmento) {
+     contatori.straordinarioFestivoDiurno50 += minuti;
+   } else if (segmento.notturno) {
+     contatori.straordinarioFerialeNotturno35 += minuti;
++  } else if (segmento.dallaQuarantanovesimaOra) {
++    contatori.straordinarioFerialeDiurno30 += minuti;
+  } else {
+     contatori.straordinarioFerialeDiurno25 += minuti;
+  }
+@@ -412,6 +440,7 @@ export function calcolaOreFiduciari({
+       domenicali: ore.domenicali,
+       festive: ore.festive,
+       riposoLavorato: ore.riposoLavorato,
++      sestoGiorno: ore.sestoGiorno,
+     },
+     maggiorazioni: {
+       domenicaleDiurno: ore.domenicaleDiurno,
+@@ -421,6 +450,7 @@ export function calcolaOreFiduciari({
+     },
+     straordinari: {
+       ferialeDiurno25: ore.straordinarioFerialeDiurno25,
++      ferialeDiurno30: ore.straordinarioFerialeDiurno30,
+       ferialeNotturno35: ore.straordinarioFerialeNotturno35,
+       festivoDiurno50: ore.straordinarioFestivoDiurno50,
+       festivoNotturno60: ore.straordinarioFestivoNotturno60,
+diff --git a/fixtures/fiduciari-agosto-2026.cjs b/fixtures/fiduciari-agosto-2026.cjs
+index d602178..3fc7d0c 100644
+--- a/fixtures/fiduciari-agosto-2026.cjs
++++ b/fixtures/fiduciari-agosto-2026.cjs
+@@ -102,6 +102,34 @@ module.exports = {
+       },
+     ],
+  },
++  riconciliazioneCedolino: {
++    straordinari: {
++      ferialeDiurno25: 32.80,
++      ferialeNotturno35: 4.99,
++      festivoDiurno50: 2.70,
++      festivoNotturno60: 2.18,
++    },
++    maggiorazioni: {
++      domenicaleDiurno: 13.30,
++      domenicaleNotturno: 6.65,
++      festivoDiurno: 0,
++      festivoNotturno: 6.67,
++    },
++    voci: [
++      {
++        id: 'ferie-cedolino',
++        descrizione: 'Ferie godute',
++        importo: 49.98,
++        natura: 'imponibile',
++      },
++      {
++        id: 'assenza-cedolino',
++        descrizione: 'Assenza',
++        importo: 49.98,
++        natura: 'trattenuta',
++      },
++    ],
++  },
+   nonRiconciliabileSenzaDatiAggiuntivi: [
+     'Differenza fra 208,50 ore calendario e 209,00 ore riconosciute dal cedolino',
+     'Attribuzione aziendale delle 42,67 ore alle quattro categorie di straordinario',
+diff --git a/scripts/test-fiduciari-economia.cjs b/scripts/test-fiduciari-economia.cjs
+index e9c7f71..43918a0 100644
+--- a/scripts/test-fiduciari-economia.cjs
++++ b/scripts/test-fiduciari-economia.cjs
+@@ -20,11 +20,15 @@ const {
+   TABELLE_RETRIBUTIVE_FIDUCIARI,
+   selezionaPagaBaseFiduciari,
+   normalizzaVociManuali,
++  normalizzaRiconciliazionePayroll,
++  stimaNettoFiduciari,
+   calcolaEconomiaFiduciari,
+ } = caricaModulo('fiduciariEconomia.js', [
+   'TABELLE_RETRIBUTIVE_FIDUCIARI',
+   'selezionaPagaBaseFiduciari',
+   'normalizzaVociManuali',
++  'normalizzaRiconciliazionePayroll',
++  'stimaNettoFiduciari',
+   'calcolaEconomiaFiduciari',
+ ]);
+ const fixture = require('../fixtures/fiduciari-agosto-2026.cjs');
+@@ -90,13 +94,27 @@ assert.equal(voci.trattenute, 26);
+ assert.equal(voci.arrotondato.totaleDopoTrattenute, 1332.61);
+ assert.equal(normalizzaVociManuali([{ importo: 10, natura: 'esente' }])[0].imponibileFiscale, false);
+ 
+-// Le quattro categorie di straordinario usano percentuali indipendenti.
++const riconciliazioneConTrenta = normalizzaRiconciliazionePayroll({
++  straordinari: { ferialeDiurno25: 2, ferialeDiurno30: '1,5' },
++});
++assert.equal(riconciliazioneConTrenta.straordinari.ferialeDiurno25, 2);
++assert.equal(riconciliazioneConTrenta.straordinari.ferialeDiurno30, 1.5);
++const riconciliazionePrecedente = normalizzaRiconciliazionePayroll({
++  straordinari: { ferialeDiurno25: 2 },
++});
++assert.equal(
++  riconciliazionePrecedente.straordinari.ferialeDiurno30,
++  undefined
++);
++
++// Le cinque categorie di straordinario usano percentuali indipendenti.
+ const quattroCategorie = calcola({
+   scattiAnzianita: 15,
+   riepilogoOre: {
+     ...riepilogoVuoto,
+     straordinari: {
+       ferialeDiurno25: 1,
++      ferialeDiurno30: 1,
+       ferialeNotturno35: 1,
+       festivoDiurno50: 1,
+       festivoNotturno60: 1,
+@@ -106,7 +124,23 @@ const quattroCategorie = calcola({
+ const pagaOraria = 1296.43 / 173;
+ assert.equal(
+   quattroCategorie.straordinari.totale.toFixed(5),
+-  (pagaOraria * (1.25 + 1.35 + 1.5 + 1.6)).toFixed(5)
++  (pagaOraria * (1.25 + 1.3 + 1.35 + 1.5 + 1.6)).toFixed(5)
++);
++
++// Il sesto giorno non è inventato; se classificato vale il 10% della paga oraria.
++const sestoNonConfigurato = calcola();
++assert.equal(sestoNonConfigurato.sestoGiorno.ore, 0);
++assert.equal(sestoNonConfigurato.sestoGiorno.importo, 0);
++const sestoConfigurato = calcola({
++  riepilogoOre: {
++    ...riepilogoVuoto,
++    ore: { fisiche: 8, riposoLavorato: 0, sestoGiorno: 8 },
++  },
++});
++assert.equal(sestoConfigurato.sestoGiorno.percentuale, 10);
++assert.equal(
++  sestoConfigurato.sestoGiorno.importo.toFixed(5),
++  (8 * (1281.43 / 173) * 0.1).toFixed(5)
+ );
+ 
+ // Le maggiorazioni si sovrappongono economicamente senza cambiare le ore fisiche.
+@@ -189,10 +223,55 @@ assert.equal(oreAgosto.ore.fisiche, 208.5);
+ assert.equal(economiaAgosto.arrotondato.pagaBase, 1281.43);
+ assert.equal(economiaAgosto.arrotondato.scattiAnzianita, 15);
+ assert.equal(economiaAgosto.riposoLavorato.configurato, false);
+-assert.ok(
+-  economiaAgosto.arrotondato.lordoStimato !==
+-    fixture.cedolinoReale.totaleCompetenze
++assert.equal(economiaAgosto.arrotondato.straordinari, 362.33);
++assert.equal(economiaAgosto.arrotondato.maggiorazioni, 54.33);
++assert.equal(economiaAgosto.arrotondato.altreCompetenze, 57.18);
++assert.equal(economiaAgosto.arrotondato.lordoStimato, 1770.27);
++
++const economiaRiconciliata = calcolaEconomiaFiduciari({
++  anno: fixture.annoTarget,
++  mese: fixture.meseTarget,
++  livello: fixture.configurazioneEconomicaDiagnostica.livello,
++  scattiAnzianita: fixture.configurazioneEconomicaDiagnostica.scattiAnzianita,
++  riepilogoOre: oreAgosto,
++  percentualiMaggiorazioni:
++    fixture.configurazioneEconomicaDiagnostica.percentualiMaggiorazioni,
++  vociManuali: fixture.configurazioneEconomicaDiagnostica.vociManuali,
++  riconciliazionePayroll: fixture.riconciliazioneCedolino,
++});
++assert.equal(economiaRiconciliata.arrotondato.straordinari, 414.22);
++assert.equal(economiaRiconciliata.arrotondato.maggiorazioni, 49.91);
++assert.equal(economiaRiconciliata.arrotondato.altreCompetenze, 107.16);
++assert.equal(
++  economiaRiconciliata.arrotondato.lordoStimato,
++  fixture.cedolinoReale.totaleCompetenze
+ );
++assert.equal(economiaRiconciliata.arrotondato.trattenute, 49.98);
++assert.equal(economiaRiconciliata.arrotondato.totaleDopoTrattenute, 1817.74);
++assert.equal(economiaRiconciliata.riconciliazionePayroll.attiva, true);
++assert.equal(
++  economiaRiconciliata.riconciliazionePayroll.automatico.straordinari.totale,
++  33.5
++);
++
++const nettoSenzaDatiFiscali = stimaNettoFiduciari({
++  economia: economiaRiconciliata,
++});
++assert.equal(nettoSenzaDatiFiscali.disponibile, false);
++assert.equal(
++  nettoSenzaDatiFiscali.motivo,
++  'trattenute_fiscali_previdenziali_mancanti'
++);
++
++const trattenuteResidueReali =
++  economiaRiconciliata.arrotondato.totaleDopoTrattenute -
++  fixture.cedolinoReale.netto;
++const nettoRiconciliato = stimaNettoFiduciari({
++  economia: economiaRiconciliata,
++  trattenutePrevidenziali: trattenuteResidueReali,
++  trattenuteFiscali: 0,
++});
++assert.equal(nettoRiconciliato.netto, fixture.cedolinoReale.netto);
+ 
+ console.log('Regressione motore economico Fiduciari superata', {
+   pagaBase: economiaAgosto.arrotondato.pagaBase,
+@@ -201,5 +280,8 @@ console.log('Regressione motore economico Fiduciari superata', {
+   maggiorazioni: economiaAgosto.arrotondato.maggiorazioni,
+   altreCompetenze: economiaAgosto.arrotondato.altreCompetenze,
+   lordoStimato: economiaAgosto.arrotondato.lordoStimato,
++  lordoRiconciliato: economiaRiconciliata.arrotondato.lordoStimato,
++  nettoRiconciliato: nettoRiconciliato.netto,
++  totaleDopoTrattenute: economiaRiconciliata.arrotondato.totaleDopoTrattenute,
+   cedolinoCompetenze: fixture.cedolinoReale.totaleCompetenze,
+ });
+diff --git a/scripts/test-fiduciari-ore.cjs b/scripts/test-fiduciari-ore.cjs
+index dc4cb04..2cf74e0 100644
+--- a/scripts/test-fiduciari-ore.cjs
++++ b/scripts/test-fiduciari-ore.cjs
+@@ -37,6 +37,80 @@ function calcola(turni, configurazione = {}, meseTarget = 8) {
+   });
+ }
+ 
++function settimanaDiurna(ore) {
++  const turni = [];
++  let rimanenti = ore;
++  for (let giorno = 3; giorno <= 9 && rimanenti > 0; giorno += 1) {
++    const durata = Math.min(8, rimanenti);
++    turni.push(turno(giorno, '07:00', `${String(7 + durata).padStart(2, '0')}:00`));
++    rimanenti -= durata;
++  }
++  return turni;
++}
++
++// Confini CCNL settimanali: ordinario fino a 40 ore, 25% fino a 48, poi 30%.
++const settimana40 = calcola(settimanaDiurna(40));
++assert.equal(settimana40.ore.ordinarie, 40);
++assert.equal(settimana40.ore.straordinarie, 0);
++
++const settimana48 = calcola(settimanaDiurna(48));
++assert.equal(settimana48.ore.ordinarie, 40);
++assert.equal(settimana48.straordinari.ferialeDiurno25, 8);
++assert.equal(settimana48.straordinari.ferialeDiurno30, 0);
++
++const settimana52 = calcola([
++  ...settimanaDiurna(40),
++  turno(8, '07:00', '19:00'),
++]);
++assert.equal(settimana52.ore.ordinarie, 40);
++assert.equal(settimana52.straordinari.ferialeDiurno25, 8);
++assert.equal(settimana52.straordinari.ferialeDiurno30, 4);
++assert.equal(settimana52.ore.straordinarie, 12);
++assert.equal(settimana52.ore.fisiche, 52);
++
++// Un unico segmento che attraversa la 48ª ora viene diviso al minuto esatto.
++const attraversa48 = calcola([
++  ...settimanaDiurna(40),
++  turno(8, '07:00', '19:00'),
++]);
++assert.equal(attraversa48.straordinari.ferialeDiurno25, 8);
++assert.equal(attraversa48.straordinari.ferialeDiurno30, 4);
++assert.ok(attraversa48.segmenti.some(
++  (segmento) => segmento.dallaQuarantanovesimaOra && segmento.minuti === 240
++));
++
++// Oltre 48 ore prevalgono comunque le categorie notturne e festive.
++const notteOltre48 = calcola([
++  ...settimanaDiurna(48),
++  turno(8, '22:00', '23:00'),
++]);
++assert.equal(notteOltre48.straordinari.ferialeNotturno35, 1);
++assert.equal(notteOltre48.straordinari.ferialeDiurno30, 0);
++
++const domenicaOltre48 = calcola([
++  ...settimanaDiurna(48),
++  turno(9, '10:00', '11:00'),
++  turno(9, '22:00', '23:00'),
++]);
++assert.equal(domenicaOltre48.straordinari.festivoDiurno50, 1);
++assert.equal(domenicaOltre48.straordinari.festivoNotturno60, 1);
++assert.equal(domenicaOltre48.straordinari.ferialeDiurno30, 0);
++
++// Il sesto giorno esiste solo con una regola esplicita e deterministica.
++const sestoNonConfigurato = calcola([turno(8, '07:00', '15:00')]);
++assert.equal(sestoNonConfigurato.ore.sestoGiorno, 0);
++const sestoConfigurato = calcola(
++  [turno(8, '07:00', '15:00')],
++  {
++    configurazioneSestoGiorno: {
++      abilitato: true,
++      modalita: 'giorno_settimana',
++      giornoSettimana: 6,
++    },
++  }
++);
++assert.equal(sestoConfigurato.ore.sestoGiorno, 8);
++
+ // 23:00-07:00 feriale: sette ore notturne e una diurna.
+ const notteFeriale = calcola([turno(11, '23:00', '07:00')]);
+ assert.equal(notteFeriale.ore.fisiche, 8);
+-- 
+2.43.0
