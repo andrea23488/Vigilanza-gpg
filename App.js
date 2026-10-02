@@ -7112,10 +7112,13 @@ console.log("🕒 ORA REALE:", new Date().toString());
         (tot, t) => tot + oreRetribuiteTurno(t),
         0
       );
-      const extraOre = giorniAggregati.reduce(
-        (tot, gruppo) => tot + gruppo.oreStraordinarie,
-        0
-      );
+      const extraOre =
+        isFiduciario && riepilogoOreFiduciario
+          ? Number(riepilogoOreFiduciario.straordinarie || 0)
+          : giorniAggregati.reduce(
+              (tot, gruppo) => tot + gruppo.oreStraordinarie,
+              0
+            );
       const notti = lavorati.filter((t) => {
         if (!t.inizio || !t.fine) return false;
         const [hi, mi] = t.inizio.split(':').map(Number);
@@ -7132,7 +7135,12 @@ console.log("🕒 ORA REALE:", new Date().toString());
         notti,
         giorni,
       };
-    }, [turniMese, oreOrdinarieGiornaliereNumero]);
+    }, [
+      turniMese,
+      oreOrdinarieGiornaliereNumero,
+      isFiduciario,
+      riepilogoOreFiduciario,
+    ]);
 
   const iniziali =
     useMemo(() => {
