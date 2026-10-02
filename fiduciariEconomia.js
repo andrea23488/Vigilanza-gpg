@@ -159,27 +159,6 @@ export function stimaNettoFiduciari({
   };
 }
 
-function normalizzaCategorieOre(categorie = {}) {
-  return Object.fromEntries(
-    Object.entries(categorie || {}).map(([categoria, ore]) => [
-      categoria,
-      nonNegativo(ore),
-    ])
-  );
-}
-
-export function normalizzaRiconciliazionePayroll(riconciliazione = null) {
-  if (!riconciliazione || typeof riconciliazione !== 'object') return null;
-  const straordinari = riconciliazione.straordinari
-    ? normalizzaCategorieOre(riconciliazione.straordinari)
-    : null;
-  const maggiorazioni = riconciliazione.maggiorazioni
-    ? normalizzaCategorieOre(riconciliazione.maggiorazioni)
-    : null;
-  const voci = normalizzaVociManuali(riconciliazione.voci || []);
-  return { straordinari, maggiorazioni, voci };
-}
-
 export function calibraProfiloFiscaleFiduciari({
   imponibilePrevidenziale,
   imponibileFiscale,
@@ -304,45 +283,6 @@ export function stimaNettoFiduciariDaProfilo({
       aliquotaContributiva: contributiva,
       aliquotaFiscale: fiscale,
       addizionali: arrotondaImporto(addizionali),
-    },
-  };
-}
-
-export function stimaNettoFiduciari({
-  economia,
-  trattenutePrevidenziali,
-  trattenuteFiscali,
-  altreTrattenute = 0,
-  detrazioni = 0,
-} = {}) {
-  if (!economia) {
-    return { disponibile: false, motivo: 'economia_mancante' };
-  }
-  const previdenziali = numero(trattenutePrevidenziali, NaN);
-  const fiscali = numero(trattenuteFiscali, NaN);
-  if (!Number.isFinite(previdenziali) || !Number.isFinite(fiscali)) {
-    return {
-      disponibile: false,
-      motivo: 'trattenute_fiscali_previdenziali_mancanti',
-      nota:
-        'Il netto non viene stimato con un coefficiente fisso: servono almeno trattenute previdenziali e fiscali.',
-    };
-  }
-  const netto =
-    nonNegativo(economia.totaleDopoTrattenute) -
-    nonNegativo(previdenziali) -
-    nonNegativo(fiscali) -
-    nonNegativo(altreTrattenute) +
-    nonNegativo(detrazioni);
-  return {
-    disponibile: true,
-    netto: arrotondaImporto(netto),
-    componenti: {
-      competenzeDopoTrattenute: arrotondaImporto(economia.totaleDopoTrattenute),
-      trattenutePrevidenziali: arrotondaImporto(previdenziali),
-      trattenuteFiscali: arrotondaImporto(fiscali),
-      altreTrattenute: arrotondaImporto(altreTrattenute),
-      detrazioni: arrotondaImporto(detrazioni),
     },
   };
 }
