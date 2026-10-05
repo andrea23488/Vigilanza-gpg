@@ -4877,6 +4877,24 @@ const cambiaStatoDotazione = (id, stato) => {
   const [cedolinoNotturno, setCedolinoNotturno] = useState('');
   const [cedolinoFestivi, setCedolinoFestivi] = useState('');
 
+  const [riconciliazionePayrollFiduciario, setRiconciliazionePayrollFiduciario] =
+    useState(null);
+
+  const [riconciliazioneCedolinoDraft, setRiconciliazioneCedolinoDraft] =
+    useState({
+      straordinario25: '',
+      straordinario35: '',
+      straordinario50: '',
+      straordinario60: '',
+      domenicaleDiurno: '',
+      domenicaleNotturno: '',
+      festivoDiurno: '',
+      festivoNotturno: '',
+      competenzeImponibili: '',
+      competenzeEsenti: '',
+      trattenute: '',
+    });
+
 
 
   const [loadingServizio, setLoadingServizio] = useState(false);
@@ -4890,6 +4908,94 @@ const cambiaStatoDotazione = (id, stato) => {
 
   const [anno, setAnno] =
     useState(() => new Date().getFullYear());
+
+  useEffect(() => {
+    let attivo = true;
+
+    const caricaRiconciliazioneCedolino = async () => {
+      try {
+        const raw = await AsyncStorage.getItem(
+          '@vigilanza_fiduciari_riconciliazioni'
+        );
+
+        const archivio = raw ? JSON.parse(raw) : {};
+        const chiave = `${anno}-${String(mese + 1).padStart(2, '0')}`;
+        const salvata = archivio?.[chiave] || null;
+
+        if (!attivo) return;
+
+        setRiconciliazionePayrollFiduciario(salvata);
+
+        setRiconciliazioneCedolinoDraft({
+          straordinario25:
+            salvata?.straordinari?.ferialeDiurno25 != null
+              ? String(salvata.straordinari.ferialeDiurno25)
+              : '',
+          straordinario35:
+            salvata?.straordinari?.ferialeNotturno35 != null
+              ? String(salvata.straordinari.ferialeNotturno35)
+              : '',
+          straordinario50:
+            salvata?.straordinari?.festivoDiurno50 != null
+              ? String(salvata.straordinari.festivoDiurno50)
+              : '',
+          straordinario60:
+            salvata?.straordinari?.festivoNotturno60 != null
+              ? String(salvata.straordinari.festivoNotturno60)
+              : '',
+          domenicaleDiurno:
+            salvata?.maggiorazioni?.domenicaleDiurno != null
+              ? String(salvata.maggiorazioni.domenicaleDiurno)
+              : '',
+          domenicaleNotturno:
+            salvata?.maggiorazioni?.domenicaleNotturno != null
+              ? String(salvata.maggiorazioni.domenicaleNotturno)
+              : '',
+          festivoDiurno:
+            salvata?.maggiorazioni?.festivoDiurno != null
+              ? String(salvata.maggiorazioni.festivoDiurno)
+              : '',
+          festivoNotturno:
+            salvata?.maggiorazioni?.festivoNotturno != null
+              ? String(salvata.maggiorazioni.festivoNotturno)
+              : '',
+          competenzeImponibili:
+            String(
+              salvata?.voci?.find(
+                (v) => v.id === 'riconciliazione-imponibili'
+              )?.importo ?? ''
+            ),
+          competenzeEsenti:
+            String(
+              salvata?.voci?.find(
+                (v) => v.id === 'riconciliazione-esenti'
+              )?.importo ?? ''
+            ),
+          trattenute:
+            String(
+              salvata?.voci?.find(
+                (v) => v.id === 'riconciliazione-trattenute'
+              )?.importo ?? ''
+            ),
+        });
+      } catch (error) {
+        console.warn(
+          'Errore caricamento riconciliazione cedolino:',
+          error
+        );
+
+        if (attivo) {
+          setRiconciliazionePayrollFiduciario(null);
+        }
+      }
+    };
+
+    caricaRiconciliazioneCedolino();
+
+    return () => {
+      attivo = false;
+    };
+  }, [anno, mese]);
 
   const [turni, setTurni] =
     useState([]);
@@ -5908,6 +6014,8 @@ const totaleCompetenzeStimate = vociCompetenzeGpg.totale;
       valore: stipendioRiposoCompensoFiduciario,
     },
     vociManuali: vociManualiFiduciario,
+    riconciliazionePayroll:
+      riconciliazionePayrollFiduciario,
   });
 
   const economiaFiduciario = calcolaEconomiaFiduciari(
@@ -5923,6 +6031,15 @@ const totaleCompetenzeStimate = vociCompetenzeGpg.totale;
   const oreNotturneFiduciario = Number(riepilogoOreFiduciario?.ore.notturne || 0);
   const importoNotturnoFiduciario = 0;
   const totaleCompetenzeFiduciario = economiaFiduciario.totaleCompetenze;
+
+  const oreStraordinariePayrollFiduciario =
+    Object.values(
+      economiaFiduciario?.straordinari?.dettagli || {}
+    ).reduce(
+      (totale, voce) =>
+        totale + Number(voce?.ore || 0),
+      0
+    );
 
   // ===== MATURATO REALE AD OGGI =====
 
@@ -9999,7 +10116,29 @@ if (screen === 'colleghi') {
             {[
               ['Ore totali', `${Number(riepilogoOreFiduciario?.ore.fisiche || 0).toFixed(1)} h`],
               ['Ordinarie', `${Number(riepilogoOreFiduciario?.ore.ordinarie || 0).toFixed(1)} h`],
-              ['Straordinarie', `${Number(riepilogoOreFiduciario?.ore.straordinarie || 0).toFixed(1)} h`],
+              ...(economiaFiduciario?.riconciliazionePayroll?.attiva
+                ? [
+                    [
+                      'Straordinarie calendario',
+                      `${Number(
+                        riepilogoOreFiduciario?.ore.straordinarie || 0
+                      ).toFixed(1)} h`,
+                    ],
+                    [
+                      'Straordinarie cedolino',
+                      `${Number(
+                        oreStraordinariePayrollFiduciario || 0
+                      ).toFixed(2)} h`,
+                    ],
+                  ]
+                : [
+                    [
+                      'Straordinarie',
+                      `${Number(
+                        riepilogoOreFiduciario?.ore.straordinarie || 0
+                      ).toFixed(1)} h`,
+                    ],
+                  ]),
               ['Riposo lavorato', `${Number(riepilogoOreFiduciario?.ore.riposoLavorato || 0).toFixed(1)} h`],
               ['Lordo base', `€ ${economiaFiduciario.arrotondato.pagaBase.toFixed(2)}`],
               ['Scatti', `€ ${economiaFiduciario.arrotondato.scattiAnzianita.toFixed(2)}`],
@@ -10008,7 +10147,12 @@ if (screen === 'colleghi') {
               ['Maggiorazioni', `€ ${economiaFiduciario.arrotondato.maggiorazioni.toFixed(2)}`],
               ['Altre competenze', `€ ${economiaFiduciario.arrotondato.altreCompetenze.toFixed(2)}`],
               ['Trattenute', `€ ${economiaFiduciario.arrotondato.trattenute.toFixed(2)}`],
-              ['Lordo stimato', `€ ${economiaFiduciario.arrotondato.lordoStimato.toFixed(2)}`],
+              [
+                economiaFiduciario?.riconciliazionePayroll?.attiva
+                  ? 'Lordo riconciliato'
+                  : 'Lordo stimato',
+                `€ ${economiaFiduciario.arrotondato.lordoStimato.toFixed(2)}`,
+              ],
             ].map(([label, value]) => (
               <View key={label} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4 }}>
                 <Text style={{ color: '#9FB2D9', fontSize: 11 }}>{label}</Text>
@@ -11238,6 +11382,293 @@ if (screen === 'colleghi') {
             })}
 
             
+
+          {isFiduciario ? (
+            <View
+              style={{
+                marginTop: 18,
+                marginBottom: 16,
+                padding: 17,
+                borderRadius: 24,
+                backgroundColor: 'rgba(24,38,78,0.94)',
+                borderWidth: 1,
+                borderColor: 'rgba(120,116,255,0.40)',
+              }}
+            >
+              <Text
+                style={{
+                  color: '#AAA4FF',
+                  fontSize: 10,
+                  fontWeight: '900',
+                  letterSpacing: 1,
+                }}
+              >
+                RICONCILIAZIONE CEDOLINO · {String(mese + 1).padStart(2, '0')}/{anno}
+              </Text>
+
+              <Text
+                style={{
+                  color: '#AAB9D0',
+                  fontSize: 10,
+                  lineHeight: 15,
+                  marginTop: 7,
+                  marginBottom: 13,
+                  fontWeight: '700',
+                }}
+              >
+                Inserisci le ore come sono classificate realmente nel cedolino.
+                Questi dati valgono solo per questo mese e non modificano i mesi successivi.
+              </Text>
+
+              {[
+                ['Straordinario feriale diurno 25% · ore', 'straordinario25'],
+                ['Straordinario feriale notturno 35% · ore', 'straordinario35'],
+                ['Straordinario festivo diurno 50% · ore', 'straordinario50'],
+                ['Straordinario festivo notturno 60% · ore', 'straordinario60'],
+                ['Domenicale diurna · ore', 'domenicaleDiurno'],
+                ['Domenicale notturna · ore', 'domenicaleNotturno'],
+                ['Festiva diurna · ore', 'festivoDiurno'],
+                ['Festiva notturna · ore', 'festivoNotturno'],
+                ['Competenze imponibili del mese · €', 'competenzeImponibili'],
+                ['Competenze esenti del mese · €', 'competenzeEsenti'],
+                ['Trattenute del mese · €', 'trattenute'],
+              ].map(([label, campo]) => (
+                <View key={campo} style={{ marginTop: 9 }}>
+                  <Text
+                    style={{
+                      color: '#CBD5EA',
+                      fontSize: 9,
+                      fontWeight: '800',
+                      marginBottom: 5,
+                    }}
+                  >
+                    {label}
+                  </Text>
+
+                  <TextInput
+                    value={riconciliazioneCedolinoDraft[campo]}
+                    onChangeText={(valore) =>
+                      setRiconciliazioneCedolinoDraft(
+                        (precedente) => ({
+                          ...precedente,
+                          [campo]: valore,
+                        })
+                      )
+                    }
+                    keyboardType="decimal-pad"
+                    placeholder="0,00"
+                    placeholderTextColor="#617493"
+                    style={{
+                      backgroundColor: '#091936',
+                      color: '#FFFFFF',
+                      borderRadius: 12,
+                      padding: 11,
+                      borderWidth: 1,
+                      borderColor: 'rgba(120,116,255,0.24)',
+                    }}
+                  />
+                </View>
+              ))}
+
+              <TouchableOpacity
+                activeOpacity={0.82}
+                onPress={async () => {
+                  const numero = (valore) => {
+                    const n = Number(
+                      String(valore || '')
+                        .trim()
+                        .replace(',', '.')
+                    );
+
+                    return Number.isFinite(n)
+                      ? Math.max(0, n)
+                      : 0;
+                  };
+
+                  const voci = [];
+
+                  const imponibili = numero(
+                    riconciliazioneCedolinoDraft.competenzeImponibili
+                  );
+
+                  const esenti = numero(
+                    riconciliazioneCedolinoDraft.competenzeEsenti
+                  );
+
+                  const trattenute = numero(
+                    riconciliazioneCedolinoDraft.trattenute
+                  );
+
+                  if (imponibili > 0) {
+                    voci.push({
+                      id: 'riconciliazione-imponibili',
+                      descrizione: 'Competenze imponibili cedolino',
+                      importo: imponibili,
+                      natura: 'imponibile',
+                    });
+                  }
+
+                  if (esenti > 0) {
+                    voci.push({
+                      id: 'riconciliazione-esenti',
+                      descrizione: 'Competenze esenti cedolino',
+                      importo: esenti,
+                      natura: 'esente',
+                    });
+                  }
+
+                  if (trattenute > 0) {
+                    voci.push({
+                      id: 'riconciliazione-trattenute',
+                      descrizione: 'Trattenute cedolino',
+                      importo: trattenute,
+                      natura: 'trattenuta',
+                    });
+                  }
+
+                  const riconciliazione = {
+                    straordinari: {
+                      ferialeDiurno25: numero(
+                        riconciliazioneCedolinoDraft.straordinario25
+                      ),
+                      ferialeNotturno35: numero(
+                        riconciliazioneCedolinoDraft.straordinario35
+                      ),
+                      festivoDiurno50: numero(
+                        riconciliazioneCedolinoDraft.straordinario50
+                      ),
+                      festivoNotturno60: numero(
+                        riconciliazioneCedolinoDraft.straordinario60
+                      ),
+                    },
+
+                    maggiorazioni: {
+                      domenicaleDiurno: numero(
+                        riconciliazioneCedolinoDraft.domenicaleDiurno
+                      ),
+                      domenicaleNotturno: numero(
+                        riconciliazioneCedolinoDraft.domenicaleNotturno
+                      ),
+                      festivoDiurno: numero(
+                        riconciliazioneCedolinoDraft.festivoDiurno
+                      ),
+                      festivoNotturno: numero(
+                        riconciliazioneCedolinoDraft.festivoNotturno
+                      ),
+                    },
+
+                    voci,
+                  };
+
+                  try {
+                    const raw = await AsyncStorage.getItem(
+                      '@vigilanza_fiduciari_riconciliazioni'
+                    );
+
+                    const archivio = raw
+                      ? JSON.parse(raw)
+                      : {};
+
+                    const chiave =
+                      `${anno}-${String(mese + 1).padStart(2, '0')}`;
+
+                    archivio[chiave] = riconciliazione;
+
+                    await AsyncStorage.setItem(
+                      '@vigilanza_fiduciari_riconciliazioni',
+                      JSON.stringify(archivio)
+                    );
+
+                    setRiconciliazionePayrollFiduciario(
+                      riconciliazione
+                    );
+
+                    Alert.alert(
+                      'Cedolino riconciliato ✅',
+                      'Da ora questo mese userà le classificazioni reali del cedolino. Gli altri mesi restano automatici.'
+                    );
+                  } catch (error) {
+                    Alert.alert(
+                      'Errore',
+                      'Non è stato possibile salvare la riconciliazione.'
+                    );
+                  }
+                }}
+                style={{
+                  marginTop: 17,
+                  backgroundColor: '#4D4BFF',
+                  borderRadius: 14,
+                  paddingVertical: 14,
+                  alignItems: 'center',
+                }}
+              >
+                <Text
+                  style={{
+                    color: '#FFFFFF',
+                    fontSize: 11,
+                    fontWeight: '900',
+                  }}
+                >
+                  USA QUESTO CEDOLINO PER IL MESE
+                </Text>
+              </TouchableOpacity>
+
+              {riconciliazionePayrollFiduciario ? (
+                <TouchableOpacity
+                  activeOpacity={0.8}
+                  onPress={async () => {
+                    try {
+                      const raw = await AsyncStorage.getItem(
+                        '@vigilanza_fiduciari_riconciliazioni'
+                      );
+
+                      const archivio = raw
+                        ? JSON.parse(raw)
+                        : {};
+
+                      const chiave =
+                        `${anno}-${String(mese + 1).padStart(2, '0')}`;
+
+                      delete archivio[chiave];
+
+                      await AsyncStorage.setItem(
+                        '@vigilanza_fiduciari_riconciliazioni',
+                        JSON.stringify(archivio)
+                      );
+
+                      setRiconciliazionePayrollFiduciario(null);
+
+                      Alert.alert(
+                        'Riconciliazione rimossa',
+                        'Il mese è tornato al calcolo automatico da calendario.'
+                      );
+                    } catch (error) {
+                      Alert.alert(
+                        'Errore',
+                        'Non è stato possibile rimuovere la riconciliazione.'
+                      );
+                    }
+                  }}
+                  style={{
+                    marginTop: 10,
+                    paddingVertical: 10,
+                    alignItems: 'center',
+                  }}
+                >
+                  <Text
+                    style={{
+                      color: '#FF9AA7',
+                      fontSize: 10,
+                      fontWeight: '900',
+                    }}
+                  >
+                    RIMUOVI RICONCILIAZIONE DEL MESE
+                  </Text>
+                </TouchableOpacity>
+              ) : null}
+            </View>
+          ) : null}
+
           {/* ===== MINI CARD NOTTURNO FESTIVI ===== */}
           <View
             style={{
