@@ -6474,8 +6474,22 @@ const quotaTempoMese =
         numeroEconomico(stipendioImponibilePrevidenzialeFiduciario)
       : 0;
 
+  const riconciliazioneFiduciarioAttiva =
+    economiaFiduciario?.riconciliazionePayroll?.attiva === true;
+
+  const imponibilePrevidenzialeFiduciarioAdOggi =
+    riconciliazioneFiduciarioAttiva &&
+    numeroEconomico(stipendioImponibilePrevidenzialeFiduciario) > 0
+      ? numeroEconomico(stipendioImponibilePrevidenzialeFiduciario) *
+        quotaTempoMese
+      : maturatoFiduciarioImponibileAdOggi;
+
   const imponibileFiscaleFiduciarioAdOggi =
-    rapportoImponibileFiscaleFiduciario > 0
+    riconciliazioneFiduciarioAttiva &&
+    numeroEconomico(stipendioImponibileFiscaleFiduciario) > 0
+      ? numeroEconomico(stipendioImponibileFiscaleFiduciario) *
+        quotaTempoMese
+      : rapportoImponibileFiscaleFiduciario > 0
       ? maturatoFiduciarioImponibileAdOggi *
         rapportoImponibileFiscaleFiduciario
       : 0;
@@ -6485,7 +6499,7 @@ const quotaTempoMese =
       ? stimaNettoFiduciariDaProfilo({
           economia: economiaFiduciarioAdOggi,
           imponibilePrevidenziale:
-            maturatoFiduciarioImponibileAdOggi,
+            imponibilePrevidenzialeFiduciarioAdOggi,
           imponibileFiscale:
             imponibileFiscaleFiduciarioAdOggi,
           aliquotaContributiva:
@@ -6548,9 +6562,20 @@ const coefficienteNettoStimato = 1992.00 / 2577.16;
     String(stipendioAliquotaContributivaFiduciario || '').trim() !== '' &&
     String(stipendioAliquotaFiscaleFiduciario || '').trim() !== '';
 
+  const imponibilePrevidenzialeFiduciarioMese =
+    riconciliazioneFiduciarioAttiva &&
+    numeroEconomico(stipendioImponibilePrevidenzialeFiduciario) > 0
+      ? numeroEconomico(stipendioImponibilePrevidenzialeFiduciario)
+      : Number(
+          economiaFiduciario.imponibilePrevidenzialeTeorico || 0
+        );
+
   const imponibileFiscaleFiduciarioMese =
-    rapportoImponibileFiscaleFiduciario > 0
-      ? Number(economiaFiduciario.imponibilePrevidenzialeTeorico || 0) *
+    riconciliazioneFiduciarioAttiva &&
+    numeroEconomico(stipendioImponibileFiscaleFiduciario) > 0
+      ? numeroEconomico(stipendioImponibileFiscaleFiduciario)
+      : rapportoImponibileFiscaleFiduciario > 0
+      ? imponibilePrevidenzialeFiduciarioMese *
         rapportoImponibileFiscaleFiduciario
       : 0;
 
@@ -6558,7 +6583,7 @@ const coefficienteNettoStimato = 1992.00 / 2577.16;
     ? stimaNettoFiduciariDaProfilo({
         economia: economiaFiduciario,
         imponibilePrevidenziale:
-          economiaFiduciario.imponibilePrevidenzialeTeorico,
+          imponibilePrevidenzialeFiduciarioMese,
         imponibileFiscale:
           imponibileFiscaleFiduciarioMese,
         aliquotaContributiva:
