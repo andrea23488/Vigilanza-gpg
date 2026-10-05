@@ -4877,6 +4877,9 @@ const cambiaStatoDotazione = (id, stato) => {
   const [cedolinoNotturno, setCedolinoNotturno] = useState('');
   const [cedolinoFestivi, setCedolinoFestivi] = useState('');
 
+  const [mostraPrecisioneCedolinoFiduciario, setMostraPrecisioneCedolinoFiduciario] =
+    useState(false);
+
   const [riconciliazionePayrollFiduciario, setRiconciliazionePayrollFiduciario] =
     useState(null);
 
@@ -11412,6 +11415,146 @@ if (screen === 'colleghi') {
             <View
               style={{
                 marginTop: 18,
+                marginBottom: mostraPrecisioneCedolinoFiduciario ? 4 : 16,
+                padding: 17,
+                borderRadius: 24,
+                backgroundColor: 'rgba(20,48,72,0.94)',
+                borderWidth: 1,
+                borderColor: 'rgba(89,211,255,0.30)',
+              }}
+            >
+              <View
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                }}
+              >
+                <View
+                  style={{
+                    width: 42,
+                    height: 42,
+                    borderRadius: 14,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    backgroundColor: 'rgba(89,211,255,0.10)',
+                    borderWidth: 1,
+                    borderColor: 'rgba(89,211,255,0.22)',
+                    marginRight: 12,
+                  }}
+                >
+                  <Ionicons
+                    name="document-text-outline"
+                    size={21}
+                    color="#79ECFF"
+                  />
+                </View>
+
+                <View style={{ flex: 1 }}>
+                  <Text
+                    style={{
+                      color: '#FFFFFF',
+                      fontSize: 15,
+                      fontWeight: '900',
+                    }}
+                  >
+                    Rendi la stima più precisa
+                  </Text>
+
+                  <Text
+                    style={{
+                      color: '#91A9C2',
+                      fontSize: 10,
+                      lineHeight: 15,
+                      fontWeight: '700',
+                      marginTop: 4,
+                    }}
+                  >
+                    Facoltativo. Usa una tua busta paga per insegnare
+                    all'app come vengono classificate realmente le tue ore.
+                  </Text>
+                </View>
+              </View>
+
+              {riconciliazionePayrollFiduciario ? (
+                <View
+                  style={{
+                    marginTop: 12,
+                    paddingVertical: 9,
+                    paddingHorizontal: 11,
+                    borderRadius: 12,
+                    backgroundColor: 'rgba(83,232,188,0.09)',
+                    borderWidth: 1,
+                    borderColor: 'rgba(83,232,188,0.24)',
+                  }}
+                >
+                  <Text
+                    style={{
+                      color: '#78EDC7',
+                      fontSize: 10,
+                      fontWeight: '900',
+                    }}
+                  >
+                    ✓ Cedolino già utilizzato per questo mese
+                  </Text>
+                </View>
+              ) : null}
+
+              <TouchableOpacity
+                activeOpacity={0.82}
+                onPress={() =>
+                  setMostraPrecisioneCedolinoFiduciario(
+                    !mostraPrecisioneCedolinoFiduciario
+                  )
+                }
+                style={{
+                  marginTop: 13,
+                  paddingVertical: 12,
+                  paddingHorizontal: 13,
+                  borderRadius: 13,
+                  backgroundColor: mostraPrecisioneCedolinoFiduciario
+                    ? 'rgba(89,211,255,0.08)'
+                    : '#3154ff',
+                  borderWidth: 1,
+                  borderColor: mostraPrecisioneCedolinoFiduciario
+                    ? 'rgba(89,211,255,0.25)'
+                    : '#6f86ff',
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <Text
+                  style={{
+                    color: '#FFFFFF',
+                    fontSize: 10,
+                    fontWeight: '900',
+                    marginRight: 7,
+                  }}
+                >
+                  {mostraPrecisioneCedolinoFiduciario
+                    ? 'NASCONDI DATI AVANZATI'
+                    : riconciliazionePayrollFiduciario
+                    ? 'VEDI / MODIFICA DATI DEL CEDOLINO'
+                    : 'USA UNA BUSTA PAGA'}
+                </Text>
+
+                <Ionicons
+                  name={
+                    mostraPrecisioneCedolinoFiduciario
+                      ? 'chevron-up'
+                      : 'chevron-down'
+                  }
+                  size={15}
+                  color="#FFFFFF"
+                />
+              </TouchableOpacity>
+            </View>
+          ) : null}
+
+          {isFiduciario && mostraPrecisioneCedolinoFiduciario ? (
+            <View
+              style={{
+                marginTop: 18,
                 marginBottom: 16,
                 padding: 17,
                 borderRadius: 24,
@@ -11428,7 +11571,7 @@ if (screen === 'colleghi') {
                   letterSpacing: 1,
                 }}
               >
-                RICONCILIAZIONE CEDOLINO · {String(mese + 1).padStart(2, '0')}/{anno}
+                DATI DELLA BUSTA PAGA · {String(mese + 1).padStart(2, '0')}/{anno}
               </Text>
 
               <Text
@@ -11441,8 +11584,8 @@ if (screen === 'colleghi') {
                   fontWeight: '700',
                 }}
               >
-                Inserisci le ore come sono classificate realmente nel cedolino.
-                Questi dati valgono solo per questo mese e non modificano i mesi successivi.
+                Copia qui le ore e gli importi riportati nella tua busta paga.
+                Servono solo a rendere più preciso questo mese e non modificano gli altri mesi.
               </Text>
 
               {[
@@ -11609,8 +11752,8 @@ if (screen === 'colleghi') {
                     );
 
                     Alert.alert(
-                      'Cedolino riconciliato ✅',
-                      'Da ora questo mese userà le classificazioni reali del cedolino. Gli altri mesi restano automatici.'
+                      'Stima aggiornata ✅',
+                      'Questo mese ora usa anche i dati della tua busta paga. Gli altri mesi restano automatici.'
                     );
                   } catch (error) {
                     Alert.alert(
@@ -11634,7 +11777,7 @@ if (screen === 'colleghi') {
                     fontWeight: '900',
                   }}
                 >
-                  USA QUESTO CEDOLINO PER IL MESE
+                  USA QUESTI DATI PER MIGLIORARE LA STIMA
                 </Text>
               </TouchableOpacity>
 
@@ -11664,8 +11807,8 @@ if (screen === 'colleghi') {
                       setRiconciliazionePayrollFiduciario(null);
 
                       Alert.alert(
-                        'Riconciliazione rimossa',
-                        'Il mese è tornato al calcolo automatico da calendario.'
+                        'Dati rimossi',
+                        'Il mese è tornato al calcolo automatico dai turni.'
                       );
                     } catch (error) {
                       Alert.alert(
@@ -11687,7 +11830,7 @@ if (screen === 'colleghi') {
                       fontWeight: '900',
                     }}
                   >
-                    RIMUOVI RICONCILIAZIONE DEL MESE
+                    RIMUOVI DATI BUSTA PAGA DEL MESE
                   </Text>
                 </TouchableOpacity>
               ) : null}
