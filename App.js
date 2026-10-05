@@ -12591,7 +12591,9 @@ if (screen === 'configuraStipendio') {
                         fontWeight: '900',
                       }}
                     >
-                      Importi di calcolo
+                      {stipendioTipoOperatore === 'fiduciario'
+                        ? 'Opzioni avanzate'
+                        : 'Importi di calcolo'}
                     </Text>
 
                     <Text
@@ -12599,9 +12601,14 @@ if (screen === 'configuraStipendio') {
                         color: '#8fa5cc',
                         fontSize: 12,
                         marginTop: 4,
+                        lineHeight: 17,
                       }}
                     >
-                      {stipendioProfiloCalcolo === 'automatico'
+                      {stipendioTipoOperatore === 'fiduciario'
+                        ? stipendioProfiloCalcolo === 'automatico'
+                          ? 'Il calcolo CCNL funziona già automaticamente. Apri solo se devi inserire scatti, indennità o dati del cedolino.'
+                          : 'Apri per modificare importi, indennità e parametri personalizzati.'
+                        : stipendioProfiloCalcolo === 'automatico'
                         ? 'Valori gestiti automaticamente'
                         : 'Inserisci i valori della tua busta paga'}
                     </Text>
@@ -12617,6 +12624,8 @@ if (screen === 'configuraStipendio') {
                   >
                     {mostraImportiCalcolo
                       ? 'Chiudi ▲'
+                      : stipendioTipoOperatore === 'fiduciario'
+                      ? 'Apri ›'
                       : 'Modifica ›'}
                   </Text>
                 </View>
