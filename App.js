@@ -1149,6 +1149,9 @@ export default function App() {
   const [mostraImportiCalcolo, setMostraImportiCalcolo] =
     useState(false);
 
+  const [configurazioneStipendioEsistente, setConfigurazioneStipendioEsistente] =
+    useState(false);
+
   const [
     stipendioProfiloCalcolo,
     setStipendioProfiloCalcolo
@@ -2733,7 +2736,12 @@ useEffect(() => {
           '@vigilanza_gpg_stipendio'
         );
 
-        if (!salvata) return;
+        if (!salvata) {
+          setConfigurazioneStipendioEsistente(false);
+          return;
+        }
+
+        setConfigurazioneStipendioEsistente(true);
 
         const dati = JSON.parse(salvata);
 
@@ -12185,6 +12193,10 @@ if (screen === 'configuraStipendio') {
             activeOpacity={0.82}
             onPress={() => {
               setStipendioTipoOperatore('fiduciario');
+
+              if (!configurazioneStipendioEsistente) {
+                setStipendioCalcoloStraordinari('settimanale');
+              }
 
               if (
                 !['A', 'B', 'C', 'D', 'E'].includes(
