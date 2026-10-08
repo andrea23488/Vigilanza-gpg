@@ -7613,8 +7613,15 @@ console.log("🕒 ORA REALE:", new Date().toString());
   }
 
   function apriGiornoCalendario(g) {
-    setGiorno(Number(g));
-    setGiornoAgendaSelezionato(Number(g));
+    const giornoPremuto = Number(g);
+
+    if (Number(giornoAgendaSelezionato) === giornoPremuto) {
+      apriSceltaAgenda(giornoPremuto);
+      return;
+    }
+
+    setGiorno(giornoPremuto);
+    setGiornoAgendaSelezionato(giornoPremuto);
   }
 
   function apriSceltaAgenda(g = giornoAgendaSelezionato) {
