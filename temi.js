@@ -99,3 +99,17 @@ export function generaPalette(preferenza = ripristinaAspetto()) {
     onAccent: testoSu(accent), text: textSicuro, textMuted: textSicuro,
     border: textSicuro, homeAccent: accent, ...COLORI_FUNZIONALI });
 }
+
+// null mantiene integralmente il rendering precedente della Home.
+export function paletteHomeDaPreferenza(preferenza) {
+  const p = normalizzaPreferenzaAspetto(preferenza);
+  if (p.preset === 'originale' && p.background === null && p.accent === null) return null;
+  const palette = generaPalette(p);
+  // Mantiene l'accento scelto: adatta soltanto la traccia della barra se necessario.
+  const progressTrack = rapportoContrasto(palette.accent, palette.surface) >= 3
+    ? palette.surface : testoSu(palette.accent);
+  return Object.freeze({ ...palette, progressTrack, progressFill: palette.accent });
+}
+export function coloreHome(palette, ruolo, originale) {
+  return palette === null ? originale : palette[ruolo];
+}

@@ -90,9 +90,9 @@ function Anteprima({ palette: p }) {
   </View>;
 }
 
-export default function AspettoColoriScreen({ onBack }) {
+export default function AspettoColoriScreen({ onBack, archivio, onSalvato }) {
   const controllore = useRef(null);
-  if (!controllore.current) controllore.current = creaControlloreAspetto();
+  if (!controllore.current) controllore.current = creaControlloreAspetto(archivio);
   const [stato, setStato] = useState(() => controllore.current.stato());
   const [messaggio, setMessaggio] = useState('');
   const montato = useRef(true);
@@ -112,8 +112,9 @@ export default function AspettoColoriScreen({ onBack }) {
   async function salva() {
     const pending = controllore.current.salva(); aggiorna();
     const r = await pending;
+    if (r.ok && onSalvato) onSalvato(r.preferenza);
     if (!montato.current) return;
-    aggiorna(); setMessaggio(r.ok ? 'Colori salvati sul dispositivo. Il tema dell’app resta invariato in questa fase.'
+    aggiorna(); setMessaggio(r.ok ? 'Colori salvati sul dispositivo e applicati alla Home.'
       : 'Salvataggio non riuscito. La selezione è ancora disponibile: riprova.');
   }
   function indietro() {
@@ -128,7 +129,7 @@ export default function AspettoColoriScreen({ onBack }) {
         <Text style={styles.testo}>‹ Torna al Profilo</Text>
       </TouchableOpacity>
       <Text style={styles.title}>Aspetto e colori</Text>
-      <Text style={styles.secondario}>Personalizza l’anteprima. I colori della Home reale restano invariati.</Text>
+      <Text style={styles.secondario}>Personalizza l’anteprima. Salva per applicare i colori alla Home.</Text>
       {stato.occupato && <ActivityIndicator color="#55B8FF" accessibilityLabel="Operazione in corso" />}
       {!!messaggio && <Text accessibilityLiveRegion="polite" style={styles.secondario}>{messaggio}</Text>}
       {!stato.pronto && !stato.occupato && <TouchableOpacity onPress={carica} accessibilityRole="button" style={styles.button}><Text style={styles.testo}>Riprova caricamento</Text></TouchableOpacity>}

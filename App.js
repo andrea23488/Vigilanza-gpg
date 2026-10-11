@@ -1,3 +1,5 @@
+import { paletteHomeDaPreferenza, coloreHome, ripristinaAspetto } from './temi';
+import { creaArchivioAspetto } from './preferenzeAspetto';
 import AspettoColoriScreen from './AspettoColoriScreen';
 import { classificaTurniGpg, leggiManualeGpg, riapriManualeGpg, formattaOreGpg } from './straordinariGpg';
 import {
@@ -146,6 +148,7 @@ function HomeDigitalCore({
   turnoInCorso,
   countdownLabel,
   countdownTurno,
+  paletteHome = null,
   onPress,
 }) {
   const { width } = useWindowDimensions();
@@ -227,7 +230,7 @@ function HomeDigitalCore({
       ? 'LEGGE 104'
       : 'NESSUN TURNO';
 
-  const accento = turnoInCorso ? '#6BFF8A' : '#5EEBFF';
+  const accento = paletteHome ? paletteHome.homeAccent : turnoInCorso ? '#6BFF8A' : '#5EEBFF';
 
   return (
     <TouchableOpacity
@@ -258,9 +261,9 @@ function HomeDigitalCore({
             width: outer * 0.98,
             height: outer * 0.98,
             borderRadius: outer,
-            backgroundColor: turnoInCorso
+            backgroundColor: coloreHome(paletteHome, 'surface', turnoInCorso
               ? 'rgba(61,255,118,0.055)'
-              : 'rgba(64,213,255,0.075)',
+              : 'rgba(64,213,255,0.075)'),
             shadowColor: accento,
             shadowOpacity: 0.75,
             shadowRadius: 34,
@@ -276,9 +279,9 @@ function HomeDigitalCore({
             width: middle,
             height: middle,
             borderRadius: middle,
-            backgroundColor: turnoInCorso
+            backgroundColor: coloreHome(paletteHome, 'surface', turnoInCorso
               ? 'rgba(41,190,92,0.08)'
-              : 'rgba(47,157,255,0.10)',
+              : 'rgba(47,157,255,0.10)'),
             shadowColor: accento,
             shadowOpacity: 0.55,
             shadowRadius: 22,
@@ -313,7 +316,7 @@ function HomeDigitalCore({
               rx={outer * 0.43}
               ry={outer * 0.43}
               fill="none"
-              stroke="#B9F8FF"
+              stroke={coloreHome(paletteHome, 'homeAccent', "#B9F8FF")}
               strokeWidth={1.2}
               strokeDasharray={`${outer * 0.09} ${outer * 0.045}`}
               opacity={0.34}
@@ -324,7 +327,7 @@ function HomeDigitalCore({
               rx={outer * 0.46}
               ry={outer * 0.46}
               fill="none"
-              stroke="#FFFFFF"
+              stroke={coloreHome(paletteHome, 'homeAccent', "#FFFFFF")}
               strokeWidth={5.2}
               strokeDasharray={`${outer * 0.15} ${outer * 2.1}`}
               opacity={0.9}
@@ -341,9 +344,9 @@ function HomeDigitalCore({
             height: middle,
             borderRadius: middle,
             borderWidth: 2.5,
-            borderColor: turnoInCorso
+            borderColor: coloreHome(paletteHome, 'accent', turnoInCorso
               ? 'rgba(107,255,138,0.72)'
-              : 'rgba(94,235,255,0.78)',
+              : 'rgba(94,235,255,0.78)'),
             shadowColor: accento,
             shadowOpacity: 0.7,
             shadowRadius: 18,
@@ -360,11 +363,11 @@ function HomeDigitalCore({
             alignItems: 'center',
             justifyContent: 'center',
             paddingHorizontal: 26,
-            backgroundColor: turnoInCorso ? '#07160F' : '#08152A',
+            backgroundColor: coloreHome(paletteHome, 'surface', turnoInCorso ? '#07160F' : '#08152A'),
             borderWidth: 1.8,
-            borderColor: turnoInCorso
+            borderColor: coloreHome(paletteHome, 'accent', turnoInCorso
               ? 'rgba(107,255,138,0.55)'
-              : 'rgba(94,235,255,0.60)',
+              : 'rgba(94,235,255,0.60)'),
             shadowColor: accento,
             shadowOpacity: 0.45,
             shadowRadius: 20,
@@ -373,7 +376,7 @@ function HomeDigitalCore({
         >
           <Text
             style={{
-              color: accento,
+              color: coloreHome(paletteHome, 'text', accento),
               fontSize: 10,
               fontWeight: '900',
               letterSpacing: 1.4,
@@ -387,7 +390,7 @@ function HomeDigitalCore({
             adjustsFontSizeToFit
             minimumFontScale={0.72}
             style={{
-              color: '#FFFFFF',
+              color: coloreHome(paletteHome, 'text', '#FFFFFF'),
               fontSize: 31,
               fontWeight: '900',
               marginTop: 9,
@@ -400,7 +403,7 @@ function HomeDigitalCore({
           <Text
             numberOfLines={2}
             style={{
-              color: '#C6D8EE',
+              color: coloreHome(paletteHome, 'text', '#C6D8EE'),
               fontSize: 12,
               fontWeight: '700',
               marginTop: 7,
@@ -414,16 +417,16 @@ function HomeDigitalCore({
             style={{
               width: '64%',
               height: 1,
-              backgroundColor: turnoInCorso
+              backgroundColor: coloreHome(paletteHome, 'surface', turnoInCorso
                 ? 'rgba(107,255,138,0.22)'
-                : 'rgba(94,235,255,0.22)',
+                : 'rgba(94,235,255,0.22)'),
               marginVertical: 13,
             }}
           />
 
           <Text
             style={{
-              color: accento,
+              color: coloreHome(paletteHome, 'text', accento),
               fontSize: 9,
               fontWeight: '900',
               letterSpacing: 1.1,
@@ -434,7 +437,7 @@ function HomeDigitalCore({
 
           <Text
             style={{
-              color: '#FFFFFF',
+              color: coloreHome(paletteHome, 'text', '#FFFFFF'),
               fontSize: 20,
               fontWeight: '900',
               marginTop: 3,
@@ -761,6 +764,18 @@ function calcolaStraordinariConfigurati({
 
 
 export default function App() {
+  const archivioAspettoRef = useRef(null);
+  if (!archivioAspettoRef.current) archivioAspettoRef.current = creaArchivioAspetto();
+  const [preferenzaAspetto, setPreferenzaAspetto] = useState(ripristinaAspetto);
+  const paletteHome = useMemo(() => paletteHomeDaPreferenza(preferenzaAspetto), [preferenzaAspetto]);
+  useEffect(() => {
+    let attivo = true;
+    archivioAspettoRef.current.carica().then(r => {
+      if (attivo && r.ok) setPreferenzaAspetto(r.preferenza);
+    });
+    return () => { attivo = false; };
+  }, []);
+
   const giorniSettimana = ["Dom", "Lun", "Mar", "Mer", "Gio", "Ven", "Sab"];
  const [accessoTest, setAccessoTest] = useState(false);
   const [authInizializzata, setAuthInizializzata] = useState(false);
@@ -26092,7 +26107,7 @@ if (screen === 'profiloCollega') {
   }
 
   if (screen === 'aspettoColori') {
-    return <AspettoColoriScreen onBack={() => setScreen('profile')} />;
+    return <AspettoColoriScreen onBack={() => setScreen('profile')} archivio={archivioAspettoRef.current} onSalvato={setPreferenzaAspetto} />;
   }
 
   if (
@@ -29677,7 +29692,7 @@ if (screen === 'profiloCollega') {
       Number(etaServizio?.ritardo_traffico || 0);
 
     return (
-      <Screen>
+      <Screen homePalette={paletteHome}>
         <ScrollView
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{
@@ -29713,7 +29728,7 @@ if (screen === 'profiloCollega') {
                   adjustsFontSizeToFit
                   minimumFontScale={0.80}
                   style={{
-                    color: '#FFFFFF',
+                    color: coloreHome(paletteHome, 'text', '#FFFFFF'),
                     fontSize: Platform.OS === 'android' ? 21 : 23,
                     fontWeight: '900',
                   }}
@@ -29724,7 +29739,7 @@ if (screen === 'profiloCollega') {
                 <Text
                   numberOfLines={2}
                   style={{
-                    color: Platform.OS === 'android' ? '#C8D4EA' : '#AEB9D6',
+                    color: coloreHome(paletteHome, 'text', Platform.OS === 'android' ? '#C8D4EA' : '#AEB9D6'),
                     fontSize: Platform.OS === 'android' ? 11 : 12,
                     fontWeight: '700',
                     marginTop: 4,
@@ -29740,7 +29755,7 @@ if (screen === 'profiloCollega') {
                   style={{
                     alignSelf: 'flex-start',
                     marginTop: 9,
-                    backgroundColor: 'rgba(24,190,88,0.17)',
+                    backgroundColor: paletteHome ? '#07160F' : 'rgba(24,190,88,0.17)',
                     borderRadius: 18,
                     paddingHorizontal: 12,
                     paddingVertical: 6,
@@ -29796,7 +29811,7 @@ if (screen === 'profiloCollega') {
               <Ionicons
                 name="notifications-outline"
                 size={24}
-                color="#FFFFFF"
+                color={coloreHome(paletteHome, 'text', "#FFFFFF")}
               />
 
               {numeroNotifiche > 0 && (
@@ -29837,11 +29852,11 @@ if (screen === 'profiloCollega') {
                   height: 58,
                   borderRadius: 29,
                   borderWidth: 2,
-                  borderColor: '#8DB8FF',
+                  borderColor: coloreHome(paletteHome, 'border', '#8DB8FF'),
                   alignItems: 'center',
                   justifyContent: 'center',
                   overflow: 'hidden',
-                  backgroundColor: '#142044',
+                  backgroundColor: coloreHome(paletteHome, 'surface', '#142044'),
                 }}
               >
                 {fotoProfilo ? (
@@ -29856,7 +29871,7 @@ if (screen === 'profiloCollega') {
                   <Ionicons
                     name="person"
                     size={27}
-                    color="#FFFFFF"
+                    color={coloreHome(paletteHome, 'text', "#FFFFFF")}
                   />
                 )}
               </TouchableOpacity>
@@ -29864,7 +29879,7 @@ if (screen === 'profiloCollega') {
           </View>
 
           {/* ================= DIGITAL CORE TURNO ================= */}
-          <HomeDigitalCore
+          <HomeDigitalCore paletteHome={paletteHome}
             turno={turnoHomeV2}
             turnoInCorso={Boolean(turnoInCorso)}
             countdownLabel={countdownLabel}
@@ -29881,16 +29896,16 @@ if (screen === 'profiloCollega') {
               paddingHorizontal: 14,
               paddingVertical: 7,
               borderRadius: 18,
-              backgroundColor: '#08172B',
+              backgroundColor: coloreHome(paletteHome, 'surface', '#08172B'),
               borderWidth: 1,
-              borderColor: 'rgba(94,235,255,0.28)',
+              borderColor: coloreHome(paletteHome, 'border', 'rgba(94,235,255,0.28)'),
             }}
           >
             {/* PERCORSO + TRAFFICO */}
               <View
                 style={{
                   height: 1,
-                  backgroundColor: 'rgba(85,244,124,0.18)',
+                  backgroundColor: coloreHome(paletteHome, 'surface', 'rgba(85,244,124,0.18)'),
                   marginTop: 8,
                   marginBottom: 7,
                 }}
@@ -29957,7 +29972,7 @@ if (screen === 'profiloCollega') {
                   width: 34,
                   height: 34,
                   borderRadius: 11,
-                  backgroundColor: 'rgba(71,221,255,0.11)',
+                  backgroundColor: coloreHome(paletteHome, 'surface', 'rgba(71,221,255,0.11)'),
                   alignItems: 'center',
                   justifyContent: 'center',
                 }}
@@ -29965,7 +29980,7 @@ if (screen === 'profiloCollega') {
                 <Ionicons
                   name="car-outline"
                   size={21}
-                  color="#63DFFF"
+                  color={coloreHome(paletteHome, 'text', "#63DFFF")}
                 />
               </View>
 
@@ -29977,7 +29992,7 @@ if (screen === 'profiloCollega') {
               >
                 <Text
                   style={{
-                    color: '#FFFFFF',
+                    color: coloreHome(paletteHome, 'text', '#FFFFFF'),
                     fontSize: 13,
                     fontWeight: '800',
                   }}
@@ -29996,7 +30011,7 @@ if (screen === 'profiloCollega') {
                 {!etaServizioLoading && minutiEtaHomeV2 <= 0 ? (
                   <Text
                     style={{
-                      color: '#8FA5CC',
+                      color: coloreHome(paletteHome, 'text', '#8FA5CC'),
                       fontSize: 10,
                       marginTop: 2,
                     }}
@@ -30009,7 +30024,7 @@ if (screen === 'profiloCollega') {
               <Ionicons
                 name="chevron-forward"
                 size={19}
-                color="#8FEAFF"
+                color={coloreHome(paletteHome, 'text', "#8FEAFF")}
               />
               </TouchableOpacity>
 
@@ -30068,8 +30083,8 @@ if (screen === 'profiloCollega') {
     height: 42,
     borderRadius: 18,
     borderWidth: 1.2,
-    borderColor: 'rgba(105,223,255,0.70)',
-    backgroundColor: 'rgba(49,103,210,0.16)',
+    borderColor: coloreHome(paletteHome, 'border', 'rgba(105,223,255,0.70)'),
+    backgroundColor: coloreHome(paletteHome, 'surface', 'rgba(49,103,210,0.16)'),
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -30078,11 +30093,11 @@ if (screen === 'profiloCollega') {
   <Ionicons
     name="add-circle-outline"
     size={21}
-    color="#69DFFF"
+    color={coloreHome(paletteHome, 'text', "#69DFFF")}
   />
   <Text
     style={{
-      color: '#FFFFFF',
+      color: coloreHome(paletteHome, 'text', '#FFFFFF'),
       fontSize: 13,
       fontWeight: '900',
       marginLeft: 8,
@@ -30106,10 +30121,10 @@ if (screen === 'profiloCollega') {
               paddingVertical: 9,
               borderRadius: 19,
 
-              backgroundColor: '#0B1930',
+              backgroundColor: coloreHome(paletteHome, 'surface', '#0B1930'),
 
               borderWidth: 1,
-              borderColor: 'rgba(78,112,255,0.60)',
+              borderColor: coloreHome(paletteHome, 'border', 'rgba(78,112,255,0.60)'),
             }}
           >
             <View
@@ -30121,7 +30136,7 @@ if (screen === 'profiloCollega') {
             >
               <Text
                 style={{
-                  color: '#FFFFFF',
+                  color: coloreHome(paletteHome, 'text', '#FFFFFF'),
                   fontSize: 13,
                   fontWeight: '900',
                 }}
@@ -30131,7 +30146,7 @@ if (screen === 'profiloCollega') {
 
               <Text
                 style={{
-                  color: '#FFFFFF',
+                  color: coloreHome(paletteHome, 'text', '#FFFFFF'),
                   fontSize: 12,
                   fontWeight: '900',
                 }}
@@ -30144,7 +30159,7 @@ if (screen === 'profiloCollega') {
               style={{
                 height: 5,
                 borderRadius: 10,
-                backgroundColor: '#19264A',
+                backgroundColor: coloreHome(paletteHome, 'progressTrack', '#19264A'),
                 marginTop: 6,
                 overflow: 'hidden',
               }}
@@ -30154,7 +30169,7 @@ if (screen === 'profiloCollega') {
                   height: '100%',
                   width: `${avanzamentoHomeV2}%`,
                   borderRadius: 10,
-                  backgroundColor: '#72FF45',
+                  backgroundColor: coloreHome(paletteHome, 'progressFill', '#72FF45'),
                 }}
               />
             </View>
@@ -30173,7 +30188,7 @@ if (screen === 'profiloCollega') {
               >
                 <Text
                   style={{
-                    color: '#FFFFFF',
+                    color: coloreHome(paletteHome, 'text', '#FFFFFF'),
                     fontSize: 17,
                     fontWeight: '900',
                   }}
@@ -30183,7 +30198,7 @@ if (screen === 'profiloCollega') {
 
                 <Text
                   style={{
-                    color: '#9DA9C8',
+                    color: coloreHome(paletteHome, 'text', '#9DA9C8'),
                     fontSize: 9,
                     fontWeight: '800',
                   }}
@@ -30195,7 +30210,7 @@ if (screen === 'profiloCollega') {
               <View
                 style={{
                   width: 1,
-                  backgroundColor: 'rgba(160,180,220,0.25)',
+                  backgroundColor: coloreHome(paletteHome, 'surface', 'rgba(160,180,220,0.25)'),
                 }}
               />
 
@@ -30207,7 +30222,7 @@ if (screen === 'profiloCollega') {
               >
                 <Text
                   style={{
-                    color: '#FFFFFF',
+                    color: coloreHome(paletteHome, 'text', '#FFFFFF'),
                     fontSize: 17,
                     fontWeight: '900',
                   }}
@@ -30217,7 +30232,7 @@ if (screen === 'profiloCollega') {
 
                 <Text
                   style={{
-                    color: '#9DA9C8',
+                    color: coloreHome(paletteHome, 'text', '#9DA9C8'),
                     fontSize: 9,
                     fontWeight: '800',
                   }}
@@ -30229,7 +30244,7 @@ if (screen === 'profiloCollega') {
               <View
                 style={{
                   width: 1,
-                  backgroundColor: 'rgba(160,180,220,0.25)',
+                  backgroundColor: coloreHome(paletteHome, 'surface', 'rgba(160,180,220,0.25)'),
                 }}
               />
 
@@ -30241,7 +30256,7 @@ if (screen === 'profiloCollega') {
               >
                 <Text
                   style={{
-                    color: '#FFFFFF',
+                    color: coloreHome(paletteHome, 'text', '#FFFFFF'),
                     fontSize: 19,
                     fontWeight: '900',
                   }}
@@ -30251,7 +30266,7 @@ if (screen === 'profiloCollega') {
 
                 <Text
                   style={{
-                    color: '#9DA9C8',
+                    color: coloreHome(paletteHome, 'text', '#9DA9C8'),
                     fontSize: 9,
                     fontWeight: '800',
                   }}
@@ -30272,7 +30287,7 @@ if (screen === 'profiloCollega') {
           >
             <Text
               style={{
-                color: '#7F93B5',
+                color: coloreHome(paletteHome, 'text', '#7F93B5'),
                 fontSize: 10,
                 fontWeight: '900',
                 letterSpacing: 1.2,
@@ -30300,10 +30315,10 @@ if (screen === 'profiloCollega') {
                   borderRadius: 22,
                   padding: 15,
                   justifyContent: 'space-between',
-                  backgroundColor: '#0A1B31',
+                  backgroundColor: coloreHome(paletteHome, 'surface', '#0A1B31'),
                   borderWidth: 1.2,
-                  borderColor: 'rgba(92,255,126,0.52)',
-                  shadowColor: '#55E86E',
+                  borderColor: coloreHome(paletteHome, 'border', 'rgba(92,255,126,0.52)'),
+                  shadowColor: coloreHome(paletteHome, 'accent', '#55E86E'),
                   shadowOpacity: 0.18,
                   shadowRadius: 12,
                   shadowOffset: { width: 0, height: 5 },
@@ -30314,7 +30329,7 @@ if (screen === 'profiloCollega') {
                     width: 40,
                     height: 40,
                     borderRadius: 14,
-                    backgroundColor: 'rgba(85,232,110,0.12)',
+                    backgroundColor: coloreHome(paletteHome, 'surface', 'rgba(85,232,110,0.12)'),
                     alignItems: 'center',
                     justifyContent: 'center',
                   }}
@@ -30322,14 +30337,14 @@ if (screen === 'profiloCollega') {
                   <Ionicons
                     name="wallet-outline"
                     size={23}
-                    color="#55E86E"
+                    color={coloreHome(paletteHome, 'text', "#55E86E")}
                   />
                 </View>
 
                 <View>
                   <Text
                     style={{
-                      color: '#FFFFFF',
+                      color: coloreHome(paletteHome, 'text', '#FFFFFF'),
                       fontSize: 14,
                       fontWeight: '900',
                     }}
@@ -30338,7 +30353,7 @@ if (screen === 'profiloCollega') {
                   </Text>
                   <Text
                     style={{
-                      color: '#8294B4',
+                      color: coloreHome(paletteHome, 'text', '#8294B4'),
                       fontSize: 9,
                       fontWeight: '700',
                       marginTop: 3,
@@ -30359,10 +30374,10 @@ if (screen === 'profiloCollega') {
                   borderRadius: 22,
                   padding: 15,
                   justifyContent: 'space-between',
-                  backgroundColor: '#0A1B31',
+                  backgroundColor: coloreHome(paletteHome, 'surface', '#0A1B31'),
                   borderWidth: 1.2,
-                  borderColor: 'rgba(99,223,255,0.42)',
-                  shadowColor: '#63DFFF',
+                  borderColor: coloreHome(paletteHome, 'border', 'rgba(99,223,255,0.42)'),
+                  shadowColor: coloreHome(paletteHome, 'accent', '#63DFFF'),
                   shadowOpacity: 0.14,
                   shadowRadius: 10,
                   shadowOffset: { width: 0, height: 5 },
@@ -30373,7 +30388,7 @@ if (screen === 'profiloCollega') {
                     width: 40,
                     height: 40,
                     borderRadius: 14,
-                    backgroundColor: 'rgba(99,223,255,0.11)',
+                    backgroundColor: coloreHome(paletteHome, 'surface', 'rgba(99,223,255,0.11)'),
                     alignItems: 'center',
                     justifyContent: 'center',
                   }}
@@ -30381,14 +30396,14 @@ if (screen === 'profiloCollega') {
                   <Ionicons
                     name="briefcase-outline"
                     size={23}
-                    color="#63DFFF"
+                    color={coloreHome(paletteHome, 'text', "#63DFFF")}
                   />
                 </View>
 
                 <View>
                   <Text
                     style={{
-                      color: '#FFFFFF',
+                      color: coloreHome(paletteHome, 'text', '#FFFFFF'),
                       fontSize: 14,
                       fontWeight: '900',
                     }}
@@ -30397,7 +30412,7 @@ if (screen === 'profiloCollega') {
                   </Text>
                   <Text
                     style={{
-                      color: '#8294B4',
+                      color: coloreHome(paletteHome, 'text', '#8294B4'),
                       fontSize: 9,
                       fontWeight: '700',
                       marginTop: 3,
@@ -30425,10 +30440,10 @@ if (screen === 'profiloCollega') {
                   borderRadius: 22,
                   padding: 15,
                   justifyContent: 'space-between',
-                  backgroundColor: '#0A1B31',
+                  backgroundColor: coloreHome(paletteHome, 'surface', '#0A1B31'),
                   borderWidth: 1.2,
-                  borderColor: 'rgba(114,154,255,0.44)',
-                  shadowColor: '#729AFF',
+                  borderColor: coloreHome(paletteHome, 'border', 'rgba(114,154,255,0.44)'),
+                  shadowColor: coloreHome(paletteHome, 'accent', '#729AFF'),
                   shadowOpacity: 0.14,
                   shadowRadius: 10,
                   shadowOffset: { width: 0, height: 5 },
@@ -30439,7 +30454,7 @@ if (screen === 'profiloCollega') {
                     width: 40,
                     height: 40,
                     borderRadius: 14,
-                    backgroundColor: 'rgba(114,154,255,0.12)',
+                    backgroundColor: coloreHome(paletteHome, 'surface', 'rgba(114,154,255,0.12)'),
                     alignItems: 'center',
                     justifyContent: 'center',
                   }}
@@ -30447,14 +30462,14 @@ if (screen === 'profiloCollega') {
                   <Ionicons
                     name="calendar-outline"
                     size={23}
-                    color="#8DB8FF"
+                    color={coloreHome(paletteHome, 'text', "#8DB8FF")}
                   />
                 </View>
 
                 <View>
                   <Text
                     style={{
-                      color: '#FFFFFF',
+                      color: coloreHome(paletteHome, 'text', '#FFFFFF'),
                       fontSize: 13,
                       fontWeight: '900',
                     }}
@@ -30463,7 +30478,7 @@ if (screen === 'profiloCollega') {
                   </Text>
                   <Text
                     style={{
-                      color: '#8294B4',
+                      color: coloreHome(paletteHome, 'text', '#8294B4'),
                       fontSize: 9,
                       fontWeight: '700',
                       marginTop: 3,
@@ -30484,10 +30499,10 @@ if (screen === 'profiloCollega') {
                   borderRadius: 22,
                   padding: 15,
                   justifyContent: 'space-between',
-                  backgroundColor: '#0A1B31',
+                  backgroundColor: coloreHome(paletteHome, 'surface', '#0A1B31'),
                   borderWidth: 1.2,
-                  borderColor: 'rgba(99,223,255,0.42)',
-                  shadowColor: '#63DFFF',
+                  borderColor: coloreHome(paletteHome, 'border', 'rgba(99,223,255,0.42)'),
+                  shadowColor: coloreHome(paletteHome, 'accent', '#63DFFF'),
                   shadowOpacity: 0.14,
                   shadowRadius: 10,
                   shadowOffset: { width: 0, height: 5 },
@@ -30498,7 +30513,7 @@ if (screen === 'profiloCollega') {
                     width: 40,
                     height: 40,
                     borderRadius: 14,
-                    backgroundColor: 'rgba(99,223,255,0.11)',
+                    backgroundColor: coloreHome(paletteHome, 'surface', 'rgba(99,223,255,0.11)'),
                     alignItems: 'center',
                     justifyContent: 'center',
                   }}
@@ -30506,14 +30521,14 @@ if (screen === 'profiloCollega') {
                   <Ionicons
                     name="calendar-number-outline"
                     size={23}
-                    color="#63DFFF"
+                    color={coloreHome(paletteHome, 'text', "#63DFFF")}
                   />
                 </View>
 
                 <View>
                   <Text
                     style={{
-                      color: '#FFFFFF',
+                      color: coloreHome(paletteHome, 'text', '#FFFFFF'),
                       fontSize: 14,
                       fontWeight: '900',
                     }}
@@ -30522,7 +30537,7 @@ if (screen === 'profiloCollega') {
                   </Text>
                   <Text
                     style={{
-                      color: '#8294B4',
+                      color: coloreHome(paletteHome, 'text', '#8294B4'),
                       fontSize: 9,
                       fontWeight: '700',
                       marginTop: 3,
@@ -30545,8 +30560,8 @@ if (screen === 'profiloCollega') {
               minHeight: 58,
               borderRadius: 19,
               borderWidth: 1,
-              borderColor: 'rgba(70,105,145,0.46)',
-              backgroundColor: '#071526',
+              borderColor: coloreHome(paletteHome, 'border', 'rgba(70,105,145,0.46)'),
+              backgroundColor: coloreHome(paletteHome, 'surface', '#071526'),
               flexDirection: 'row',
               alignItems: 'center',
               paddingHorizontal: 6,
@@ -30565,11 +30580,11 @@ if (screen === 'profiloCollega') {
               <Ionicons
                 name="calendar-outline"
                 size={22}
-                color="#55E86E"
+                color={coloreHome(paletteHome, 'text', "#55E86E")}
               />
               <Text
                 style={{
-                  color: '#FFFFFF',
+                  color: coloreHome(paletteHome, 'text', '#FFFFFF'),
                   fontSize: 9,
                   fontWeight: '900',
                   marginTop: 4,
@@ -30591,11 +30606,11 @@ if (screen === 'profiloCollega') {
               <Ionicons
                 name="chatbubble-ellipses-outline"
                 size={22}
-                color="#C395FF"
+                color={coloreHome(paletteHome, 'text', "#C395FF")}
               />
               <Text
                 style={{
-                  color: '#FFFFFF',
+                  color: coloreHome(paletteHome, 'text', '#FFFFFF'),
                   fontSize: 9,
                   fontWeight: '900',
                   marginTop: 4,
@@ -30627,11 +30642,11 @@ if (screen === 'profiloCollega') {
               <Ionicons
                 name="people-outline"
                 size={22}
-                color="#7FDBFF"
+                color={coloreHome(paletteHome, 'text', "#7FDBFF")}
               />
               <Text
                 style={{
-                  color: '#FFFFFF',
+                  color: coloreHome(paletteHome, 'text', '#FFFFFF'),
                   fontSize: 9,
                   fontWeight: '900',
                   marginTop: 4,
@@ -44057,6 +44072,7 @@ function Screen({
   contentOffset,
   showScrollTop = false,
   scrollRef,
+  homePalette = null,
 }) {
   const internalScreenScrollRef = React.useRef(null);
   const screenScrollRef = scrollRef || internalScreenScrollRef;
@@ -44064,14 +44080,14 @@ function Screen({
   return (
     <SafeAreaView
       style={
-        styles.safe
+        homePalette ? [styles.safe, { backgroundColor: homePalette.background }] : styles.safe
       }
     >
       <ScrollView
         keyboardDismissMode="interactive"
         automaticallyAdjustKeyboardInsets={true}
         style={
-          styles.screen
+          homePalette ? [styles.screen, { backgroundColor: homePalette.background }] : styles.screen
         }
         contentContainerStyle={
           styles.content
