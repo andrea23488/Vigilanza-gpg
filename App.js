@@ -1,3 +1,4 @@
+import { classificaTurniGpg, leggiManualeGpg, riapriManualeGpg, formattaOreGpg } from './straordinariGpg';
 import {
   Ionicons } from '@expo/vector-icons';
 import * as DocumentPicker from 'expo-document-picker';
@@ -304,7 +305,14 @@ function calcolaStraordinariConfigurati({
   sogliaSettimanale,
   meseTarget,
   annoTarget,
+  abilitaManuale = true,
 }) {
+  if (abilitaManuale && tuttiTurni.some(t => t.straordinario_manuale_minuti != null)) {
+    const selezionati = new Set(giornateMese);
+    return classificaTurniGpg(tuttiTurni, { modalita, sogliaGiornaliera, sogliaSettimanale })
+      .filter(r => selezionati.has(r.turno))
+      .reduce((tot, r) => tot + r.straordinarie, 0);
+  }
   // MODALITÀ GIORNALIERA
   if (modalita !== 'settimanale') {
     const turniOrdinari = giornateMese.filter(
@@ -4470,6 +4478,7 @@ const cambiaStatoDotazione = (id, stato) => {
       ),
       meseTarget: mese + 1,
       annoTarget: anno,
+      abilitaManuale: !isFiduciario,
     });
 
   const mediaOreGiornata =
@@ -4564,6 +4573,10 @@ useEffect(() => {
 
   const [extra, setExtra] =
     useState('1');
+
+  const [modalitaExtraGpg, setModalitaExtraGpg] = useState('automatico');
+  const [oreExtraGpg, setOreExtraGpg] = useState('0');
+  const [minutiExtraGpg, setMinutiExtraGpg] = useState('0');
 
   const [minutiAggiuntiviRetribuiti, setMinutiAggiuntiviRetribuiti] =
     useState('0');
@@ -4740,6 +4753,14 @@ useEffect(() => {
       if (mostraLoading) setLoading(true);
       const dati = await caricaTurniUtente();
       const lista = Array.isArray(dati) ? dati : [];
+      if (!isFiduciario) {
+        lista.forEach(t => {
+          if (t.tipo === 'turno' && t.straordinario_manuale_minuti != null) {
+            const manuale = riapriManualeGpg(t);
+            leggiManualeGpg(manuale.modalita, manuale.ore, manuale.minuti, oreRetribuiteTurno(t));
+          }
+        });
+      }
       console.log(
       '🔎 TURNI CARICATI DAL DATABASE:',
       lista.map(t => ({
@@ -4936,6 +4957,8 @@ const oreStipendioMeseLegacy = giornateStipendioMese.reduce(
     0
   );
 
+  const haOverrideGpgMese = !isFiduciario && giornateStipendioMese.some(t => t.straordinario_manuale_minuti != null);
+
   const extraStipendioMeseLegacy =
     calcolaStraordinariConfigurati({
       giornateMese: giornateStipendioMese,
@@ -4947,6 +4970,7 @@ const oreStipendioMeseLegacy = giornateStipendioMese.reduce(
       ),
       meseTarget: mese + 1,
       annoTarget: anno,
+      abilitaManuale: !isFiduciario,
     });
 
   const riepilogoOreFiduciario = isFiduciario
@@ -4997,6 +5021,7 @@ const oreStipendioMeseLegacy = giornateStipendioMese.reduce(
       }));
     }
 
+    if (!haOverrideGpgMese) {
     // GIORNALIERO
     if (stipendioCalcoloStraordinari !== 'settimanale') {
       return aggregaTurniPerGiorno(
@@ -5163,6 +5188,25 @@ const oreStipendioMeseLegacy = giornateStipendioMese.reduce(
     );
 
     return risultato;
+    }
+
+    const righe = classificaTurniGpg(turni, {
+      modalita: stipendioCalcoloStraordinari,
+      sogliaGiornaliera: oreOrdinarieGiornaliereNumero,
+      sogliaSettimanale: Number(String(stipendioOreSettimanali || '40').replace(',', '.')),
+    });
+    const gruppi = new Map();
+    righe.forEach(r => {
+      if (Number(r.turno.mese) !== mese + 1 || Number(r.turno.anno) !== Number(anno)) return;
+      if (!gruppi.has(r.periodo)) gruppi.set(r.periodo, {
+        tipo: stipendioCalcoloStraordinari === 'settimanale' ? 'settimana' : 'giorno',
+        etichetta: stipendioCalcoloStraordinari === 'settimanale' ? `Settimana dal ${r.periodo.slice(8, 10)}/${r.periodo.slice(5, 7)}` : `${r.periodo.slice(8, 10)}/${r.periodo.slice(5, 7)}`, ore: 0, extra: 0,
+      });
+      const gruppo = gruppi.get(r.periodo);
+      gruppo.ore += r.ore;
+      gruppo.extra += r.straordinarie;
+    });
+    return [...gruppi.values()].filter(r => r.extra > 0);
   })();
 
 
@@ -5571,6 +5615,7 @@ const totaleCompetenzeStimate = vociCompetenzeGpg.totale;
       ),
       meseTarget: mese + 1,
       annoTarget: anno,
+      abilitaManuale: !isFiduciario,
     });
 
   const extraCompletatoStipendio = isFiduciario
@@ -6545,10 +6590,11 @@ console.log("🕒 ORA REALE:", new Date().toString());
         (tot, t) => tot + oreRetribuiteTurno(t),
         0
       );
-      const extraOre = giorniAggregati.reduce(
-        (tot, gruppo) => tot + gruppo.oreStraordinarie,
-        0
-      );
+      const extraOre = !haOverrideGpgMese ? giorniAggregati.reduce(
+        (tot, gruppo) => tot + gruppo.oreStraordinarie, 0
+      ) : classificaTurniGpg(turniMese, {
+        modalita: 'giornaliero', sogliaGiornaliera: oreOrdinarieGiornaliereNumero,
+      }).reduce((tot, r) => tot + r.straordinarie, 0);
       const notti = lavorati.filter((t) => {
         if (!t.inizio || !t.fine) return false;
         const [hi, mi] = t.inizio.split(':').map(Number);
@@ -6565,7 +6611,7 @@ console.log("🕒 ORA REALE:", new Date().toString());
         notti,
         giorni,
       };
-    }, [turniMese, oreOrdinarieGiornaliereNumero]);
+    }, [turniMese, oreOrdinarieGiornaliereNumero, haOverrideGpgMese]);
 
   const iniziali =
     useMemo(() => {
@@ -6872,6 +6918,9 @@ console.log("🕒 ORA REALE:", new Date().toString());
     setIndirizzoServizio('');
 
     setExtra('1');
+    setModalitaExtraGpg('automatico');
+    setOreExtraGpg('0');
+    setMinutiExtraGpg('0');
     setMinutiAggiuntiviRetribuiti('0');
 
     setRiposoLavorato(
@@ -6908,6 +6957,17 @@ console.log("🕒 ORA REALE:", new Date().toString());
       return;
     }
 
+    if (!isFiduciario) {
+      try {
+        const manuale = riapriManualeGpg(record);
+        setModalitaExtraGpg(manuale.modalita);
+        setOreExtraGpg(manuale.ore);
+        setMinutiExtraGpg(manuale.minuti);
+      } catch (error) {
+        Alert.alert('Straordinario non valido', error.message);
+        return;
+      }
+    }
     setEditingId(
       record.id
     );
@@ -6992,7 +7052,14 @@ console.log("🕒 ORA REALE:", new Date().toString());
           )
       );
 
+    if (!isFiduciario && tipo === 'turno' && riposoLavorato && modalitaExtraGpg === 'manuale') {
+      throw new Error('Il riposo lavorato segue la voce economica dedicata: seleziona straordinario automatico.');
+    }
+    const manualeGpg = !isFiduciario && tipo === 'turno'
+      ? leggiManualeGpg(modalitaExtraGpg, oreExtraGpg, minutiExtraGpg, ore + minutiAggiuntivi / 60)
+      : null;
     return {
+      ...(!isFiduciario ? { straordinario_manuale_minuti: manualeGpg } : {}),
       giorno:
         Number(giorno),
 
@@ -7037,7 +7104,7 @@ console.log("🕒 ORA REALE:", new Date().toString());
 
       extra:
       tipo === 'turno'
-        ? Math.max(
+        ? manualeGpg != null ? manualeGpg / 60 : Math.max(
             0,
             Number(ore || 0) + minutiAggiuntivi / 60 -
               oreOrdinarieGiornaliereNumero
@@ -9219,7 +9286,7 @@ if (screen === 'colleghi') {
               marginTop: 8,
             }}
           >
-            Extra: {extraStipendioMese.toFixed(1)} h · Giorni lavorati: {new Set(
+            Extra: {!haOverrideGpgMese ? `${extraStipendioMese.toFixed(1)} h` : formattaOreGpg(extraStipendioMese)} · Giorni lavorati: {new Set(
   giornateStipendioMese.map(chiaveDataTurno).filter(Boolean)
 ).size}
           </Text>
@@ -9616,7 +9683,7 @@ if (screen === 'colleghi') {
               ○ Ore ordinarie
             </Text>
             <Text style={{ color: 'white', fontSize: 15, fontWeight: '900' }}>
-              {Math.max(0, oreStipendioMese - extraStipendioMese).toFixed(1)} h
+              {!haOverrideGpgMese ? `${Math.max(0, oreStipendioMese - extraStipendioMese).toFixed(1)} h` : formattaOreGpg(Math.max(0, oreStipendioMese - extraStipendioMese))}
             </Text>
           </View>
 
@@ -9638,7 +9705,7 @@ if (screen === 'colleghi') {
               ⭐ Straordinari
             </Text>
             <Text style={{ color: '#ffd54a', fontSize: 15, fontWeight: '900' }}>
-              {extraStipendioMese.toFixed(1)} h
+              {!haOverrideGpgMese ? `${extraStipendioMese.toFixed(1)} h` : formattaOreGpg(extraStipendioMese)}
             </Text>
           </View>
 
@@ -9775,7 +9842,7 @@ if (screen === 'colleghi') {
                         fontWeight: '900',
                       }}
                     >
-                      +{riga.extra.toFixed(1)} h
+                      +{!haOverrideGpgMese ? `${riga.extra.toFixed(1)} h` : formattaOreGpg(riga.extra)}
                     </Text>
                   </View>
                 )
@@ -9810,7 +9877,7 @@ if (screen === 'colleghi') {
                   fontSize: 13,
                 }}
               >
-                {extraStipendioMese.toFixed(1)} h
+                {!haOverrideGpgMese ? `${extraStipendioMese.toFixed(1)} h` : formattaOreGpg(extraStipendioMese)}
               </Text>
             </View>
           </View>
@@ -25358,7 +25425,7 @@ if (screen === 'profiloCollega') {
 
           <Stat
             label="EXTRA"
-            value={`${statistiche.extraOre}h`}
+            value={!haOverrideGpgMese ? `${statistiche.extraOre}h` : formattaOreGpg(statistiche.extraOre)}
           />
 
           <Stat
@@ -25833,7 +25900,7 @@ if (screen === 'profiloCollega') {
                   marginTop: 3,
                 }}
               >
-                {Number(extra || 0) > 0 ? `${extra}h` : '0h'}
+                {isFiduciario ? (Number(extra || 0) > 0 ? `${extra}h` : '0h') : modalitaExtraGpg === 'manuale' ? `${oreExtraGpg} h ${minutiExtraGpg} min` : 'Automatico'}
               </Text>
             </View>
           </View>
@@ -26405,16 +26472,31 @@ if (screen === 'profiloCollega') {
           </Text>
       </View>
 
-            <Field
-              label="ORE STRAORDINARIE"
-              value={
-                extra
-              }
-              onChange={
-                setExtra
-              }
-              keyboardType="decimal-pad"
-            />
+            {isFiduciario ? (
+              <Field label="ORE STRAORDINARIE" value={extra} onChange={setExtra} keyboardType="decimal-pad" />
+            ) : (
+              <View>
+                <Text style={styles.label}>STRAORDINARIO GPG</Text>
+                <View style={{ flexDirection: 'row', gap: 12, marginBottom: 12 }}>
+                  {['automatico', 'manuale'].map(modalita => (
+                    <TouchableOpacity key={modalita}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected: modalitaExtraGpg === modalita }}
+                      onPress={() => setModalitaExtraGpg(modalita)}
+                      style={{ padding: 12, borderRadius: 10,
+                        backgroundColor: modalitaExtraGpg === modalita ? '#245FDA' : '#10213A' }}>
+                      <Text style={{ color: '#FFFFFF' }}>{modalita === 'automatico' ? 'Automatico' : 'Manuale'}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+                {modalitaExtraGpg === 'manuale' ? (
+                  <View>
+                    <Field label="ORE STRAORDINARIE" value={oreExtraGpg} onChange={setOreExtraGpg} keyboardType="number-pad" />
+                    <Field label="MINUTI STRAORDINARI (0–59)" value={minutiExtraGpg} onChange={setMinutiExtraGpg} keyboardType="number-pad" />
+                  </View>
+                ) : <Text style={{ color: '#8fa5cc', marginBottom: 12 }}>Calcolato dalle ore retribuite e dalle soglie impostate nello stipendio.</Text>}
+              </View>
+            )}
 
             <Field
               label="MINUTI AGGIUNTIVI RETRIBUITI"
@@ -27091,7 +27173,8 @@ if (screen === 'profiloCollega') {
                       ? `${ore}h`
                       : `${ore}h ${String(min).padStart(2, '0')}m`;
 
-                  const extra = Number(t.extra || 0);
+                  const manualeSchedaGpg = !isFiduciario && t.straordinario_manuale_minuti != null;
+                  const extra = manualeSchedaGpg ? t.straordinario_manuale_minuti / 60 : Number(t.extra || 0);
 
                   return (
                     <View
@@ -27121,7 +27204,7 @@ if (screen === 'profiloCollega') {
                             marginTop: 2,
                           }}
                         >
-                          +{extra}h EXTRA
+                          +{!manualeSchedaGpg ? `${extra}h` : formattaOreGpg(extra)} EXTRA
                         </Text>
                       )}
                     </View>
@@ -27931,7 +28014,7 @@ if (screen === 'profiloCollega') {
                     fontWeight: '900',
                   }}
                 >
-                  {Number(extraStipendioMese || 0).toFixed(0)}h
+                  {!haOverrideGpgMese ? `${Number(extraStipendioMese || 0).toFixed(0)}h` : formattaOreGpg(extraStipendioMese)}
                 </Text>
 
                 <Text
