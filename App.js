@@ -1,3 +1,4 @@
+import AspettoColoriScreen from './AspettoColoriScreen';
 import { classificaTurniGpg, leggiManualeGpg, riapriManualeGpg, formattaOreGpg } from './straordinariGpg';
 import {
   Ionicons } from '@expo/vector-icons';
@@ -26090,6 +26091,10 @@ if (screen === 'profiloCollega') {
     );
   }
 
+  if (screen === 'aspettoColori') {
+    return <AspettoColoriScreen onBack={() => setScreen('profile')} />;
+  }
+
   if (
     screen ===
     'profile'
@@ -26119,6 +26124,14 @@ if (screen === 'profiloCollega') {
         >
           Identità professionale
         </Text>
+
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Aspetto e colori"
+          onPress={() => setScreen('aspettoColori')}
+          style={{ flexDirection: 'row', alignItems: 'center', gap: 10, padding: 16,
+            backgroundColor: COLORS.card, borderRadius: 14, marginBottom: 16 }}>
+          <Ionicons name="color-palette-outline" size={24} color={COLORS.lightBlue} />
+          <Text style={{ color: COLORS.white, fontWeight: '800' }}>Aspetto e colori</Text>
+        </TouchableOpacity>
 
         <View
           style={
