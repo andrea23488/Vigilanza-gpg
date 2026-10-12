@@ -29,7 +29,7 @@ const COLORS = {
   green: '#50D89F',
 };
 
-export default function LoginScreen({ onEnterTest, onAuthenticated }) {
+export default function LoginScreen({ onEnterTest, onAuthenticated, onBeforeSignOut }) {
   const [mode, setMode] = useState('login');
 
   const [email, setEmail] = useState('');
@@ -240,6 +240,7 @@ export default function LoginScreen({ onEnterTest, onAuthenticated }) {
       setRecuperoPassword(false);
       setPassword('');
 
+      await onBeforeSignOut?.();
       await supabase.auth.signOut();
 
       Alert.alert(

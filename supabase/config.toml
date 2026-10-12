@@ -428,3 +428,11 @@ entrypoint = "./functions/eta-servizio/index.ts"
 enabled = true
 verify_jwt = false
 entrypoint = "./functions/elimina-account/index.ts"
+
+# Autenticazione manuale: JWT verificato dal codice; revoca offline puo' solo disattivare.
+[functions.push-dispositivi]
+verify_jwt = false
+
+# Nessun endpoint pubblico attivo senza flag e segreto worker lato server.
+[functions.push-worker]
+verify_jwt = false

@@ -1,0 +1,5 @@
+import {test} from 'node:test';import assert from 'node:assert/strict';
+import {preparaProvaSQL} from './credentialProof.ts';
+test('SQL riceve solo hash, segreto e input originale non esposti',async()=>{const input={azione:'stato',credenziale:'a'.repeat(64),credenziale_hash:'forged'};const result=await preparaProvaSQL(input);assert.equal('credenziale' in result,false);assert.match(result.credenziale_hash as string,/^[0-9a-f]{64}$/);assert.notEqual(result.credenziale_hash,'forged');assert.equal(input.credenziale,'a'.repeat(64));});
+test('prova mancante/oggetto/array/non canonica rifiutata con errore generico',async()=>{for(const value of [null,undefined,1,[],{},'','b'.repeat(63),'B'.repeat(64)])await assert.rejects(preparaProvaSQL({azione:'revoca_intenzione',credenziale:value}),/^Error: prova_non_valida$/);});
+test('preferenze non accettano hash forniti arbitrariamente dal client',async()=>{assert.deepEqual(await preparaProvaSQL({azione:'preferenze',credenziale_hash:'forged'}),{azione:'preferenze'});});
