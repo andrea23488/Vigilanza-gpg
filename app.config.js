@@ -1,9 +1,20 @@
-const {isTest,validateEnvironment,TEST_BUNDLE}=require('./scripts/push-test-policy.cjs');
+const {isTest,validateMetadata,TEST_BUNDLE,fail,diagnosticCode}=require('./scripts/push-test-policy.cjs');
 module.exports=({config})=>{
  // Existing profiles return the supplied Expo config unchanged.
- if(!isTest(process.env))return config;
- validateEnvironment(process.env,{configOnly:true});
- if(config.extra?.eas?.projectId!==process.env.EXPO_PUBLIC_PUSH_PROJECT_ID)throw Error('Progetto EAS TEST incoerente');
+ let testBuild;
+ try {
+  testBuild=isTest(process.env);
+  if(testBuild){
+   validateMetadata(process.env);
+   if(config.extra?.eas?.projectId!==process.env.EXPO_PUBLIC_PUSH_PROJECT_ID)fail('PUSH_TEST_EAS_PROJECT_MISMATCH');
+  }
+ }catch(error){
+  const code=diagnosticCode(error);
+  // SDK54 config --json suppresses console.error; only a fixed code goes to stderr.
+  try{process.stderr.write(code+'\n');}catch{/* Diagnostic output never changes rejection. */}
+  fail(code);
+ }
+ if(!testBuild)return config;
  const test=JSON.parse(JSON.stringify(config));
  test.name='Vigilanza GPG — Push TEST';
  test.scheme='vigilanzagpg-pushtest';

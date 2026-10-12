@@ -47,15 +47,17 @@ Supabase, non creazione di un altro account/progetto Expo.
 
 ## Controlli bloccanti
 
-app.config.js verifica URL, marker TEST, dotenv disabilitato, flag push false,
-progetto EAS e formato/tipo della chiave. Durante la sola risoluzione iniziale
-locale dei metadati EAS la chiave può essere assente: EAS CLI deve prima leggere
-il projectId per scaricare le Sensitive. Questo NON autorizza compilazione.
-Nel processo EAS_BUILD=true la chiave deve essere presente.
+app.config.js verifica soltanto URL, marker TEST, dotenv disabilitato, flag push
+false e progetto EAS. Non legge né valida la chiave dedicata durante i metadati,
+anche con EAS_BUILD=true. EAS può leggere projectId e risolvere i plugin prima
+e dopo il caricamento delle Sensitive. Questo NON autorizza compilazione.
+La funzione validateEnvironment usata dal preflight richiede sempre la chiave:
+non esiste più un parametro configOnly che possa saltare il controllo.
 
 Il hook eas-build-pre-install verifica tutto prima di installazione/prebuild:
 chiave obbligatoria, profilo, identificativi e assenza di cartelle ios/android
-pregenerate. La verifica online usa soltanto GET sul gateway REST del progetto
+pregenerate. Il hook rifiuta --offline: la verifica online non può essere saltata nella build.
+La verifica online usa soltanto GET sul gateway REST del progetto
 TEST, con timeout e redirect vietati; non effettua login né SQL. Una chiave
 opaca sb_publishable non dimostra il progetto offline: errore/rete indisponibile
 bloccano la compilazione. Il hook non stampa chiavi, header o risposte.
@@ -76,9 +78,34 @@ provisioning, deploy, migrazioni e attivazione richiedono autorizzazioni distint
 Test automatici di isolamento con sole chiavi sintetiche, inclusi confronto
 con i profili originali e client originale, errori, fallback e gateway simulato.
 Schema e risoluzione EAS verificati con @expo/eas-json 24.13.0. Config dinamica
-valutata con @expo/config 12.0.14 (SDK 54), senza eseguire plugin/prebuild nativi.
+valutata con @expo/config 12.0.14 (SDK 54) e comando Expo CLI reale, con plugin
+risolti ma senza prebuild o compilazione nativa.
 Sorgenti apple-targets 4.0.6, dev-client 6.0.21 e WatchConnectivity 2.0.0 verificati.
 I pacchetti di verifica sono fuori dal repository: nessuna nuova dipendenza
 applicativa. Non sono stati interrogati il gateway Supabase, EAS o Apple con
 credenziali durante queste verifiche. Provisioning e binario richiedono la
 successiva prova autorizzata; non sono dichiarati verificati localmente.
+
+## Diagnostica senza credenziali
+
+I guard emettono soltanto codici fissi, mai valori, header o risposte Auth.
+SDK54 config --json silenzia console.error: il guard dei metadati scrive soltanto
+il codice su stderr, mentre il preflight riporta lo stesso codice senza dettagli:
+
+- PUSH_TEST_KEY_MISSING: configurare la variabile dedicata Sensitive su EAS.
+- PUSH_TEST_KEY_FORMAT / KEY_ROLE_INVALID / KEY_PROJECT_MISMATCH / KEY_EXPIRED
+  (tutti con prefisso PUSH_TEST_): chiave non ammissibile per il TEST.
+- PUSH_TEST_KEY_UNCONFIRMED: verifica gateway TEST fallita o indisponibile;
+  compilazione bloccata, senza fallback.
+- PUSH_TEST_URL_MISMATCH / DOTENV_ENABLED / FALLBACK_KEY / PUSH_ENABLED
+  (prefisso PUSH_TEST_): configurazione di isolamento non rispettata.
+- PUSH_TEST_PROFILE_MISMATCH / MARKER_INVALID / PLATFORM_INVALID /
+  EAS_PROJECT_MISMATCH (prefisso PUSH_TEST_): selezione profilo/progetto errata.
+- PUSH_TEST_NATIVE_DIR_PRESENT / NATIVE_ISOLATION: isolamento nativo non valido.
+- PUSH_TEST_INTERNAL: errore inatteso; nessun messaggio esterno viene riportato.
+
+Controllo automatico del comando Expo reale e dei plugin, senza prebuild:
+`node scripts/test-push-test-expo.cjs`. Richiede dipendenze del lockfile già
+installate, senza scaricarle automaticamente. Il test usa un fixture temporaneo
+senza .env, sole chiavi sintetiche e blocco delle connessioni di rete; verifica
+sia TEST sia produzione. Non dimostra il provisioning o una build EAS riuscita.
