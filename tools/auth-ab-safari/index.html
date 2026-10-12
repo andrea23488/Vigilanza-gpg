@@ -1,0 +1,13 @@
+<!doctype html><html lang="it"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="referrer" content="no-referrer"><title>Auth A/B — solo TEST</title><link rel="stylesheet" href="/style.css"></head><body>
+<h1>Supabase Auth A/B — TEST</h1><p>Progetto esclusivo: <strong>ilmhjsrxhnishnbocrnm</strong>. Nessuna notifica push.</p>
+<p>Aprire solo su porta Codespaces <strong>Privata</strong>. Chiudere questa pagina può impedire il cleanup. Non usare registrazione schermo o dispositivi condivisi.</p>
+<label><input id="private" type="checkbox"> Ho verificato che la porta sia Privata e il Codespace sia sotto il mio controllo.</label>
+<label>Chiave pubblicabile del solo progetto TEST <input id="key" type="password" autocomplete="off" autocapitalize="none" spellcheck="false"></label>
+<label>Email sintetica TEST <input id="email" type="text" autocomplete="off" autocapitalize="none" spellcheck="false"></label>
+<label>Password sintetica TEST <input id="password" type="password" autocomplete="off" autocapitalize="none" spellcheck="false"></label>
+<button id="login" type="button">1. Avvia login A/B</button><button id="refreshA" type="button" disabled>2. Refresh A</button><button id="logoutA" type="button" disabled>3. Logout locale A</button><button id="checkA" type="button" disabled>4. Ho osservato A assente: ricontrolla JWT A</button><button id="refreshB" type="button" disabled>5. Refresh B</button><button id="cleanup" type="button" disabled>Cleanup A/B / interrompi</button>
+<p>Prima del refresh: annotare presenza, proprietario e orari A/B nel SQL Editor TEST. Dopo logout A: lettura fresca, A assente e B presente; un errore non equivale ad assenza. Il pulsante 4 non certifica l'osservazione.</p>
+<h2>Lettura nel SQL Editor del solo progetto TEST</h2><pre id="query">La query comparirà dopo login A/B. Nessuna query viene eseguita dalla pagina.</pre>
+<pre id="result" aria-live="polite">Nessuna richiesta effettuata.</pre>
+<p>Una firma valida non prova che la sessione sia attiva. Nessun esito automatico dichiara superata la revoca. Dopo cleanup verificare in Dashboard che entrambe le sessioni siano terminate.</p>
+<script type="module" src="/page.mjs"></script></body></html>
