@@ -1,3 +1,6 @@
+import NotifichePushScreen from './NotifichePushScreen';
+import { creaGestorePush, destinazionePush } from './pushClient';
+import * as PushNotifications from 'expo-notifications';
 import { paletteHomeDaPreferenza, coloreHome, ripristinaAspetto } from './temi';
 import { creaArchivioAspetto } from './preferenzeAspetto';
 import AspettoColoriScreen from './AspettoColoriScreen';
@@ -810,6 +813,77 @@ export default function App() {
   // Memorizza fino a 2 curve rapide senza resettare il timer di gioco.
   const snakeCodaDirezioniRef = React.useRef([]);
   const [consegnaSelezionata, setConsegnaSelezionata] = useState(null);
+  const gestorePushRef = useRef(null);
+  if (!gestorePushRef.current) {
+    gestorePushRef.current = creaGestorePush({
+      notifiche: PushNotifications, platform: Platform.OS,
+      // Nessun fallback insicuro: manca un provider nativo verificato per segreti e CSPRNG.
+      secureStorage: null, randomBytes: null,
+      api: async (azione, input, accessToken) => {
+        const { data, error } = await supabase.functions.invoke('push-dispositivi', {
+          body: { azione, ...input }, headers: { Authorization: `Bearer ${accessToken}` },
+        });
+        if (error) throw new Error('Operazione push non confermata');
+        return data;
+      },
+    });
+  }
+  const pushSessioneRef = useRef(null);
+  const pushTapPendentiRef = useRef(null);
+  const pushTapVistiRef = useRef(new Set());
+  useEffect(() => {
+    let disposed = false, authObserved = false;
+    const applica = (session, refresh=false) => {
+      pushSessioneRef.current = session;
+      gestorePushRef.current.cambiaSessione(session,refresh);
+      if (!session) { pushTapPendentiRef.current = null; pushTapVistiRef.current.clear(); }
+    };
+    supabase.auth.getSession().then(({data,error})=>{if(!disposed&&!error&&!authObserved)applica(data.session);}).catch(()=>{if(!disposed&&!authObserved)applica(null);});
+    const {data}=supabase.auth.onAuthStateChange((_event,session)=>{authObserved=true;applica(session,_event==='TOKEN_REFRESHED');});
+    return ()=>{disposed=true;data.subscription.unsubscribe();applica(null);};
+  }, []);
+  useEffect(() => {
+    if (Platform.OS !== 'ios' && Platform.OS !== 'android') return;
+    let disposed=false;
+    // Nessun handler foreground aggiuntivo: il Centro Notifiche resta invariato.
+    const ricevi = response => {
+      if(disposed)return;
+      const data = response?.notification?.request?.content?.data;
+      if (data) { pushTapPendentiRef.current = data; apriTap(); }
+    };
+    const apriTap = async () => {
+      const session=pushSessioneRef.current, raw=pushTapPendentiRef.current;
+      if(!session?.user?.id||!raw)return;
+      const target=destinazionePush(raw,session.user.id);pushTapPendentiRef.current=null;
+      if(!target||pushTapVistiRef.current.has(target.eventoId))return;
+      pushTapVistiRef.current.add(target.eventoId);
+      try {
+        // La sorgente viene rivalidata sul server: il payload non autorizza l'accesso.
+        const {data,error}=await supabase.rpc('push_risolvi_comunicazione',{p_evento:target.eventoId});
+        if(error||!data||pushSessioneRef.current?.access_token!==session.access_token)return;
+        if(data.tipo==='messaggio_privato') {
+          const colleghi=await caricaColleghi();
+          if(pushSessioneRef.current?.access_token!==session.access_token)return;
+          const collega=colleghi.find(c=>c.altro_user_id===data.mittente_id&&c.stato==='accettato');
+          if(!collega)return;
+          setCollegaSelezionato(collega);setChatMessaggio('');setScreen('chatCollega');
+        } else if(data.tipo==='consegna_servizio') {
+          const rows=await caricaConsegneRicevute();
+          if(pushSessioneRef.current?.access_token!==session.access_token)return;
+          const consegna=rows.find(r=>String(r.id)===data.sorgente_id);
+          if(consegna){setConsegnaSelezionata(consegna);setScreen('dettaglioConsegna');}
+        }
+      } catch { /* Dati obsoleti o servizio non disponibile: nessuna navigazione. */ }
+    };
+    const listener=PushNotifications.addNotificationResponseReceivedListener(ricevi);
+    PushNotifications.getLastNotificationResponseAsync().then(r=>{if(r)ricevi(r);}).catch(()=>{});
+    const tokenListener=PushNotifications.addPushTokenListener(()=>{
+      // Rinnovo automatico solo dopo disponibilita dello storage sicuro e opt-in.
+      if(gestorePushRef.current.stato().registrato)gestorePushRef.current.rinnova().catch(()=>{});
+    });
+    return ()=>{disposed=true;listener.remove();tokenListener.remove();};
+  }, [utenteAutenticato?.id]);
+
   const [consegneRicevute, setConsegneRicevute] = useState([]);
   const [notificheNascoste, setNotificheNascoste] = useState([]);
   const tornaSuRef = useRef(null);
@@ -1002,6 +1076,7 @@ export default function App() {
   const usaAccessoNormale = async () => {
     azzeraStatoProfilo();
     setProfiloCaricamento(true);
+    await gestorePushRef.current.revoca().catch(()=>{});
     const { error } = await supabase.auth.signOut();
 
     if (error) {
@@ -8469,6 +8544,7 @@ async function logout() {
     azzeraStatoProfilo();
     setProfiloErrore('');
     setProfiloCaricamento(true);
+    await gestorePushRef.current.revoca().catch(()=>{});
     const { error } = await supabase.auth.signOut();
     if (error) {
       setProfiloCaricamento(false);
@@ -26106,6 +26182,8 @@ if (screen === 'profiloCollega') {
     );
   }
 
+  if (screen === 'notifichePush') return <NotifichePushScreen onBack={() => setScreen('profile')} gestore={gestorePushRef.current} />;
+
   if (screen === 'aspettoColori') {
     return <AspettoColoriScreen onBack={() => setScreen('profile')} archivio={archivioAspettoRef.current} onSalvato={setPreferenzaAspetto} />;
   }
@@ -26140,6 +26218,10 @@ if (screen === 'profiloCollega') {
           Identità professionale
         </Text>
 
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Notifiche di sistema"
+          onPress={() => setScreen('notifichePush')} style={{padding:16,marginBottom:16}}>
+          <Text style={{color:COLORS.white}}>Notifiche di sistema</Text>
+        </TouchableOpacity>
         <TouchableOpacity accessibilityRole="button" accessibilityLabel="Aspetto e colori"
           onPress={() => setScreen('aspettoColori')}
           style={{ flexDirection: 'row', alignItems: 'center', gap: 10, padding: 16,
