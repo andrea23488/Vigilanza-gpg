@@ -60,7 +60,7 @@ import {
   calibraProfiloFiscaleFiduciari,
 } from './fiduciariEconomia';
 import { costruisciInputEconomiaFiduciari } from './fiduciariIntegrazione';
-import { supabase } from './supabase';
+import { supabase, SUPABASE_URL, SUPABASE_KEY } from './supabase';
 import {
   creaProfiloVuoto,
   costruisciProfiloUtente,
@@ -471,12 +471,6 @@ const invalidaContestoAppleWatch = () => {
     console.warn('⌚ WATCH RESET ERROR:', error);
   }
 };
-
-const SUPABASE_URL =
-  process.env.EXPO_PUBLIC_SUPABASE_URL;
-
-const SUPABASE_KEY =
-  process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 
 const PHOTO_STORAGE_KEY =
   '@vigilanza_gpg_profile_photo';

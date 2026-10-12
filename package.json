@@ -43,7 +43,8 @@
     "test:stipendio": "node scripts/test-stipendio-calcoli.cjs",
     "test:fiduciari": "node scripts/test-fiduciari-ore.cjs",
     "test:fiduciari-economia": "node scripts/test-fiduciari-economia.cjs",
-    "postinstall": "patch-package"
+    "postinstall": "patch-package",
+    "eas-build-pre-install": "node scripts/preflight-push-test.cjs --eas-hook"
   },
   "private": true,
   "devDependencies": {

@@ -16,6 +16,23 @@
     },
     "production": {
       "autoIncrement": true
+    },
+    "push-test-ios": {
+      "distribution": "internal",
+      "developmentClient": false,
+      "environment": "development",
+      "ios": {
+        "simulator": false,
+        "buildConfiguration": "Release"
+      },
+      "env": {
+        "EXPO_NO_DOTENV": "1",
+        "EXPO_PUBLIC_PUSH_TEST_BUILD": "true",
+        "EXPO_PUBLIC_SUPABASE_URL": "https://ilmhjsrxhnishnbocrnm.supabase.co",
+        "EXPO_PUBLIC_PUSH_REGISTRATION_ENABLED": "false",
+        "EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY": "__PUSH_TEST_NO_FALLBACK__",
+        "EXPO_PUBLIC_PUSH_PROJECT_ID": "3f83a3a9-df1a-4dcc-beaf-8c390f52eca2"
+      }
     }
   },
   "submit": {
