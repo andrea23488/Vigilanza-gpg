@@ -26,7 +26,11 @@ function validateKey(key){
  if(key===undefined||key===null||key==='')fail('PUSH_TEST_KEY_MISSING');
  if(typeof key!=='string'||key.length>4096||key!==key.trim())fail('PUSH_TEST_KEY_FORMAT');
  if(key.startsWith('sb_secret_'))fail('PUSH_TEST_KEY_ROLE_INVALID');
- if(/^sb_publishable_[A-Za-z0-9_-]{16,512}$/.test(key))return;
+ // Publishable keys are opaque: validate HTTP-safe ASCII, not an assumed encoding.
+ if(key.startsWith('sb_publishable_')){
+  if(!/^sb_publishable_[\x21-\x7E]+$/.test(key))fail('PUSH_TEST_KEY_FORMAT');
+  return;
+ }
  // Legacy anon JWT: decode to reject wrong-project/admin keys, not to assert signature validity.
  const parts=key.split('.');if(parts.length!==3||parts.some(x=>! /^[A-Za-z0-9_-]+$/.test(x)))fail('PUSH_TEST_KEY_FORMAT');
  let header,claim;

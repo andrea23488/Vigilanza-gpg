@@ -109,3 +109,13 @@ Controllo automatico del comando Expo reale e dei plugin, senza prebuild:
 installate, senza scaricarle automaticamente. Il test usa un fixture temporaneo
 senza .env, sole chiavi sintetiche e blocco delle connessioni di rete; verifica
 sia TEST sia produzione. Non dimostra il provisioning o una build EAS riuscita.
+
+## Formato Publishable opaco
+
+Il preflight tratta sb_publishable_ separatamente dai JWT legacy: suffisso
+non vuoto, solo ASCII stampabile senza whitespace/controlli (0x21–0x7E),
+lunghezza totale massima 4096. Non presume un alfabeto Base64 né una lunghezza
+minima del suffisso. Non corregge o tronca valori. Chiavi sb_secret_ e JWT
+legacy privilegiati restano rifiutati. Il controllo locale non dimostra che
+una chiave sia autentica: conferma gateway TEST sempre obbligatoria nel hook,
+con timeout 15 secondi, redirect vietati e compilazione bloccata su errore.

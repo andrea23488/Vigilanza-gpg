@@ -56,3 +56,37 @@ test('hook EAS non puo usare offline per saltare la verifica online',()=>{
  const r=cp.spawnSync(process.execPath,[path.join(__dirname,'preflight-push-test.cjs'),'--eas-hook','--offline'],{env,encoding:'utf8'});
  assert.equal(r.status,1);assert.match(r.stderr,/^PUSH_TEST_MODE_INVALID:/);assert.equal(r.stdout,'');
 });
+
+test('Publishable opache: suffissi corti, lunghi, punteggiatura e aspetto JWT ammessi',()=>{
+ const prefix='sb_publishable_';
+ const suffixes=['x','synthetic.short','synthetic+slash/value==','synthetic.jwt.like','a'.repeat(15),'a'.repeat(513),'a'.repeat(4096-prefix.length),Array.from({length:94},(_,i)=>String.fromCharCode(33+i)).join('')];
+ for(const suffix of suffixes)assert.doesNotThrow(()=>policy.validateKey(prefix+suffix));
+});
+test('Publishable vuote, oltre limite, whitespace, controlli e Unicode rifiutate',()=>{
+ const prefix='sb_publishable_';
+ const invalid=[prefix,prefix+'a'.repeat(4097-prefix.length),' '+prefix+'synthetic',prefix+'synthetic ',prefix+'synthetic\n',prefix+'synthetic\r',prefix+'synthetic\t',prefix+'synthetic internal',prefix+'synthetic\u00a0',prefix+'synthetic\u200b',prefix+'syntheticé'];
+ for(let i=0;i<33;i++)invalid.push(prefix+'synthetic'+String.fromCharCode(i)+'suffix');
+ invalid.push(prefix+'synthetic'+String.fromCharCode(127));
+ for(const value of invalid)assert.throws(()=>policy.validateKey(value),e=>e.code==='PUSH_TEST_KEY_FORMAT'&&e.message===e.code&&!e.message.includes(value));
+ for(const value of [undefined,null,''])assert.throws(()=>policy.validateKey(value),e=>e.code==='PUSH_TEST_KEY_MISSING');
+ for(const value of [[],{},42,new String(prefix+'synthetic')])assert.throws(()=>policy.validateKey(value),e=>e.code==='PUSH_TEST_KEY_FORMAT');
+});
+test('chiavi privilegiate e JWT legacy conservano i controlli esistenti',()=>{
+ assert.throws(()=>policy.validateKey('sb_secret_synthetic'),e=>e.code==='PUSH_TEST_KEY_ROLE_INVALID');
+ assert.throws(()=>policy.validateKey(legacy('service_role')),e=>e.code==='PUSH_TEST_KEY_ROLE_INVALID');
+ assert.throws(()=>policy.validateKey(legacy('anon','synthetic-other-project')),e=>e.code==='PUSH_TEST_KEY_PROJECT_MISMATCH');
+ assert.doesNotThrow(()=>policy.validateKey(legacy()));
+});
+test('nuovi formati attraversano il gateway TEST simulato, che resta obbligatorio',async()=>{
+ const values=['sb_publishable_x','sb_publishable_synthetic+slash/value==','sb_publishable_synthetic.with.dots'];
+ for(const value of values){
+  let calls=0;
+  await guard.verifyProjectKey(value,async(url,options)=>{calls++;assert.equal(url,policy.TEST_URL+'/rest/v1/');assert.equal(options.headers.apikey,value);assert.equal(options.redirect,'error');assert.ok(options.signal instanceof AbortSignal);return {ok:true,redirected:false,url};});
+  assert.equal(calls,1);
+  await assert.rejects(guard.verifyProjectKey(value,async()=>({ok:false})),e=>e.code==='PUSH_TEST_KEY_UNCONFIRMED');
+  await assert.rejects(guard.verifyProjectKey(value,async()=>({ok:true,redirected:true})),e=>e.code==='PUSH_TEST_KEY_UNCONFIRMED');
+  await assert.rejects(guard.verifyProjectKey(value,async()=>{throw Error('synthetic timeout/private response');}),e=>e.code==='PUSH_TEST_KEY_UNCONFIRMED'&&e.message===e.code);
+ }
+ let calls=0;await assert.rejects(guard.verifyProjectKey('sb_publishable_synthetic\r\n',async()=>{calls++;}),e=>e.code==='PUSH_TEST_KEY_FORMAT');assert.equal(calls,0);
+ assert.equal(realNetwork,0);
+});
