@@ -1,5 +1,22 @@
 import { supabase } from './supabase';
 
+function inviaPushSenzaBloccare(tipo, id) {
+  if (id === undefined || id === null) return;
+
+  supabase.functions
+    .invoke('send-push', {
+      body: { tipo, id },
+    })
+    .then(({ error }) => {
+      if (error) {
+        console.log('Push non inviata:', tipo, error.message);
+      }
+    })
+    .catch((error) => {
+      console.log('Push non inviata:', tipo, error);
+    });
+}
+
 async function getCurrentUser() {
   const {
     data: { session },
@@ -51,6 +68,8 @@ export async function inviaMessaggio(destinatarioId, testo) {
     .single();
 
   if (error) throw error;
+
+  inviaPushSenzaBloccare('messaggio', data?.id);
 
   return data;
 }
@@ -355,6 +374,8 @@ export async function inviaConsegna(destinatarioId, consegna) {
     .single();
 
   if (error) throw error;
+
+  inviaPushSenzaBloccare('consegna', data?.id);
 
   return data;
 }
