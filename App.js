@@ -94,6 +94,7 @@ import PostiSalvatiScreen from './PostiSalvatiScreen';
 import CalendarioColleghiScreen from './CalendarioColleghiScreen';
 import BriscolaGame from './games/BriscolaGame';
 import ScopaGame from './games/ScopaGame';
+import GiocoColleghiScreen from './games/GiocoColleghiScreen';
 import BlockGame from './games/BlockGame';
 import PongGame from './games/PongGame';
 import * as Clipboard from 'expo-clipboard';
@@ -797,6 +798,7 @@ export default function App() {
   const [erroreBiometria, setErroreBiometria] = useState('');
   const richiestaBiometriaRef = useRef(false);
   const [screen, setScreen] = useState("home");
+  const [partitaOnlinePushId, setPartitaOnlinePushId] = useState(null);
 
   useEffect(() => {
     if (!utenteAutenticato?.id) return undefined;
@@ -860,6 +862,21 @@ export default function App() {
           }
 
           setScreen('dettaglioConsegna');
+          return;
+        }
+
+        if (
+          (dati?.tipo === 'sfida_gioco' || dati?.tipo === 'turno_gioco') &&
+          dati?.partitaId &&
+          (dati?.gioco === 'scopa' || dati?.gioco === 'briscola')
+        ) {
+          setPartitaOnlinePushId(String(dati.partitaId));
+          setScreen(
+            dati.gioco === 'scopa'
+              ? 'scopaOnline'
+              : 'briscolaOnline'
+          );
+          return;
         }
       } catch (error) {
         console.log('Errore apertura notifica push:', error);
@@ -15097,6 +15114,35 @@ if (screen === 'configuraStipendio') {
     );
   }
 
+
+  if (screen === 'scopaOnline') {
+    return (
+      <GiocoColleghiScreen
+        gioco="scopa"
+        colleghi={colleghi}
+        partitaInizialeId={partitaOnlinePushId}
+        onBack={() => {
+          setPartitaOnlinePushId(null);
+          setScreen('passatempo');
+        }}
+      />
+    );
+  }
+
+  if (screen === 'briscolaOnline') {
+    return (
+      <GiocoColleghiScreen
+        gioco="briscola"
+        colleghi={colleghi}
+        partitaInizialeId={partitaOnlinePushId}
+        onBack={() => {
+          setPartitaOnlinePushId(null);
+          setScreen('passatempo');
+        }}
+      />
+    );
+  }
+
   if (screen === 'snakeGame') {
     const nuovaPartitaSnake = () => {
       snakeDirezioneRealeRef.current = { x: 1, y: 0 };
@@ -16927,13 +16973,53 @@ if (screen === 'configuraStipendio') {
 
 
               if (gioco.id === 'briscola') {
-                setScreen('briscolaGame');
+                Alert.alert(
+                  'Briscola',
+                  'Come vuoi giocare?',
+                  [
+                    {
+                      text: 'Contro il computer',
+                      onPress: () => setScreen('briscolaGame'),
+                    },
+                    {
+                      text: 'Sfida un collega',
+                      onPress: () => {
+                        setPartitaOnlinePushId(null);
+                        setScreen('briscolaOnline');
+                      },
+                    },
+                    {
+                      text: 'Annulla',
+                      style: 'cancel',
+                    },
+                  ]
+                );
                 return;
               }
 
 
         if (gioco.id === 'scopa') {
-          setScreen('scopaGame');
+          Alert.alert(
+            'Scopa',
+            'Come vuoi giocare?',
+            [
+              {
+                text: 'Contro il computer',
+                onPress: () => setScreen('scopaGame'),
+              },
+              {
+                text: 'Sfida un collega',
+                onPress: () => {
+                  setPartitaOnlinePushId(null);
+                  setScreen('scopaOnline');
+                },
+              },
+              {
+                text: 'Annulla',
+                style: 'cancel',
+              },
+            ]
+          );
           return;
         }
 
@@ -17022,7 +17108,7 @@ Alert.alert(
               textAlign: 'center',
             }}
           >
-            🎮 Giochi offline · nessun costo · nessuna pubblicità
+            🎮 Giochi offline e sfide tra colleghi · nessun costo · nessuna pubblicità
           </Text>
         </View>
       </Screen>
