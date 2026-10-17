@@ -14999,6 +14999,7 @@ if (screen === 'configuraStipendio') {
   if (screen === 'consegneServizio') {
     return (
       <ConsegneServizioScreen
+        paletteHome={paletteHome}
         onBack={() => setScreen('strumenti')}
         postazioni={postazioniSalvate}
         colleghi={colleghi}
@@ -34180,6 +34181,7 @@ function RapportoServizioScreen({
    CONSEGNE SERVIZIO V1
    ========================================================= */
 function ConsegneServizioScreen({
+  paletteHome = null,
   onBack,
   postazioni = [],
   colleghi = [],
