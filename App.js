@@ -9121,7 +9121,7 @@ async function logout() {
     };
 
     return (
-      <Screen>
+      <Screen homePalette={paletteHome}>
         <ScrollView
           ref={tornaSuRef}
           showsVerticalScrollIndicator={false}
@@ -10091,12 +10091,12 @@ if (screen === 'colleghi') {
 
   if (screen === 'stipendio') {
     return (
-      <Screen>
+      <Screen homePalette={paletteHome}>
         <Back onPress={() => setScreen('home')} />
 
         <Text
           style={{
-        color: '#73DFFF',
+        color: coloreHome(paletteHome, 'accent', '#73DFFF'),
         fontSize: 13,
         fontWeight: '900',
         marginBottom: 10,
@@ -10114,10 +10114,10 @@ if (screen === 'colleghi') {
           marginBottom: 14,
           padding: 8,
           borderRadius: 20,
-          backgroundColor: '#09172B',
+          backgroundColor: coloreHome(paletteHome, 'surface', '#09172B'),
           borderWidth: 1,
-          borderColor: '#29496E',
-          shadowColor: '#49CFFF',
+          borderColor: coloreHome(paletteHome, 'border', '#29496E'),
+          shadowColor: coloreHome(paletteHome, 'accent', '#49CFFF'),
           shadowOpacity: 0.10,
           shadowRadius: 12,
           shadowOffset: { width: 0, height: 5 },
@@ -10129,14 +10129,14 @@ if (screen === 'colleghi') {
               width: 44,
               height: 44,
               borderRadius: 14,
-              backgroundColor: '#07101F',
+              backgroundColor: coloreHome(paletteHome, 'surfaceRaised', '#07101F'),
               alignItems: 'center',
               justifyContent: 'center',
             }}
           >
             <Text
               style={{
-                color: '#5a8cff',
+                color: coloreHome(paletteHome, 'accent', '#5a8cff'),
                 fontSize: 30,
                 fontWeight: '900',
                 marginTop: -3,
@@ -10164,14 +10164,14 @@ if (screen === 'colleghi') {
               width: 44,
               height: 44,
               borderRadius: 14,
-              backgroundColor: '#07101F',
+              backgroundColor: coloreHome(paletteHome, 'surfaceRaised', '#07101F'),
               alignItems: 'center',
               justifyContent: 'center',
             }}
           >
             <Text
               style={{
-                color: '#5a8cff',
+                color: coloreHome(paletteHome, 'accent', '#5a8cff'),
                 fontSize: 30,
                 fontWeight: '900',
                 marginTop: -3,
@@ -10184,7 +10184,7 @@ if (screen === 'colleghi') {
 
         <Text
           style={{
-            color: '#9fb2d9',
+            color: coloreHome(paletteHome, 'textMuted', '#9fb2d9'),
             fontSize: 14,
             marginBottom: 22,
           }}
@@ -10204,7 +10204,7 @@ if (screen === 'colleghi') {
             borderWidth: 1,
             borderColor: '#3E9B58',
           }}>
-  <Text style={{ color: '#dfe6ff', fontSize: 14 }}>
+  <Text style={{ color: coloreHome(paletteHome, 'text', '#dfe6ff'), fontSize: 14 }}>
     🛌 Riposo lavorato
   </Text>
   <Text style={{ color: '#FFFFFF', fontSize: 15, fontWeight: '900' }}>
@@ -10217,13 +10217,13 @@ if (screen === 'colleghi') {
 
 <View
           style={{
-          backgroundColor: '#152E70',
+          backgroundColor: coloreHome(paletteHome, 'surfaceRaised', '#152E70'),
           borderRadius: 24,
           padding: 20,
           marginBottom: 16,
           borderWidth: 1.3,
-          borderColor: '#667CFF',
-          shadowColor: '#536BFF',
+          borderColor: coloreHome(paletteHome, 'accent', '#667CFF'),
+          shadowColor: coloreHome(paletteHome, 'accent', '#536BFF'),
           shadowOpacity: 0.30,
           shadowRadius: 20,
           shadowOffset: { width: 0, height: 8 },
@@ -10231,7 +10231,7 @@ if (screen === 'colleghi') {
         >
           <Text
             style={{
-              color: '#5a8cff',
+              color: coloreHome(paletteHome, 'accent', '#5a8cff'),
               fontSize: 11,
               fontWeight: '900',
             }}
@@ -10252,7 +10252,7 @@ if (screen === 'colleghi') {
 
           <Text
             style={{
-              color: '#9fb2d9',
+              color: coloreHome(paletteHome, 'textMuted', '#9fb2d9'),
               fontSize: 13,
               marginTop: 8,
             }}
@@ -10266,7 +10266,7 @@ if (screen === 'colleghi') {
         {isFiduciario ? (
           <View
             style={{
-              backgroundColor: '#0B2038',
+              backgroundColor: coloreHome(paletteHome, 'surface', '#0B2038'),
               borderRadius: 20,
               padding: 16,
               marginBottom: 16,
@@ -10319,7 +10319,7 @@ if (screen === 'colleghi') {
               ],
             ].map(([label, value]) => (
               <View key={label} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4 }}>
-                <Text style={{ color: '#9FB2D9', fontSize: 11 }}>{label}</Text>
+                <Text style={{ color: coloreHome(paletteHome, 'textMuted', '#9FB2D9'), fontSize: 11 }}>{label}</Text>
                 <Text style={{ color: '#FFFFFF', fontSize: 11, fontWeight: '900' }}>{value}</Text>
               </View>
             ))}
@@ -10333,7 +10333,7 @@ if (screen === 'colleghi') {
 
         <View
           style={{
-            backgroundColor: '#284cff',
+            backgroundColor: coloreHome(paletteHome, 'accent', '#284cff'),
             borderRadius: 20,
             padding: 18,
             marginBottom: 16,
@@ -10391,7 +10391,7 @@ if (screen === 'colleghi') {
           <>
 <Text
             style={{
-              color: '#dfe6ff',
+              color: coloreHome(paletteHome, 'text', '#dfe6ff'),
               fontSize: 11,
               fontWeight: '900',
             }}
@@ -10412,7 +10412,7 @@ if (screen === 'colleghi') {
 
     <Text
       style={{
-        color: '#9fb2d9',
+        color: coloreHome(paletteHome, 'textMuted', '#9fb2d9'),
         fontSize: 13,
         fontWeight: '700',
         marginTop: 8,
@@ -10458,7 +10458,7 @@ if (screen === 'colleghi') {
 
         <Text
           style={{
-            color: '#9FB2D9',
+            color: coloreHome(paletteHome, 'textMuted', '#9FB2D9'),
             fontSize: 11,
             lineHeight: 16,
             marginTop: 5,
@@ -10475,7 +10475,7 @@ if (screen === 'colleghi') {
           }}
           style={{
             marginTop: 11,
-            backgroundColor: '#3154ff',
+            backgroundColor: coloreHome(paletteHome, 'accent', '#3154ff'),
             borderRadius: 12,
             paddingVertical: 11,
             paddingHorizontal: 14,
@@ -10530,13 +10530,13 @@ if (screen === 'colleghi') {
 
         <View
           style={{
-          backgroundColor: '#09182C',
+          backgroundColor: coloreHome(paletteHome, 'surface', '#09182C'),
           borderRadius: 20,
           padding: 17,
           marginBottom: 16,
           borderWidth: 1,
-          borderColor: '#2E5A83',
-          shadowColor: '#40D7FF',
+          borderColor: coloreHome(paletteHome, 'border', '#2E5A83'),
+          shadowColor: coloreHome(paletteHome, 'accent', '#40D7FF'),
           shadowOpacity: 0.12,
           shadowRadius: 12,
           shadowOffset: { width: 0, height: 5 },
@@ -10544,7 +10544,7 @@ if (screen === 'colleghi') {
         >
           <Text
             style={{
-              color: '#5a8cff',
+              color: coloreHome(paletteHome, 'accent', '#5a8cff'),
               fontSize: 11,
               fontWeight: '900',
             }}
@@ -10567,7 +10567,7 @@ if (screen === 'colleghi') {
         <View style={{ marginTop: 7 }}>
           <Text
             style={{
-              color: '#8FA5CC',
+              color: coloreHome(paletteHome, 'textMuted', '#8FA5CC'),
               fontSize: 10,
               fontWeight: '800',
             }}
@@ -10592,7 +10592,7 @@ if (screen === 'colleghi') {
 
           <Text
             style={{
-              color: '#9fb2d9',
+              color: coloreHome(paletteHome, 'textMuted', '#9fb2d9'),
               fontSize: 12,
               marginTop: 7,
             }}
@@ -10683,7 +10683,7 @@ if (screen === 'colleghi') {
 
         <View
           style={{
-          backgroundColor: '#09182C',
+          backgroundColor: coloreHome(paletteHome, 'surface', '#09182C'),
           borderRadius: 22,
           padding: 18,
           marginBottom: 16,
@@ -10697,7 +10697,7 @@ if (screen === 'colleghi') {
         >
           <Text
             style={{
-              color: '#5a8cff',
+              color: coloreHome(paletteHome, 'accent', '#5a8cff'),
               fontSize: 11,
               fontWeight: '900',
               marginBottom: 14,
@@ -10720,7 +10720,7 @@ if (screen === 'colleghi') {
             borderColor: '#31506F',
           }}
           >
-            <Text style={{ color: '#dfe6ff', fontSize: 14 }}>
+            <Text style={{ color: coloreHome(paletteHome, 'text', '#dfe6ff'), fontSize: 14 }}>
               🕐 Ore totali
             </Text>
             <Text style={{ color: 'white', fontSize: 15, fontWeight: '900' }}>
@@ -10742,7 +10742,7 @@ if (screen === 'colleghi') {
             borderColor: '#2B4663',
           }}
           >
-            <Text style={{ color: '#dfe6ff', fontSize: 14 }}>
+            <Text style={{ color: coloreHome(paletteHome, 'text', '#dfe6ff'), fontSize: 14 }}>
               ○ Ore ordinarie
             </Text>
             <Text style={{ color: 'white', fontSize: 15, fontWeight: '900' }}>
@@ -10764,7 +10764,7 @@ if (screen === 'colleghi') {
             borderColor: '#B67A22',
           }}
           >
-            <Text style={{ color: '#dfe6ff', fontSize: 14 }}>
+            <Text style={{ color: coloreHome(paletteHome, 'text', '#dfe6ff'), fontSize: 14 }}>
               ⭐ Straordinari
             </Text>
             <Text style={{ color: '#ffd54a', fontSize: 15, fontWeight: '900' }}>
@@ -10878,7 +10878,7 @@ if (screen === 'colleghi') {
                     <View>
                       <Text
                         style={{
-                          color: '#dfe6ff',
+                          color: coloreHome(paletteHome, 'text', '#dfe6ff'),
                           fontSize: 12,
                           fontWeight: '700',
                         }}
@@ -10925,7 +10925,7 @@ if (screen === 'colleghi') {
             >
               <Text
                 style={{
-                  color: '#dfe6ff',
+                  color: coloreHome(paletteHome, 'text', '#dfe6ff'),
                   fontWeight: '800',
                   fontSize: 12,
                 }}
@@ -10955,7 +10955,7 @@ if (screen === 'colleghi') {
               marginBottom: 12,
             }}
           >
-            <Text style={{ color: '#dfe6ff', fontSize: 14 }}>
+            <Text style={{ color: coloreHome(paletteHome, 'text', '#dfe6ff'), fontSize: 14 }}>
               🌙 Turni notturni
             </Text>
             <Text style={{ color: '#c7b8ff', fontSize: 15, fontWeight: '900' }}>
@@ -10964,7 +10964,7 @@ if (screen === 'colleghi') {
           </View>
 
 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-  <Text style={{ color: '#dfe6ff', fontSize: 14 }}>
+  <Text style={{ color: coloreHome(paletteHome, 'text', '#dfe6ff'), fontSize: 14 }}>
     ☀️ Ore domenicali
   </Text>
   <Text style={{ color: '#FFFFFF', fontSize: 15, fontWeight: '900' }}>
@@ -10975,7 +10975,7 @@ if (screen === 'colleghi') {
           <View
             style={{
               height: 1,
-              backgroundColor: '#284cff',
+              backgroundColor: coloreHome(paletteHome, 'accent', '#284cff'),
               marginVertical: 4,
               marginBottom: 12,
             }}
@@ -10988,7 +10988,7 @@ if (screen === 'colleghi') {
               alignItems: 'center',
             }}
           >
-            <Text style={{ color: '#dfe6ff', fontSize: 14 }}>
+            <Text style={{ color: coloreHome(paletteHome, 'text', '#dfe6ff'), fontSize: 14 }}>
               📅 Giorni lavorati
             </Text>
             <Text style={{ color: '#35e58b', fontSize: 15, fontWeight: '900' }}>
@@ -11002,7 +11002,7 @@ if (screen === 'colleghi') {
         <TouchableOpacity
           onPress={() => setScreen('configuraStipendio')}
           style={{
-            backgroundColor: '#284cff',
+            backgroundColor: coloreHome(paletteHome, 'accent', '#284cff'),
             borderRadius: 14,
             padding: 14,
             marginTop: 8,
@@ -11026,7 +11026,7 @@ if (screen === 'colleghi') {
   
   if (screen === 'controlloCedolino') {
     return (
-      <Screen>
+      <Screen homePalette={paletteHome}>
         <Back onPress={() => setScreen('stipendio')} />
 
         <ScrollView
@@ -12192,7 +12192,7 @@ if (screen === 'colleghi') {
 
 if (screen === 'configuraStipendio') {
     return (
-      <Screen>
+      <Screen homePalette={paletteHome}>
         <Back onPress={() => setScreen('stipendio')} />
 
         <Text
@@ -13456,7 +13456,7 @@ if (screen === 'configuraStipendio') {
 
   if (screen === 'listaChat') {
     return (
-      <Screen>
+      <Screen homePalette={paletteHome}>
         <Back onPress={() => setScreen('home')} />
 
         <Text style={{
@@ -14872,7 +14872,7 @@ if (screen === 'configuraStipendio') {
     );
 
     return (
-      <Screen>
+      <Screen homePalette={paletteHome}>
         {Platform.OS === 'android' && (
           <View style={{ height: 14 }} />
         )}
@@ -15154,7 +15154,7 @@ if (screen === 'configuraStipendio') {
       10;
 
     return (
-      <Screen>
+      <Screen homePalette={paletteHome}>
 
         <Back
           onPress={() => {
@@ -15909,7 +15909,7 @@ if (screen === 'configuraStipendio') {
       contaBandiereMine(mineCampo);
 
     return (
-      <Screen>
+      <Screen homePalette={paletteHome}>
         <Back
           onPress={() => {
             setMineAvviato(false);
@@ -16419,7 +16419,7 @@ if (screen === 'configuraStipendio') {
 ];
 
     return (
-      <Screen showScrollTop>
+      <Screen homePalette={paletteHome} showScrollTop>
         <Back onPress={() => setScreen('strumenti')} />
 
         <View
@@ -16735,7 +16735,7 @@ Alert.alert(
     };
 
     return (
-      <Screen>
+      <Screen homePalette={paletteHome}>
         <ScrollView
           ref={passatempoScrollRef}
           showsVerticalScrollIndicator={false}
@@ -17927,7 +17927,7 @@ if (screen === 'strumenti') {
 ];
 
     return (
-      <Screen>
+      <Screen homePalette={paletteHome}>
         <Back onPress={() => setScreen('home')} />
 
         <View
@@ -17937,12 +17937,12 @@ if (screen === 'strumenti') {
             padding: 20,
             borderRadius: 26,
 
-            backgroundColor: 'rgba(23,31,85,0.92)',
+            backgroundColor: coloreHome(paletteHome, 'surfaceRaised', 'rgba(23,31,85,0.92)'),
 
             borderWidth: 1,
-            borderColor: 'rgba(100,199,255,0.42)',
+            borderColor: coloreHome(paletteHome, 'border', 'rgba(100,199,255,0.42)'),
 
-            shadowColor: '#5CDFFF',
+            shadowColor: coloreHome(paletteHome, 'accent', '#5CDFFF'),
             shadowOpacity: 0.17,
             shadowRadius: 17,
             shadowOffset: { width: 0, height: 7 },
@@ -17950,7 +17950,7 @@ if (screen === 'strumenti') {
         >
           <Text
             style={{
-              color: '#70DEFF',
+              color: coloreHome(paletteHome, 'accent', '#70DEFF'),
               fontSize: 10,
               fontWeight: '900',
               letterSpacing: 1.4,
@@ -17961,7 +17961,7 @@ if (screen === 'strumenti') {
 
           <Text
             style={{
-              color: '#FFFFFF',
+              color: coloreHome(paletteHome, 'text', '#FFFFFF'),
               fontSize: 27,
               fontWeight: '900',
               marginTop: 6,
@@ -17973,7 +17973,7 @@ if (screen === 'strumenti') {
 
           <Text
             style={{
-              color: '#A9C0DD',
+              color: coloreHome(paletteHome, 'textMuted', '#A9C0DD'),
               fontSize: 13,
               fontWeight: '600',
               lineHeight: 19,
@@ -18004,7 +18004,7 @@ if (screen === 'strumenti') {
 
                 borderRadius: 23,
 
-                backgroundColor: 'rgba(10,29,61,0.94)',
+                backgroundColor: coloreHome(paletteHome, 'surface', 'rgba(10,29,61,0.94)'),
 
                 borderWidth: 1,
                 borderColor: `${item.colore}70`,
@@ -18026,7 +18026,7 @@ if (screen === 'strumenti') {
                   alignItems: 'center',
                   justifyContent: 'center',
 
-                  backgroundColor: 'rgba(32,55,98,0.85)',
+                  backgroundColor: coloreHome(paletteHome, 'surfaceRaised', 'rgba(32,55,98,0.85)'),
 
                   borderWidth: 1,
                   borderColor: `${item.colore}80`,
@@ -18041,7 +18041,7 @@ if (screen === 'strumenti') {
 
               <Text
                 style={{
-                  color: '#FFFFFF',
+                  color: coloreHome(paletteHome, 'text', '#FFFFFF'),
                   fontSize: 15,
                   fontWeight: '900',
                   marginTop: 13,
@@ -18052,7 +18052,7 @@ if (screen === 'strumenti') {
 
               <Text
                 style={{
-                  color: '#8EA8C5',
+                  color: coloreHome(paletteHome, 'textMuted', '#8EA8C5'),
                   fontSize: 10.5,
                   fontWeight: '600',
                   lineHeight: 15,
@@ -18076,22 +18076,22 @@ if (screen === 'strumenti') {
 
             borderRadius: 18,
 
-            backgroundColor: 'rgba(18,37,65,0.72)',
+            backgroundColor: coloreHome(paletteHome, 'surface', 'rgba(18,37,65,0.72)'),
 
             borderWidth: 1,
-            borderColor: 'rgba(76,126,171,0.28)',
+            borderColor: coloreHome(paletteHome, 'border', 'rgba(76,126,171,0.28)'),
           }}
         >
           <Ionicons
             name="shield-checkmark-outline"
             size={19}
-            color="#69D8FF"
+            color={coloreHome(paletteHome, 'accent', '#69D8FF')}
           />
 
           <Text
             style={{
               flex: 1,
-              color: '#819CB7',
+              color: coloreHome(paletteHome, 'textMuted', '#819CB7'),
               fontSize: 10,
               lineHeight: 15,
               fontWeight: '700',
@@ -18131,7 +18131,7 @@ if (screen === 'strumenti') {
       );
 
     return (
-      <Screen>
+      <Screen homePalette={paletteHome}>
         <Back
           onPress={() => {
             setDocumentoSelezionato(null);
@@ -18937,7 +18937,7 @@ if (screen === 'strumenti') {
 
     if (!emergenza) {
       return (
-        <Screen>
+        <Screen homePalette={paletteHome}>
           <Back
             onPress={() =>
               setScreen('emergenzeServizio')
@@ -18968,7 +18968,7 @@ if (screen === 'strumenti') {
     }
 
     return (
-      <Screen>
+      <Screen homePalette={paletteHome}>
         <Back
           onPress={() => {
             setEmergenzaSelezionata(null);
@@ -19454,7 +19454,7 @@ if (screen === 'strumenti') {
     ];
 
     return (
-      <Screen>
+      <Screen homePalette={paletteHome}>
         <Back
           onPress={() =>
             setScreen('regoleGiuramento')
@@ -19734,6 +19734,7 @@ if (screen === 'strumenti') {
     return (
       <CalendarioColleghiScreen
         onBack={() => setScreen('home')}
+        palette={paletteHome}
       />
     );
   }
@@ -19762,7 +19763,7 @@ if (screen === 'strumenti') {
   if (screen === 'postazioni') {
 
     return (
-      <Screen>
+      <Screen homePalette={paletteHome}>
         <Back onPress={() => setScreen('strumenti')} />
 
         <View
@@ -20064,7 +20065,7 @@ if (screen === 'strumenti') {
   if (screen === 'postazioneDettaglio') {
 
     return (
-      <Screen>
+      <Screen homePalette={paletteHome}>
         <Back
           onPress={chiudiDettaglioPostazione}
         />
@@ -21251,7 +21252,7 @@ if (screen === 'strumenti') {
     ];
 
     return (
-      <Screen>
+      <Screen homePalette={paletteHome}>
         <Back onPress={() => setScreen('strumenti')} />
 
         <View
@@ -21937,7 +21938,7 @@ if (screen === 'strumenti') {
     })();
 
     return (
-      <Screen>
+      <Screen homePalette={paletteHome}>
         <Back onPress={() => setScreen('strumenti')} />
 
         <View
@@ -23295,7 +23296,7 @@ if (screen === 'strumenti') {
     };
 
     return (
-      <Screen>
+      <Screen homePalette={paletteHome}>
         <Back onPress={() => setScreen('strumenti')} />
 
         {/* HERO */}
@@ -24165,7 +24166,7 @@ if (screen === 'strumenti') {
     ];
 
     return (
-      <Screen>
+      <Screen homePalette={paletteHome}>
         <Back onPress={() => setScreen('strumenti')} />
 
         <View
@@ -24512,7 +24513,7 @@ if (screen === 'strumenti') {
     ];
 
     return (
-      <Screen>
+      <Screen homePalette={paletteHome}>
         <Back onPress={() => setScreen('strumenti')} />
 
         <View
@@ -24726,7 +24727,7 @@ if (screen === 'strumenti') {
      ===================================================== */
   if (screen === 'giuramentoGpg') {
     return (
-      <Screen>
+      <Screen homePalette={paletteHome}>
         <Back onPress={() => setScreen('regoleGiuramento')} />
 
         <View
@@ -24904,7 +24905,7 @@ if (screen === 'strumenti') {
     ];
 
     return (
-      <Screen>
+      <Screen homePalette={paletteHome}>
         <Back onPress={() => setScreen('regoleGiuramento')} />
 
         <Text
@@ -25007,7 +25008,7 @@ if (screen === 'strumenti') {
     ];
 
     return (
-      <Screen>
+      <Screen homePalette={paletteHome}>
         <Back onPress={() => setScreen('regoleGiuramento')} />
 
         <Text
@@ -25132,7 +25133,7 @@ if (
     const pagina = dati[screen];
 
     return (
-      <Screen>
+      <Screen homePalette={paletteHome}>
         <Back onPress={() => setScreen('strumenti')} />
 
         <View
@@ -25222,7 +25223,7 @@ if (screen === 'profiloCollega') {
       null;
 
     return (
-      <Screen>
+      <Screen homePalette={paletteHome}>
         <Back
           onPress={() => {
             setCollegaSelezionato(null);
@@ -26148,7 +26149,7 @@ if (screen === 'profiloCollega') {
     'profile'
   ) {
     return (
-      <Screen>
+      <Screen homePalette={paletteHome}>
         <Back
           onPress={() =>
             setScreen(
@@ -26159,7 +26160,7 @@ if (screen === 'profiloCollega') {
 
         <Text
           style={
-            styles.title
+            [styles.title, { color: coloreHome(paletteHome, 'text', '#FFFFFF'), textShadowColor: coloreHome(paletteHome, 'accent', 'rgba(66,140,255,0.35)') }]
           }
         >
           Il mio profilo
@@ -26167,7 +26168,7 @@ if (screen === 'profiloCollega') {
 
         <Text
           style={
-            styles.subtitle
+            [styles.subtitle, { color: coloreHome(paletteHome, 'textMuted', '#8FA6C9') }]
           }
         >
           Identità professionale
@@ -26176,19 +26177,19 @@ if (screen === 'profiloCollega') {
         <TouchableOpacity accessibilityRole="button" accessibilityLabel="Aspetto e colori"
           onPress={() => setScreen('aspettoColori')}
           style={{ flexDirection: 'row', alignItems: 'center', gap: 10, padding: 16,
-            backgroundColor: COLORS.card, borderRadius: 14, marginBottom: 16 }}>
-          <Ionicons name="color-palette-outline" size={24} color={COLORS.lightBlue} />
-          <Text style={{ color: COLORS.white, fontWeight: '800' }}>Aspetto e colori</Text>
+            backgroundColor: coloreHome(paletteHome, 'surface', COLORS.card), borderRadius: 14, marginBottom: 16, borderWidth: 1, borderColor: coloreHome(paletteHome, 'border', COLORS.border) }}>
+          <Ionicons name="color-palette-outline" size={24} color={coloreHome(paletteHome, 'accent', COLORS.lightBlue)} />
+          <Text style={{ color: coloreHome(paletteHome, 'text', COLORS.white), fontWeight: '800' }}>Aspetto e colori</Text>
         </TouchableOpacity>
 
         <View
           style={
-            styles.profileHero
+            [styles.profileHero, { backgroundColor: coloreHome(paletteHome, 'surfaceRaised', 'rgba(30,39,104,0.92)'), borderColor: coloreHome(paletteHome, 'accent', '#756CFF'), shadowColor: coloreHome(paletteHome, 'accent', '#7367FF') }]
           }
         >
           <TouchableOpacity
             style={
-              styles.profileAvatar
+              [styles.profileAvatar, { backgroundColor: coloreHome(paletteHome, 'surface', '#17355A'), borderColor: coloreHome(paletteHome, 'accent', '#62E8FF'), shadowColor: coloreHome(paletteHome, 'accent', '#56E6FF') }]
             }
             onPress={
               scegliFotoProfilo
@@ -26201,13 +26202,13 @@ if (screen === 'profiloCollega') {
                     fotoProfilo,
                 }}
                 style={
-                  styles.profileAvatarImage
+                  [styles.profileAvatar, { backgroundColor: coloreHome(paletteHome, 'surface', '#17355A'), borderColor: coloreHome(paletteHome, 'accent', '#62E8FF'), shadowColor: coloreHome(paletteHome, 'accent', '#56E6FF') }]Image
                 }
               />
             ) : (
               <Text
                 style={
-                  styles.profileAvatarText
+                  [styles.profileAvatar, { backgroundColor: coloreHome(paletteHome, 'surface', '#17355A'), borderColor: coloreHome(paletteHome, 'accent', '#62E8FF'), shadowColor: coloreHome(paletteHome, 'accent', '#56E6FF') }]Text
                 }
               >
                 {iniziali}
@@ -26216,12 +26217,12 @@ if (screen === 'profiloCollega') {
 
             <View
               style={
-                styles.cameraBadge
+                [styles.cameraBadge, { backgroundColor: coloreHome(paletteHome, 'surfaceRaised', '#262D70'), borderColor: coloreHome(paletteHome, 'accent', '#74EBFF'), shadowColor: coloreHome(paletteHome, 'accent', '#5DEAFF') }]
               }
             >
               <Text
                 style={
-                  styles.cameraBadgeText
+                  [styles.cameraBadge, { backgroundColor: coloreHome(paletteHome, 'surfaceRaised', '#262D70'), borderColor: coloreHome(paletteHome, 'accent', '#74EBFF'), shadowColor: coloreHome(paletteHome, 'accent', '#5DEAFF') }]Text
                 }
               >
                 📷
@@ -26232,7 +26233,7 @@ if (screen === 'profiloCollega') {
 
           <Text
             style={
-              styles.photoHint
+              [styles.photoHint, { color: coloreHome(paletteHome, 'textMuted', '#91A3BA') }]
             }
           >
             Tocca per scegliere la foto
@@ -26240,7 +26241,7 @@ if (screen === 'profiloCollega') {
 
           <Text
             style={
-              styles.profileName
+              [styles.profileName, { color: coloreHome(paletteHome, 'text', '#FFFFFF'), textShadowColor: coloreHome(paletteHome, 'accent', 'rgba(92,235,255,0.32)') }]
             }
           >
             {profilo.nome}{' '}
@@ -26249,7 +26250,7 @@ if (screen === 'profiloCollega') {
 
           <Text
             style={
-              styles.profileRole
+              [styles.profileRole, { color: coloreHome(paletteHome, 'textMuted', '#B5CBE1') }]
             }
           >
             {profilo.ruolo}
@@ -26257,12 +26258,12 @@ if (screen === 'profiloCollega') {
 
           <View
             style={
-              styles.companyBadge
+              [styles.companyBadge, { backgroundColor: coloreHome(paletteHome, 'surfaceRaised', 'rgba(58,78,174,0.72)'), borderColor: coloreHome(paletteHome, 'accent', '#638FEF'), shadowColor: coloreHome(paletteHome, 'accent', '#5CEAFF') }]
             }
           >
             <Text
               style={
-                styles.companyBadgeText
+                [styles.companyBadge, { backgroundColor: coloreHome(paletteHome, 'surfaceRaised', 'rgba(58,78,174,0.72)'), borderColor: coloreHome(paletteHome, 'accent', '#638FEF'), shadowColor: coloreHome(paletteHome, 'accent', '#5CEAFF') }]Text
               }
             >
               {profilo.azienda}
@@ -26272,7 +26273,7 @@ if (screen === 'profiloCollega') {
 
         <Text
           style={
-            styles.profileSectionTitle
+            [styles.profileSectionTitle, { color: coloreHome(paletteHome, 'accent', '#8FE8FF') }]
           }
         >
           DATI PERSONALI
@@ -26312,13 +26313,13 @@ if (screen === 'profiloCollega') {
 
       {/* MATRICOLA PROFILO */}
       <View style={styles.profileFieldWrap}>
-        <Text style={styles.profileFieldLabel}>
+        <Text style={[styles.profileFieldLabel, { color: coloreHome(paletteHome, 'accent', '#8FE8FF') }]}>
           MATRICOLA
         </Text>
 
         <View
           style={[
-            styles.profileFieldInput,
+            [styles.profileFieldInput, { backgroundColor: coloreHome(paletteHome, 'surface', 'rgba(25,31,78,0.90)'), borderColor: coloreHome(paletteHome, 'border', '#65DFF5'), color: coloreHome(paletteHome, 'text', '#FFFFFF'), shadowColor: coloreHome(paletteHome, 'accent', '#58E4FF') }],
             {
               flexDirection: 'row',
               alignItems: 'center',
@@ -26379,7 +26380,7 @@ if (screen === 'profiloCollega') {
 
         <Text
           style={
-            styles.profileSectionTitle
+            [styles.profileSectionTitle, { color: coloreHome(paletteHome, 'accent', '#8FE8FF') }]
           }
         >
           RUOLO
@@ -27029,18 +27030,18 @@ if (screen === 'profiloCollega') {
     );
 
     return (
-      <Screen>
+      <Screen homePalette={paletteHome}>
         <Back onPress={tornaHome} />
 
-        <Text style={styles.title}>
+        <Text style={[styles.title, { color: coloreHome(paletteHome, 'text', '#FFFFFF'), textShadowColor: coloreHome(paletteHome, 'accent', 'rgba(66,140,255,0.35)') }]}>
           Agenda
         </Text>
 
-        <Text style={styles.subtitle}>
+        <Text style={[styles.subtitle, { color: coloreHome(paletteHome, 'textMuted', '#8FA6C9') }]}>
           Lavoro e vita personale, in un solo calendario
         </Text>
 
-        <View style={styles.monthBox}>
+        <View style={[[styles.month, { color: coloreHome(paletteHome, 'text', '#FFFFFF') }]Box, { backgroundColor: coloreHome(paletteHome, 'surface', '#101F38'), borderColor: coloreHome(paletteHome, 'border', '#294E83'), shadowColor: coloreHome(paletteHome, 'accent', '#2E7DFF') }]}>
           <TouchableOpacity
             onPress={mesePrecedente}
           >
@@ -27050,11 +27051,11 @@ if (screen === 'profiloCollega') {
           </TouchableOpacity>
 
           <View>
-            <Text style={styles.month}>
+            <Text style={[styles.month, { color: coloreHome(paletteHome, 'text', '#FFFFFF') }]}>
               {MESI[mese]}
             </Text>
 
-            <Text style={styles.year}>
+            <Text style={[styles.year, { color: coloreHome(paletteHome, 'textMuted', '#91A3BA') }]}>
               {anno}
             </Text>
           </View>
@@ -27653,7 +27654,7 @@ if (screen === 'profiloCollega') {
     };
 
     return (
-      <Screen>
+      <Screen homePalette={paletteHome}>
         <Back onPress={() => setScreen('calendar')} />
 
         <Text style={styles.title}>Turni del giorno</Text>
@@ -27847,7 +27848,7 @@ if (screen === 'profiloCollega') {
 
 
     return (
-      <Screen scrollRef={editScreenScrollRef}>
+      <Screen homePalette={paletteHome} scrollRef={editScreenScrollRef}>
         <Back
           onPress={
             () => {
@@ -29006,7 +29007,7 @@ if (screen === 'profiloCollega') {
       return fineMinuti <= inizioMinuti;
     }).length;
     return (
-      <Screen
+      <Screen homePalette={paletteHome}
       showScrollTop
       contentOffset={{
         x: 0,
@@ -30716,7 +30717,7 @@ if (screen === 'profiloCollega') {
   }
 
   return (
-    <Screen>
+    <Screen homePalette={paletteHome}>
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 120 }}
@@ -33075,7 +33076,7 @@ function RapportoServizioScreen({
   ];
 
   return (
-    <Screen>
+    <Screen homePalette={paletteHome}>
       <Back onPress={onBack} />
 
       <View
@@ -34308,7 +34309,7 @@ function ConsegneServizioScreen({
   ];
 
   return (
-    <Screen showScrollTop>
+    <Screen homePalette={paletteHome} showScrollTop>
       <Back onPress={onBack} />
 
       <View
@@ -35369,7 +35370,7 @@ function OcchioGpgGameScreen({ onBack }) {
   };
 
   return (
-    <Screen>
+    <Screen homePalette={paletteHome}>
       <Back onPress={onBack} />
 
       <View
@@ -35999,7 +36000,7 @@ function CctvChallengeGameScreen({ onBack }) {
   };
 
   return (
-    <Screen showScrollTop>
+    <Screen homePalette={paletteHome} showScrollTop>
 
       <Back onPress={onBack} />
 
@@ -36829,7 +36830,7 @@ function FalsoAllarmeGameScreen({ onBack }) {
   };
 
   return (
-    <Screen showScrollTop>
+    <Screen homePalette={paletteHome} showScrollTop>
 
       <Back onPress={onBack} />
 
@@ -37621,7 +37622,7 @@ function PattugliaNotturnaGameScreen({ onBack }) {
   };
 
   return (
-    <Screen showScrollTop>
+    <Screen homePalette={paletteHome} showScrollTop>
 
       <Back onPress={onBack} />
 
@@ -38503,7 +38504,7 @@ function CodiceRadioGameScreen({ onBack }) {
   };
 
   return (
-    <Screen showScrollTop>
+    <Screen homePalette={paletteHome} showScrollTop>
 
       <Back onPress={onBack} />
 
@@ -39428,7 +39429,7 @@ function ControlloTargaGameScreen({ onBack }) {
   };
 
   return (
-    <Screen showScrollTop>
+    <Screen homePalette={paletteHome} showScrollTop>
 
       <Back onPress={onBack} />
 
@@ -40251,7 +40252,7 @@ function MazzoChiaviGameScreen({ onBack }) {
   };
 
   return (
-    <Screen showScrollTop>
+    <Screen homePalette={paletteHome} showScrollTop>
 
       <Back onPress={onBack} />
 
@@ -40999,7 +41000,7 @@ function FineTurnoGameScreen({ onBack }) {
   };
 
   return (
-    <Screen showScrollTop>
+    <Screen homePalette={paletteHome} showScrollTop>
 
       <Back onPress={onBack} />
 
@@ -41867,7 +41868,7 @@ function NonAddormentartiGameScreen({ onBack }) {
   };
 
   return (
-    <Screen>
+    <Screen homePalette={paletteHome}>
 
       <Back onPress={onBack} />
 
@@ -42664,7 +42665,7 @@ function SfidaColleghiGameScreen({ onBack }) {
   };
 
   return (
-    <Screen showScrollTop>
+    <Screen homePalette={paletteHome} showScrollTop>
 
       <Back onPress={onBack} />
 
@@ -43556,7 +43557,7 @@ function TrovaAnomaliaGameScreen({ onBack }) {
   };
 
   return (
-    <Screen showScrollTop>
+    <Screen homePalette={paletteHome} showScrollTop>
 
       <Back onPress={onBack} />
 
