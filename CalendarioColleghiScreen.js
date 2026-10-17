@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { coloreHome } from './temi';
 
 import { caricaTurniUtente } from './turniApi';
 import { caricaColleghi } from './colleghiApi';
@@ -161,7 +162,7 @@ function turnoInCorsoAdesso(turno) {
   return adesso >= inizio && adesso < fine;
 }
 
-export default function CalendarioColleghiScreen({ onBack }) {
+export default function CalendarioColleghiScreen({ onBack, palette = null }) {
   const scrollRef = useRef(null);
   const [mostraTornaSu, setMostraTornaSu] = useState(false);
   const [inizioSettimana, setInizioSettimana] = useState(
@@ -461,7 +462,7 @@ export default function CalendarioColleghiScreen({ onBack }) {
     <View
       style={{
         flex: 1,
-        backgroundColor: '#07111F',
+        backgroundColor: coloreHome(palette, 'background', '#07111F'),
       }}
     >
       <ScrollView
@@ -492,7 +493,7 @@ export default function CalendarioColleghiScreen({ onBack }) {
               width: 42,
               height: 42,
               borderRadius: 21,
-              backgroundColor: '#101B34',
+              backgroundColor: coloreHome(palette, 'surface', '#101B34'),
               alignItems: 'center',
               justifyContent: 'center',
               marginRight: 12,
@@ -508,7 +509,7 @@ export default function CalendarioColleghiScreen({ onBack }) {
           <View style={{ flex: 1 }}>
             <Text
               style={{
-                color: '#8DB8FF',
+                color: coloreHome(palette, 'accent', '#8DB8FF'),
                 fontSize: 11,
                 fontWeight: '900',
                 letterSpacing: 1.2,
@@ -532,13 +533,13 @@ export default function CalendarioColleghiScreen({ onBack }) {
           <Ionicons
             name="people"
             size={29}
-            color="#8DB8FF"
+            color={coloreHome(palette, 'accent', '#8DB8FF')}
           />
         </View>
 
         <View
           style={{
-            backgroundColor: '#101B34',
+            backgroundColor: coloreHome(palette, 'surface', '#101B34'),
             borderRadius: 18,
             borderWidth: 1,
             borderColor: 'rgba(130,160,255,0.20)',
@@ -590,7 +591,7 @@ export default function CalendarioColleghiScreen({ onBack }) {
 
               <Text
                 style={{
-                  color: '#8190AD',
+                  color: coloreHome(palette, 'textMuted', '#8190AD'),
                   fontSize: 11,
                   marginTop: 4,
                 }}
@@ -627,7 +628,7 @@ export default function CalendarioColleghiScreen({ onBack }) {
           onPress={apriCondivisione}
           activeOpacity={0.82}
           style={{
-            backgroundColor: '#3158A8',
+            backgroundColor: coloreHome(palette, 'accent', '#3158A8'),
             borderRadius: 17,
             minHeight: 54,
             flexDirection: 'row',
@@ -748,7 +749,7 @@ export default function CalendarioColleghiScreen({ onBack }) {
                   {!!persona.azienda && (
                     <Text
                       style={{
-                        color: '#8190AD',
+                        color: coloreHome(palette, 'textMuted', '#8190AD'),
                         fontSize: 10.5,
                         fontWeight: '700',
                         marginTop: 2,
@@ -762,7 +763,7 @@ export default function CalendarioColleghiScreen({ onBack }) {
                     <Text
                       numberOfLines={1}
                       style={{
-                        color: '#8997B5',
+                        color: coloreHome(palette, 'textMuted', '#8997B5'),
                         fontSize: 11,
                         marginTop: 4,
                       }}
@@ -819,7 +820,7 @@ export default function CalendarioColleghiScreen({ onBack }) {
             <ActivityIndicator />
             <Text
               style={{
-                color: '#8190AD',
+                color: coloreHome(palette, 'textMuted', '#8190AD'),
                 marginTop: 12,
               }}
             >
@@ -856,7 +857,7 @@ export default function CalendarioColleghiScreen({ onBack }) {
 
                   <Text
                     style={{
-                      color: '#8DB8FF',
+                      color: coloreHome(palette, 'accent', '#8DB8FF'),
                       fontSize: 13,
                       fontWeight: '800',
                       marginLeft: 7,
@@ -870,7 +871,7 @@ export default function CalendarioColleghiScreen({ onBack }) {
                 {elementi.length === 0 ? (
                   <View
                     style={{
-                      backgroundColor: '#0D172B',
+                      backgroundColor: coloreHome(palette, 'surfaceRaised', '#0D172B'),
                       borderRadius: 15,
                       padding: 14,
                       borderWidth: 1,
@@ -959,7 +960,7 @@ export default function CalendarioColleghiScreen({ onBack }) {
                                   : 'shield-outline'
                               }
                               size={19}
-                              color="#8DB8FF"
+                              color={coloreHome(palette, 'accent', '#8DB8FF')}
                             />
                           </View>
 
@@ -1000,7 +1001,7 @@ export default function CalendarioColleghiScreen({ onBack }) {
                             {!elemento.mio && !!azienda && (
                               <Text
                                 style={{
-                                  color: '#8190AD',
+                                  color: coloreHome(palette, 'textMuted', '#8190AD'),
                                   fontSize: 11,
                                   fontWeight: '700',
                                   marginTop: 2,
@@ -1036,7 +1037,7 @@ export default function CalendarioColleghiScreen({ onBack }) {
                             >
                               <Text
                                 style={{
-                                  color: '#8DB8FF',
+                                  color: coloreHome(palette, 'accent', '#8DB8FF'),
                                   fontSize: 9,
                                   fontWeight: '900',
                                 }}
@@ -1202,7 +1203,7 @@ export default function CalendarioColleghiScreen({ onBack }) {
         >
           <View
             style={{
-              backgroundColor: '#0B1629',
+              backgroundColor: coloreHome(palette, 'surface', '#0B1629'),
               borderTopLeftRadius: 28,
               borderTopRightRadius: 28,
               maxHeight: '85%',
@@ -1231,7 +1232,7 @@ export default function CalendarioColleghiScreen({ onBack }) {
 
                 <Text
                   style={{
-                    color: '#8190AD',
+                    color: coloreHome(palette, 'textMuted', '#8190AD'),
                     fontSize: 12,
                     marginTop: 4,
                   }}
@@ -1369,7 +1370,7 @@ export default function CalendarioColleghiScreen({ onBack }) {
                   >
                     <Text
                       style={{
-                        color: '#8DB8FF',
+                        color: coloreHome(palette, 'accent', '#8DB8FF'),
                         fontSize: 12,
                         fontWeight: '900',
                       }}
@@ -1386,13 +1387,13 @@ export default function CalendarioColleghiScreen({ onBack }) {
                 <View
                   style={{
                     padding: 20,
-                    backgroundColor: '#101B34',
+                    backgroundColor: coloreHome(palette, 'surface', '#101B34'),
                     borderRadius: 16,
                   }}
                 >
                   <Text
                     style={{
-                      color: '#8997B5',
+                      color: coloreHome(palette, 'textMuted', '#8997B5'),
                       textAlign: 'center',
                     }}
                   >
@@ -1419,7 +1420,7 @@ export default function CalendarioColleghiScreen({ onBack }) {
                       style={{
                         flexDirection: 'row',
                         alignItems: 'center',
-                        backgroundColor: '#101B34',
+                        backgroundColor: coloreHome(palette, 'surface', '#101B34'),
                         borderRadius: 15,
                         padding: 13,
                         marginBottom: 8,
@@ -1465,7 +1466,7 @@ export default function CalendarioColleghiScreen({ onBack }) {
                           ?.azienda && (
                           <Text
                             style={{
-                              color: '#8190AD',
+                              color: coloreHome(palette, 'textMuted', '#8190AD'),
                               fontSize: 11,
                               marginTop: 3,
                             }}
@@ -1510,7 +1511,7 @@ export default function CalendarioColleghiScreen({ onBack }) {
               disabled={salvataggio}
               onPress={salvaCondivisione}
               style={{
-                backgroundColor: '#3158A8',
+                backgroundColor: coloreHome(palette, 'accent', '#3158A8'),
                 borderRadius: 16,
                 minHeight: 54,
                 alignItems: 'center',
