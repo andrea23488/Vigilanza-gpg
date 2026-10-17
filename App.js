@@ -34927,6 +34927,100 @@ function ConsegneServizioScreen({
     );
   };
 
+
+  const esportaConsegnaFile = async () => {
+    if (
+      !consegnaPostazione.trim() &&
+      !consegnaAccaduto.trim() &&
+      !consegnaDaFare.trim() &&
+      !consegnaAnomalie.trim() &&
+      !consegnaChiavi.trim() &&
+      !consegnaApparati.trim() &&
+      !consegnaNote.trim()
+    ) {
+      Alert.alert(
+        'Consegna vuota',
+        'Inserisci almeno una informazione utile prima di esportare.'
+      );
+      return;
+    }
+
+    try {
+      const disponibile = await Sharing.isAvailableAsync();
+
+      if (!disponibile) {
+        Alert.alert(
+          'Condivisione non disponibile',
+          'Questo dispositivo non supporta la condivisione del file.'
+        );
+        return;
+      }
+
+      const dataFile = String(consegnaData || '')
+        .replace(/[^0-9A-Za-z_-]+/g, '-')
+        .replace(/^-+|-+$/g, '');
+
+      const postazioneFile = String(consegnaPostazione || 'servizio')
+        .trim()
+        .replace(/[^0-9A-Za-zÀ-ÿ_-]+/g, '-')
+        .replace(/^-+|-+$/g, '')
+        .slice(0, 40);
+
+      const nomeFile =
+        `consegna-servizio_${dataFile || 'senza-data'}_${postazioneFile || 'servizio'}.txt`;
+
+      const intestazione = [
+        'VIGILANZA GPG',
+        'CONSEGNA DI SERVIZIO',
+        '',
+        `Data: ${consegnaData || '—'}`,
+        `Ora: ${consegnaOra || '—'}`,
+        `Postazione / luogo: ${consegnaPostazione || '—'}`,
+        '',
+        '----------------------------------------',
+        '',
+      ].join('\n');
+
+      const contenuto = intestazione + testoConsegna + '\n';
+
+      const directory =
+        FileSystem.cacheDirectory ||
+        FileSystem.documentDirectory;
+
+      if (!directory) {
+        throw new Error(
+          'Cartella temporanea non disponibile.'
+        );
+      }
+
+      const uri = directory + nomeFile;
+
+      await FileSystem.writeAsStringAsync(
+        uri,
+        contenuto,
+        {
+          encoding: FileSystem.EncodingType.UTF8,
+        }
+      );
+
+      await Sharing.shareAsync(uri, {
+        mimeType: 'text/plain',
+        dialogTitle: 'Condividi consegna di servizio',
+        UTI: 'public.plain-text',
+      });
+    } catch (e) {
+      console.log(
+        'Errore esportazione consegna:',
+        e
+      );
+
+      Alert.alert(
+        'Esportazione non riuscita',
+        'Non è stato possibile creare o condividere il file della consegna.'
+      );
+    }
+  };
+
   const inviaConsegnaACollega = async (collega) => {
     const destinatarioId =
       collega?.altro_user_id;
@@ -35515,6 +35609,41 @@ function ConsegneServizioScreen({
           }}
         >
           📋 COPIA CONSEGNA
+        </Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        activeOpacity={0.82}
+        onPress={esportaConsegnaFile}
+        style={{
+          minHeight: 56,
+          marginBottom: 10,
+          alignItems: 'center',
+          justifyContent: 'center',
+          flexDirection: 'row',
+          borderRadius: 18,
+          backgroundColor:
+            'rgba(92,72,168,0.92)',
+          borderWidth: 1,
+          borderColor:
+            'rgba(167,145,255,0.60)',
+        }}
+      >
+        <Ionicons
+          name="share-social-outline"
+          size={19}
+          color="#FFFFFF"
+        />
+
+        <Text
+          style={{
+            color: '#FFFFFF',
+            fontSize: 12,
+            fontWeight: '900',
+            marginLeft: 8,
+          }}
+        >
+          ESPORTA / CONDIVIDI FILE
         </Text>
       </TouchableOpacity>
 
