@@ -58,6 +58,10 @@ import {
 import { costruisciInputEconomiaFiduciari } from './fiduciariIntegrazione';
 import { supabase } from './supabase';
 import {
+  ascoltaTapNotifiche,
+  registraPushDispositivo,
+} from './pushNotifications';
+import {
   creaProfiloVuoto,
   costruisciProfiloUtente,
 } from './profiloUtente';
@@ -792,6 +796,77 @@ export default function App() {
   const [erroreBiometria, setErroreBiometria] = useState('');
   const richiestaBiometriaRef = useRef(false);
   const [screen, setScreen] = useState("home");
+
+  useEffect(() => {
+    if (!utenteAutenticato?.id) return undefined;
+
+    registraPushDispositivo().catch((error) => {
+      console.log('Registrazione push non disponibile:', error?.message || error);
+    });
+
+    const stop = ascoltaTapNotifiche(async (dati) => {
+      try {
+        if (dati?.tipo === 'chat' && dati?.mittenteId) {
+          const nomeCompleto = String(dati?.nomeMittente || 'Collega').trim();
+
+          setCollegaSelezionato({
+            altro_user_id: String(dati.mittenteId),
+            profilo: {
+              nome: nomeCompleto || 'Collega',
+              cognome: '',
+            },
+          });
+          setChatMessaggio('');
+          setScreen('chatCollega');
+          return;
+        }
+
+        if (dati?.tipo === 'consegna' && dati?.consegnaId) {
+          const { data: consegna, error } = await supabase
+            .from('consegne_servizio')
+            .select('*')
+            .eq('id', dati.consegnaId)
+            .eq('destinatario_id', utenteAutenticato.id)
+            .maybeSingle();
+
+          if (error) throw error;
+          if (!consegna) return;
+
+          const dettaglio = {
+            ...consegna,
+            nomeMittente: String(dati?.nomeMittente || 'Collega'),
+          };
+
+          setConsegnaSelezionata(dettaglio);
+
+          if (!consegna.letta) {
+            try {
+              await segnaConsegnaComeLetta(consegna.id);
+              setConsegneRicevute((prev) =>
+                prev.map((item) =>
+                  String(item.id) === String(consegna.id)
+                    ? {
+                        ...item,
+                        letta: true,
+                        letta_at: new Date().toISOString(),
+                      }
+                    : item
+                )
+              );
+            } catch (erroreLettura) {
+              console.log('Errore lettura consegna da push:', erroreLettura);
+            }
+          }
+
+          setScreen('dettaglioConsegna');
+        }
+      } catch (error) {
+        console.log('Errore apertura notifica push:', error);
+      }
+    });
+
+    return stop;
+  }, [utenteAutenticato?.id]);
 
   // Agenda personale: separata dai turni di lavoro.
   const [impegniPersonali, setImpegniPersonali] = useState([]);
