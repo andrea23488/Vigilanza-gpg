@@ -64,30 +64,428 @@ function Scelta({ label, selezionato, disabled, onPress, colori }) {
 }
 
 function Anteprima({ palette: p }) {
-  // Riprende la gerarchia reale: saluto, nucleo circolare, schede servizi.
-  // Esempio dichiarato e statico: nessun dato utente o azione operativa.
-  return <View accessibilityLabel="Anteprima Home con dati dimostrativi" style={[styles.preview, { backgroundColor: p.background, borderColor: p.border }]}>
-    <Text style={{ color: p.text, fontSize: 22, fontWeight: '900' }}>Ciao 👋</Text>
-    <Text style={{ color: p.textMuted, marginTop: 4 }}>Vigilanza · Anteprima dimostrativa</Text>
-    <View style={{ alignItems: 'center', marginVertical: 20 }}>
-      <View style={{ width: 190, minHeight: 190, borderRadius: 95, borderWidth: 3, borderColor: p.homeAccent,
-        backgroundColor: p.surface, alignItems: 'center', justifyContent: 'center', padding: 18 }}>
-        <Ionicons name="shield-checkmark-outline" size={28} color={p.homeAccent} />
-        <Text style={{ color: p.textMuted, marginTop: 10 }}>PROSSIMO TURNO</Text>
-        <Text style={{ color: p.text, fontWeight: '900', fontSize: 25 }}>06:00 — 14:00</Text>
-        <Text style={{ color: p.textMuted, marginTop: 6 }}>Servizio di esempio</Text>
+  const card = {
+    backgroundColor: p.surface,
+    borderWidth: 1,
+    borderColor: p.border,
+  };
+
+  const servizi = [
+    {
+      titolo: 'CALENDARIO',
+      sottotitolo: 'Vista mensile turni',
+      icona: 'calendar-number-outline',
+    },
+    {
+      titolo: 'STRUMENTI',
+      sottotitolo: 'Utilità operative',
+      icona: 'briefcase-outline',
+    },
+    {
+      titolo: 'STIPENDIO',
+      sottotitolo: 'Riepilogo e stima',
+      icona: 'wallet-outline',
+    },
+    {
+      titolo: 'COLLEGHI',
+      sottotitolo: 'Turni condivisi',
+      icona: 'people-outline',
+    },
+  ];
+
+  return (
+    <View
+      accessibilityLabel="Anteprima Home con dati dimostrativi"
+      style={[
+        styles.preview,
+        {
+          backgroundColor: p.background,
+          borderColor: p.border,
+        },
+      ]}
+    >
+      {/* Header simile alla Home reale */}
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+        }}
+      >
+        <View style={{ flex: 1 }}>
+          <Text
+            style={{
+              color: p.text,
+              fontSize: 20,
+              fontWeight: '900',
+            }}
+          >
+            Ciao Andrea 👋
+          </Text>
+
+          <Text
+            style={{
+              color: p.textMuted,
+              fontSize: 10.5,
+              fontWeight: '700',
+              marginTop: 3,
+            }}
+          >
+            Vigilanza Demo · Guardia Particolare Giurata
+          </Text>
+
+          <View
+            style={{
+              alignSelf: 'flex-start',
+              marginTop: 8,
+              paddingHorizontal: 10,
+              paddingVertical: 5,
+              borderRadius: 14,
+              backgroundColor: p.surface,
+              borderWidth: 1,
+              borderColor: p.border,
+            }}
+          >
+            <Text
+              style={{
+                color: p.accent,
+                fontSize: 9,
+                fontWeight: '900',
+              }}
+            >
+              ○ FUORI SERVIZIO
+            </Text>
+          </View>
+        </View>
+
+        <View
+          style={{
+            width: 40,
+            height: 40,
+            borderRadius: 20,
+            alignItems: 'center',
+            justifyContent: 'center',
+            ...card,
+          }}
+        >
+          <Ionicons
+            name="person"
+            size={20}
+            color={p.text}
+          />
+        </View>
+      </View>
+
+      {/* Nucleo turno, ispirato al vero Digital Core */}
+      <View
+        style={{
+          alignItems: 'center',
+          justifyContent: 'center',
+          marginVertical: 18,
+        }}
+      >
+        <View
+          style={{
+            width: 206,
+            height: 206,
+            borderRadius: 103,
+            alignItems: 'center',
+            justifyContent: 'center',
+            borderWidth: 2.5,
+            borderColor: p.homeAccent,
+            backgroundColor: p.surface,
+            shadowColor: p.homeAccent,
+            shadowOpacity: 0.28,
+            shadowRadius: 18,
+            shadowOffset: { width: 0, height: 0 },
+          }}
+        >
+          <View
+            style={{
+              position: 'absolute',
+              width: 184,
+              height: 184,
+              borderRadius: 92,
+              borderWidth: 1.3,
+              borderColor: p.border,
+            }}
+          />
+
+          <Ionicons
+            name="shield-checkmark-outline"
+            size={26}
+            color={p.homeAccent}
+          />
+
+          <Text
+            style={{
+              color: p.homeAccent,
+              fontSize: 8.5,
+              fontWeight: '900',
+              letterSpacing: 1.1,
+              marginTop: 8,
+            }}
+          >
+            TURNO DI OGGI
+          </Text>
+
+          <Text
+            style={{
+              color: p.text,
+              fontSize: 27,
+              fontWeight: '900',
+              marginTop: 6,
+            }}
+          >
+            06:00 – 14:00
+          </Text>
+
+          <Text
+            style={{
+              color: p.textMuted,
+              fontSize: 10.5,
+              fontWeight: '700',
+              marginTop: 4,
+            }}
+          >
+            Fiumicino · Terminal 1
+          </Text>
+
+          <View
+            style={{
+              width: '55%',
+              height: 1,
+              backgroundColor: p.border,
+              marginVertical: 9,
+            }}
+          />
+
+          <Text
+            style={{
+              color: p.homeAccent,
+              fontSize: 8.5,
+              fontWeight: '900',
+              letterSpacing: 0.8,
+            }}
+          >
+            INIZIO TRA
+          </Text>
+
+          <Text
+            style={{
+              color: p.text,
+              fontSize: 15,
+              fontWeight: '900',
+              marginTop: 2,
+            }}
+          >
+            1h 24m
+          </Text>
+        </View>
+      </View>
+
+      {/* Mini riepilogo mese */}
+      <View
+        style={[
+          card,
+          {
+            borderRadius: 17,
+            padding: 11,
+            marginBottom: 12,
+          },
+        ]}
+      >
+        <View
+          style={{
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+          }}
+        >
+          <Text
+            style={{
+              color: p.text,
+              fontSize: 10.5,
+              fontWeight: '900',
+            }}
+          >
+            OTTOBRE 2026
+          </Text>
+
+          <Text
+            style={{
+              color: p.text,
+              fontSize: 10,
+              fontWeight: '900',
+            }}
+          >
+            AVANZ. 55%
+          </Text>
+        </View>
+
+        <View
+          style={{
+            height: 5,
+            borderRadius: 10,
+            backgroundColor: p.surfaceRaised,
+            marginTop: 7,
+            overflow: 'hidden',
+          }}
+        >
+          <View
+            style={{
+              height: '100%',
+              width: '55%',
+              borderRadius: 10,
+              backgroundColor: p.accent,
+            }}
+          />
+        </View>
+
+        <View
+          style={{
+            flexDirection: 'row',
+            marginTop: 9,
+          }}
+        >
+          {[
+            ['128h', 'LAVORATE'],
+            ['22h', 'EXTRA'],
+            ['16', 'GIORNI'],
+          ].map(([valore, etichetta], indice) => (
+            <View
+              key={etichetta}
+              style={{
+                flex: 1,
+                alignItems: 'center',
+                borderLeftWidth: indice === 0 ? 0 : 1,
+                borderLeftColor: p.border,
+              }}
+            >
+              <Text
+                style={{
+                  color: p.text,
+                  fontSize: 14,
+                  fontWeight: '900',
+                }}
+              >
+                {valore}
+              </Text>
+
+              <Text
+                style={{
+                  color: p.textMuted,
+                  fontSize: 7.5,
+                  fontWeight: '800',
+                  marginTop: 1,
+                }}
+              >
+                {etichetta}
+              </Text>
+            </View>
+          ))}
+        </View>
+      </View>
+
+      {/* Stessa logica visiva del Centro Operativo */}
+      <Text
+        style={{
+          color: p.textMuted,
+          fontSize: 8.5,
+          fontWeight: '900',
+          letterSpacing: 1,
+          marginBottom: 7,
+        }}
+      >
+        CENTRO OPERATIVO
+      </Text>
+
+      <View
+        style={{
+          flexDirection: 'row',
+          flexWrap: 'wrap',
+          justifyContent: 'space-between',
+          rowGap: 8,
+        }}
+      >
+        {servizi.map((item) => (
+          <View
+            key={item.titolo}
+            style={[
+              card,
+              {
+                width: '48.7%',
+                minHeight: 82,
+                borderRadius: 17,
+                padding: 11,
+                justifyContent: 'space-between',
+              },
+            ]}
+          >
+            <View
+              style={{
+                width: 31,
+                height: 31,
+                borderRadius: 10,
+                backgroundColor: p.surfaceRaised,
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <Ionicons
+                name={item.icona}
+                size={17}
+                color={p.accent}
+              />
+            </View>
+
+            <View style={{ marginTop: 10 }}>
+              <Text
+                style={{
+                  color: p.text,
+                  fontSize: 10.5,
+                  fontWeight: '900',
+                }}
+              >
+                {item.titolo}
+              </Text>
+
+              <Text
+                numberOfLines={1}
+                style={{
+                  color: p.textMuted,
+                  fontSize: 7.5,
+                  fontWeight: '700',
+                  marginTop: 2,
+                }}
+              >
+                {item.sottotitolo}
+              </Text>
+            </View>
+          </View>
+        ))}
+      </View>
+
+      <View
+        style={{
+          marginTop: 12,
+          paddingVertical: 10,
+          paddingHorizontal: 12,
+          borderRadius: 15,
+          backgroundColor: p.accent,
+        }}
+      >
+        <Text
+          style={{
+            color: p.onAccent,
+            fontSize: 10.5,
+            fontWeight: '900',
+            textAlign: 'center',
+          }}
+        >
+          ANTEPRIMA HOME
+        </Text>
       </View>
     </View>
-    <View style={{ flexDirection: 'row', gap: 10 }}>
-      {['Turni', 'Stipendio'].map(label => <View key={label} style={{ flex: 1, padding: 14, borderRadius: 16,
-        backgroundColor: p.surfaceRaised, borderWidth: 1, borderColor: p.border }}>
-        <Text style={{ color: p.text, fontWeight: '800' }}>{label}</Text>
-      </View>)}
-    </View>
-    <View style={{ backgroundColor: p.accent, borderRadius: 12, padding: 12, marginTop: 12 }}>
-      <Text style={{ color: p.onAccent, fontWeight: '800', textAlign: 'center' }}>Apri il servizio · Anteprima</Text>
-    </View>
-  </View>;
+  );
 }
 
 export default function AspettoColoriScreen({ onBack, archivio, onSalvato, paletteAttuale = null }) {
