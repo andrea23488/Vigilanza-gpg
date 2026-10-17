@@ -5222,11 +5222,25 @@ const cambiaStatoDotazione = (id, stato) => {
   const [turnoRapidoOperativita, setTurnoRapidoOperativita] = useState('');
   const [turnoRapidoPostazione, setTurnoRapidoPostazione] = useState('');
 
+  const [turnoRapidoPeriodoId, setTurnoRapidoPeriodoId] = useState('');
+  const [turnoRapidoDalGiorno, setTurnoRapidoDalGiorno] = useState('1');
+  const [turnoRapidoAlGiorno, setTurnoRapidoAlGiorno] = useState('31');
+  const [turnoRapidoGiorniSettimana, setTurnoRapidoGiorniSettimana] =
+    useState([1, 2, 3, 4, 5]);
+  const [salvataggioTurniPeriodo, setSalvataggioTurniPeriodo] = useState(false);
+
   useEffect(() => {
     let attivo = true;
 
     caricaTurniRapidi().then((lista) => {
-      if (attivo) setTurniRapidi(lista);
+      if (attivo) {
+        setTurniRapidi(lista);
+        setTurnoRapidoPeriodoId((corrente) =>
+          lista.some((x) => x.id === corrente)
+            ? corrente
+            : (lista[0]?.id || '')
+        );
+      }
     });
 
     return () => {
@@ -7810,6 +7824,199 @@ console.log("🕒 ORA REALE:", new Date().toString());
         'Non è stato possibile ripristinare i turni rapidi.'
       );
     }
+  }
+
+
+  function alternaGiornoSettimanaTurnoRapido(indice) {
+    setTurnoRapidoGiorniSettimana((correnti) =>
+      correnti.includes(indice)
+        ? correnti.filter((x) => x !== indice)
+        : [...correnti, indice].sort()
+    );
+  }
+
+  function payloadTurnoRapidoPerGiorno(voce, giornoTarget) {
+    const ore = calcolaOreIntervallo(voce.inizio, voce.fine);
+
+    return {
+      ...(!isFiduciario
+        ? { straordinario_manuale_minuti: null }
+        : {}),
+      giorno: Number(giornoTarget),
+      mese: mese + 1,
+      anno: Number(anno),
+      tipo: 'turno',
+      inizio: voce.inizio,
+      fine: voce.fine,
+      luogo: voce.operativita || 'Servizio',
+      indirizzo_servizio: voce.postazione || null,
+      localita_meteo: null,
+      ore,
+      minuti_aggiuntivi_retribuiti: 0,
+      extra: Math.max(
+        0,
+        Number(ore || 0) - oreOrdinarieGiornaliereNumero
+      ),
+      fascia: fasciaTurno(voce.inizio),
+      riposo_lavorato: false,
+    };
+  }
+
+  async function applicaTurnoRapidoAlPeriodo() {
+    if (salvataggioTurniPeriodo) return;
+
+    const voce = turniRapidi.find(
+      (x) => x.id === turnoRapidoPeriodoId
+    );
+
+    if (!voce) {
+      Alert.alert(
+        'Scegli un turno',
+        'Seleziona il turno rapido da applicare.'
+      );
+      return;
+    }
+
+    const giorniNelMese = new Date(
+      Number(anno),
+      mese + 1,
+      0
+    ).getDate();
+
+    const dal = Math.max(
+      1,
+      Math.min(
+        giorniNelMese,
+        Number(turnoRapidoDalGiorno) || 1
+      )
+    );
+
+    const al = Math.max(
+      dal,
+      Math.min(
+        giorniNelMese,
+        Number(turnoRapidoAlGiorno) || giorniNelMese
+      )
+    );
+
+    if (turnoRapidoGiorniSettimana.length === 0) {
+      Alert.alert(
+        'Giorni mancanti',
+        'Seleziona almeno un giorno della settimana.'
+      );
+      return;
+    }
+
+    const candidati = [];
+
+    for (let giornoTarget = dal; giornoTarget <= al; giornoTarget += 1) {
+      const data = new Date(
+        Number(anno),
+        mese,
+        giornoTarget,
+        12,
+        0,
+        0
+      );
+
+      if (!turnoRapidoGiorniSettimana.includes(data.getDay())) {
+        continue;
+      }
+
+      candidati.push(
+        payloadTurnoRapidoPerGiorno(voce, giornoTarget)
+      );
+    }
+
+    if (candidati.length === 0) {
+      Alert.alert(
+        'Nessun giorno',
+        'Nel periodo scelto non ci sono giorni corrispondenti alla selezione.'
+      );
+      return;
+    }
+
+    Alert.alert(
+      'Applica turno al periodo',
+      `Verrà inserito “${voce.nome}” in ${candidati.length} giorn${
+        candidati.length === 1 ? 'o' : 'i'
+      } del mese selezionato. I giorni con turni sovrapposti verranno saltati.`,
+      [
+        { text: 'Annulla', style: 'cancel' },
+        {
+          text: 'Applica',
+          onPress: async () => {
+            try {
+              setSalvataggioTurniPeriodo(true);
+
+              const giaPresenti = [...turni];
+              const salvati = [];
+              const saltati = [];
+
+              for (const payload of candidati) {
+                const conflitti = rilevaSovrapposizioniGiornaliere([
+                  ...giaPresenti.filter((t) => t.tipo === 'turno'),
+                  { ...payload, id: `bulk_${payload.giorno}` },
+                ]);
+
+                if (conflitti.length > 0) {
+                  saltati.push(payload.giorno);
+                  continue;
+                }
+
+                const creato = await inserisciTurno(payload);
+
+                if (!creato || creato.id === undefined) {
+                  throw new Error(
+                    `Turno del giorno ${payload.giorno} non restituito correttamente.`
+                  );
+                }
+
+                salvati.push(creato);
+                giaPresenti.push(creato);
+              }
+
+              if (salvati.length > 0) {
+                setTurni((precedenti) => [
+                  ...precedenti,
+                  ...salvati,
+                ]);
+
+                await caricaTurni(false, {
+                  preservaTurniSuErrore: true,
+                  mostraErrore: false,
+                });
+              }
+
+              Alert.alert(
+                'Periodo completato ✅',
+                `${salvati.length} turn${
+                  salvati.length === 1 ? 'o inserito' : 'i inseriti'
+                }${
+                  saltati.length > 0
+                    ? `. ${saltati.length} giorn${
+                        saltati.length === 1 ? 'o saltato' : 'i saltati'
+                      } per sovrapposizione.`
+                    : '.'
+                }`
+              );
+            } catch (error) {
+              console.log('ERRORE TURNI RAPIDI PERIODO:', error);
+
+              Alert.alert(
+                'Operazione non completata',
+                messaggioErroreTurni(
+                  error,
+                  'Non è stato possibile completare tutti i turni del periodo.'
+                )
+              );
+            } finally {
+              setSalvataggioTurniPeriodo(false);
+            }
+          },
+        },
+      ]
+    );
   }
 
   function nuovoGiorno(
@@ -28600,6 +28807,214 @@ if (screen === 'profiloCollega') {
                     </TouchableOpacity>
                   )}
                 </View>
+
+
+                <View
+                  style={{
+                    height: 1,
+                    backgroundColor: '#294B70',
+                    marginTop: 16,
+                    marginBottom: 14,
+                  }}
+                />
+
+                <Text
+                  style={{
+                    color: '#FFFFFF',
+                    fontSize: 14,
+                    fontWeight: '900',
+                  }}
+                >
+                  Applica a più giorni
+                </Text>
+
+                <Text
+                  style={{
+                    color: '#8FA5CC',
+                    fontSize: 10,
+                    lineHeight: 15,
+                    marginTop: 4,
+                    marginBottom: 11,
+                  }}
+                >
+                  Scegli un turno modello, il periodo del mese e i giorni della settimana. I turni già presenti che si sovrappongono non verranno modificati.
+                </Text>
+
+                <Text
+                  style={{
+                    color: '#8EDFFF',
+                    fontSize: 9,
+                    fontWeight: '900',
+                    letterSpacing: 0.7,
+                    marginBottom: 7,
+                  }}
+                >
+                  TURNO MODELLO
+                </Text>
+
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    flexWrap: 'wrap',
+                    marginBottom: 10,
+                  }}
+                >
+                  {turniRapidi.map((voce) => {
+                    const selezionato =
+                      turnoRapidoPeriodoId === voce.id;
+
+                    return (
+                      <TouchableOpacity
+                        key={`periodo_${voce.id}`}
+                        activeOpacity={0.82}
+                        onPress={() =>
+                          setTurnoRapidoPeriodoId(voce.id)
+                        }
+                        style={{
+                          paddingVertical: 8,
+                          paddingHorizontal: 10,
+                          marginRight: 7,
+                          marginBottom: 7,
+                          borderRadius: 12,
+                          backgroundColor: selezionato
+                            ? '#3154FF'
+                            : '#10213A',
+                          borderWidth: 1,
+                          borderColor: selezionato
+                            ? '#69DFFF'
+                            : '#294B70',
+                        }}
+                      >
+                        <Text
+                          style={{
+                            color: '#FFFFFF',
+                            fontSize: 9.5,
+                            fontWeight: '900',
+                          }}
+                        >
+                          {voce.nome}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+
+                <View style={styles.row}>
+                  <View style={styles.half}>
+                    <Field
+                      label="DAL GIORNO"
+                      value={turnoRapidoDalGiorno}
+                      onChange={setTurnoRapidoDalGiorno}
+                      keyboardType="number-pad"
+                    />
+                  </View>
+
+                  <View style={{ width: 10 }} />
+
+                  <View style={styles.half}>
+                    <Field
+                      label="AL GIORNO"
+                      value={turnoRapidoAlGiorno}
+                      onChange={setTurnoRapidoAlGiorno}
+                      keyboardType="number-pad"
+                    />
+                  </View>
+                </View>
+
+                <Text
+                  style={{
+                    color: '#8EDFFF',
+                    fontSize: 9,
+                    fontWeight: '900',
+                    letterSpacing: 0.7,
+                    marginBottom: 7,
+                  }}
+                >
+                  GIORNI DELLA SETTIMANA
+                </Text>
+
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    flexWrap: 'wrap',
+                    marginBottom: 10,
+                  }}
+                >
+                  {[
+                    [1, 'L'],
+                    [2, 'M'],
+                    [3, 'M'],
+                    [4, 'G'],
+                    [5, 'V'],
+                    [6, 'S'],
+                    [0, 'D'],
+                  ].map(([indice, etichetta], posizione) => {
+                    const attivo =
+                      turnoRapidoGiorniSettimana.includes(indice);
+
+                    return (
+                      <TouchableOpacity
+                        key={`weekday_${indice}`}
+                        activeOpacity={0.82}
+                        onPress={() =>
+                          alternaGiornoSettimanaTurnoRapido(indice)
+                        }
+                        style={{
+                          width: 38,
+                          height: 38,
+                          borderRadius: 12,
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          marginRight: posizione === 6 ? 0 : 6,
+                          marginBottom: 6,
+                          backgroundColor: attivo
+                            ? '#3154FF'
+                            : '#10213A',
+                          borderWidth: 1,
+                          borderColor: attivo
+                            ? '#69DFFF'
+                            : '#294B70',
+                        }}
+                      >
+                        <Text
+                          style={{
+                            color: '#FFFFFF',
+                            fontSize: 11,
+                            fontWeight: '900',
+                          }}
+                        >
+                          {etichetta}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+
+                <TouchableOpacity
+                  activeOpacity={0.84}
+                  disabled={salvataggioTurniPeriodo}
+                  onPress={applicaTurnoRapidoAlPeriodo}
+                  style={{
+                    minHeight: 47,
+                    borderRadius: 14,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    backgroundColor: '#3154FF',
+                    opacity: salvataggioTurniPeriodo ? 0.55 : 1,
+                  }}
+                >
+                  <Text
+                    style={{
+                      color: '#FFFFFF',
+                      fontSize: 10.5,
+                      fontWeight: '900',
+                    }}
+                  >
+                    {salvataggioTurniPeriodo
+                      ? 'SALVATAGGIO...'
+                      : 'APPLICA AL PERIODO'}
+                  </Text>
+                </TouchableOpacity>
 
                 <TouchableOpacity
                   activeOpacity={0.8}
