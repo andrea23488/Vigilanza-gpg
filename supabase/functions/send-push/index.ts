@@ -6,7 +6,7 @@ const corsHeaders = {
     'authorization, x-client-info, apikey, content-type',
 }
 
-type TipoPush = 'messaggio' | 'consegna'
+type TipoPush = 'messaggio' | 'consegna' | 'sfida_gioco' | 'turno_gioco'
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -52,7 +52,7 @@ Deno.serve(async (req) => {
       | { tipo?: TipoPush; id?: string | number }
       | null
 
-    if (!input || !['messaggio', 'consegna'].includes(String(input.tipo))) {
+    if (!input || !['messaggio', 'consegna', 'sfida_gioco', 'turno_gioco'].includes(String(input.tipo))) {
       return json({ error: 'Tipo push non valido' }, 400)
     }
 
@@ -98,7 +98,7 @@ Deno.serve(async (req) => {
         messaggioId: String(record.id),
         nomeMittente,
       }
-    } else {
+    } else if (input.tipo === 'consegna') {
       const { data: record, error } = await admin
         .from('consegne_servizio')
         .select('id, mittente_id, destinatario_id')
@@ -121,6 +121,66 @@ Deno.serve(async (req) => {
         mittenteId: String(user.id),
         consegnaId: String(record.id),
         nomeMittente,
+      }
+    } else {
+      const { data: record, error } = await admin
+        .from('partite_gioco')
+        .select('id, gioco, sfidante_id, sfidato_id, stato, turno_user_id')
+        .eq('id', input.id)
+        .maybeSingle()
+
+      if (error || !record) {
+        return json({ error: 'Partita non trovata' }, 404)
+      }
+
+      const partecipante =
+        String(record.sfidante_id) === String(user.id) ||
+        String(record.sfidato_id) === String(user.id)
+
+      if (!partecipante) {
+        return json({ error: 'Operazione non autorizzata' }, 403)
+      }
+
+      const nomeGioco =
+        record.gioco === 'scopa' ? 'Scopa' : 'Briscola'
+
+      if (input.tipo === 'sfida_gioco') {
+        if (
+          String(record.sfidante_id) !== String(user.id) ||
+          record.stato !== 'in_attesa'
+        ) {
+          return json({ error: 'Sfida non valida' }, 403)
+        }
+
+        destinatarioId = String(record.sfidato_id)
+        titolo = `Sfida a ${nomeGioco}`
+        corpo = `${nomeMittente} ti ha sfidato a ${nomeGioco}`
+        data = {
+          tipo: 'sfida_gioco',
+          partitaId: String(record.id),
+          gioco: String(record.gioco),
+          mittenteId: String(user.id),
+          nomeMittente,
+        }
+      } else {
+        if (
+          record.stato !== 'in_corso' ||
+          !record.turno_user_id ||
+          String(record.turno_user_id) === String(user.id)
+        ) {
+          return json({ error: 'Turno partita non valido' }, 403)
+        }
+
+        destinatarioId = String(record.turno_user_id)
+        titolo = `Tocca a te · ${nomeGioco}`
+        corpo = `${nomeMittente} ha giocato. Ora tocca a te.`
+        data = {
+          tipo: 'turno_gioco',
+          partitaId: String(record.id),
+          gioco: String(record.gioco),
+          mittenteId: String(user.id),
+          nomeMittente,
+        }
       }
     }
 
