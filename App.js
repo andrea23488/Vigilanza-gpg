@@ -25,6 +25,7 @@ import {
 } from './chatApi';
 import { caricaTurniUtente, creaTurnoUtente, aggiornaTurnoUtente, eliminaTurnoUtente } from './turniApi';
 import { messaggioErroreTurni } from './turniRete';
+import { preparaTurniWatch } from './watchTurni';
 import {
   CHIAVE_POSTAZIONI,
   caricaPostazioniLocali,
@@ -6377,55 +6378,12 @@ console.log("🕒 ORA REALE:", new Date().toString());
         }
         watchUserIdRef.current = sessioneWatch.user.id;
 
-        const creaIntervalloWatch = (turno) => {
-          if (
-            turno?.tipo !== 'turno' ||
-            !/^([01]?\d|2[0-3]):[0-5]\d$/.test(String(turno.inizio || '')) ||
-            !/^([01]?\d|2[0-3]):[0-5]\d$/.test(String(turno.fine || ''))
-          ) return null;
-
-          const [oraInizio, minutoInizio] = String(turno.inizio).split(':').map(Number);
-          const [oraFine, minutoFine] = String(turno.fine).split(':').map(Number);
-          const inizio = new Date(
-            Number(turno.anno), Number(turno.mese) - 1, Number(turno.giorno),
-            oraInizio, minutoInizio, 0, 0
-          );
-          const fine = new Date(
-            Number(turno.anno), Number(turno.mese) - 1, Number(turno.giorno),
-            oraFine, minutoFine, 0, 0
-          );
-          if (!Number.isFinite(inizio.getTime()) || !Number.isFinite(fine.getTime())) return null;
-          if (fine <= inizio) fine.setDate(fine.getDate() + 1);
-          return { turno, inizio, fine };
-        };
-
-        const intervalliWatch = turni
-          .map(creaIntervalloWatch)
-          .filter(Boolean)
-          .sort((a, b) => a.inizio - b.inizio);
-        const finestraTurniWatch = intervalliWatch
-          .filter(({ fine }) => fine > adessoWatch)
-          .slice(0, 31)
-          .map(({ turno, inizio, fine }) => ({
-            id: String(turno.id || ''),
-            inizio: String(turno.inizio || ''),
-            fine: String(turno.fine || ''),
-            luogo: String(turno.luogo || ''),
-            indirizzo: String(turno.indirizzo_servizio || ''),
-            inizioTimestamp: inizio.getTime() / 1000,
-            fineTimestamp: fine.getTime() / 1000,
-          }));
-        const correnteWatch = intervalliWatch.find(
-          ({ inizio, fine }) => adessoWatch >= inizio && adessoWatch < fine
-        ) || null;
-        const prossimoWatch = intervalliWatch.find(
-          ({ inizio }) => inizio > adessoWatch
-        ) || null;
-        const successivoWatch = correnteWatch
-          ? prossimoWatch
-          : intervalliWatch.find(
-              ({ inizio }) => prossimoWatch && inizio > prossimoWatch.inizio
-            ) || null;
+        const {
+          finestraTurniWatch,
+          correnteWatch,
+          prossimoWatch,
+          successivoWatch,
+        } = preparaTurniWatch(turni, adessoWatch);
         const riposoOggiWatch = turni.find(
           (turno) =>
             turno?.tipo === 'riposo' &&
