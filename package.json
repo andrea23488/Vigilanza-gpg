@@ -37,6 +37,7 @@
     "test:postazioni": "node scripts/test-postazioni-media.cjs",
     "test:games": "node scripts/test-giochi-carte.cjs",
     "test:privacy-chat": "node scripts/test-condivisione-privacy-chat.cjs",
+    "test:watch": "node scripts/test-watch-turni.cjs",
     "test:turni": "node scripts/test-turni-calcoli.cjs",
     "test:stipendio": "node scripts/test-stipendio-calcoli.cjs",
     "test:fiduciari": "node scripts/test-fiduciari-ore.cjs",
