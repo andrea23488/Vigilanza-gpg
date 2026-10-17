@@ -7762,7 +7762,7 @@ console.log("🕒 ORA REALE:", new Date().toString());
     const inizioVoce = String(turnoRapidoInizio || '').trim();
     const fineVoce = String(turnoRapidoFine || '').trim();
     const oraValida = (valore) =>
-      /^([01]\\d|2[0-3]):[0-5]\\d$/.test(valore);
+      /^([01]\d|2[0-3]):[0-5]\d$/.test(valore);
 
     if (!nome) {
       Alert.alert('Nome mancante', 'Inserisci un nome per il turno rapido.');
