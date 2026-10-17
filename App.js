@@ -26141,7 +26141,7 @@ if (screen === 'profiloCollega') {
   }
 
   if (screen === 'aspettoColori') {
-    return <AspettoColoriScreen onBack={() => setScreen('profile')} archivio={archivioAspettoRef.current} onSalvato={setPreferenzaAspetto} />;
+    return <AspettoColoriScreen onBack={() => setScreen('profile')} archivio={archivioAspettoRef.current} onSalvato={setPreferenzaAspetto} paletteAttuale={paletteHome} />;
   }
 
   if (
