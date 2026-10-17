@@ -30,6 +30,7 @@ import {
 import { caricaTurniUtente, creaTurnoUtente, aggiornaTurnoUtente, eliminaTurnoUtente } from './turniApi';
 import { messaggioErroreTurni } from './turniRete';
 import { preparaTurniWatch } from './watchTurni';
+import { caricaTurniRapidi, salvaTurniRapidi, ripristinaTurniRapidi, TURNI_RAPIDI_PREDEFINITI } from './turniRapidi';
 import {
   CHIAVE_POSTAZIONI,
   caricaPostazioniLocali,
@@ -5210,6 +5211,29 @@ const cambiaStatoDotazione = (id, stato) => {
   const [fine, setFine] =
     useState('14:00');
 
+  const [turniRapidi, setTurniRapidi] = useState(() =>
+    TURNI_RAPIDI_PREDEFINITI.map((x) => ({ ...x }))
+  );
+  const [gestisciTurniRapidi, setGestisciTurniRapidi] = useState(false);
+  const [turnoRapidoInModifica, setTurnoRapidoInModifica] = useState(null);
+  const [turnoRapidoNome, setTurnoRapidoNome] = useState('');
+  const [turnoRapidoInizio, setTurnoRapidoInizio] = useState('06:00');
+  const [turnoRapidoFine, setTurnoRapidoFine] = useState('14:00');
+  const [turnoRapidoOperativita, setTurnoRapidoOperativita] = useState('');
+  const [turnoRapidoPostazione, setTurnoRapidoPostazione] = useState('');
+
+  useEffect(() => {
+    let attivo = true;
+
+    caricaTurniRapidi().then((lista) => {
+      if (attivo) setTurniRapidi(lista);
+    });
+
+    return () => {
+      attivo = false;
+    };
+  }, []);
+
   const [promemoriaTurnoMinuti, setPromemoriaTurnoMinuti] =
     useState(0);
 
@@ -7653,10 +7677,20 @@ console.log("🕒 ORA REALE:", new Date().toString());
 
   function turnoRapido(
     start,
-    end
+    end,
+    operativita = '',
+    postazione = ''
   ) {
     setInizio(start);
     setFine(end);
+
+    if (operativita) {
+      setLuogo(operativita);
+    }
+
+    if (postazione) {
+      setIndirizzoServizio(postazione);
+    }
 
     const ore =
       calcolaOre(
@@ -7672,6 +7706,110 @@ console.log("🕒 ORA REALE:", new Date().toString());
         )
       )
     );
+  }
+
+  function azzeraEditorTurnoRapido() {
+    setTurnoRapidoInModifica(null);
+    setTurnoRapidoNome('');
+    setTurnoRapidoInizio('06:00');
+    setTurnoRapidoFine('14:00');
+    setTurnoRapidoOperativita('');
+    setTurnoRapidoPostazione('');
+  }
+
+  function modificaTurnoRapido(voce) {
+    setTurnoRapidoInModifica(voce.id);
+    setTurnoRapidoNome(voce.nome || '');
+    setTurnoRapidoInizio(voce.inizio || '06:00');
+    setTurnoRapidoFine(voce.fine || '14:00');
+    setTurnoRapidoOperativita(voce.operativita || '');
+    setTurnoRapidoPostazione(voce.postazione || '');
+  }
+
+  async function salvaTurnoRapidoPersonalizzato() {
+    const nome = String(turnoRapidoNome || '').trim();
+    const inizioVoce = String(turnoRapidoInizio || '').trim();
+    const fineVoce = String(turnoRapidoFine || '').trim();
+    const oraValida = (valore) =>
+      /^([01]\\d|2[0-3]):[0-5]\\d$/.test(valore);
+
+    if (!nome) {
+      Alert.alert('Nome mancante', 'Inserisci un nome per il turno rapido.');
+      return;
+    }
+
+    if (!oraValida(inizioVoce) || !oraValida(fineVoce)) {
+      Alert.alert(
+        'Orario non valido',
+        'Usa il formato HH:MM, ad esempio 06:30 oppure 15:00.'
+      );
+      return;
+    }
+
+    const nuovaVoce = {
+      id: turnoRapidoInModifica || `rapido_${Date.now()}`,
+      nome,
+      inizio: inizioVoce,
+      fine: fineVoce,
+      operativita: String(turnoRapidoOperativita || '').trim(),
+      postazione: String(turnoRapidoPostazione || '').trim(),
+    };
+
+    const prossimi = turnoRapidoInModifica
+      ? turniRapidi.map((x) =>
+          x.id === turnoRapidoInModifica ? nuovaVoce : x
+        )
+      : [...turniRapidi, nuovaVoce];
+
+    try {
+      const salvati = await salvaTurniRapidi(prossimi);
+      setTurniRapidi(salvati);
+      azzeraEditorTurnoRapido();
+    } catch {
+      Alert.alert(
+        'Salvataggio non riuscito',
+        'Non è stato possibile salvare i turni rapidi.'
+      );
+    }
+  }
+
+  async function eliminaTurnoRapidoPersonalizzato(id) {
+    if (turniRapidi.length <= 1) {
+      Alert.alert(
+        'Almeno un turno',
+        'Deve rimanere almeno un turno rapido.'
+      );
+      return;
+    }
+
+    const prossimi = turniRapidi.filter((x) => x.id !== id);
+
+    try {
+      const salvati = await salvaTurniRapidi(prossimi);
+      setTurniRapidi(salvati);
+
+      if (turnoRapidoInModifica === id) {
+        azzeraEditorTurnoRapido();
+      }
+    } catch {
+      Alert.alert(
+        'Eliminazione non riuscita',
+        'Non è stato possibile eliminare il turno rapido.'
+      );
+    }
+  }
+
+  async function ripristinaTurniRapidiPredefiniti() {
+    try {
+      const lista = await ripristinaTurniRapidi();
+      setTurniRapidi(lista);
+      azzeraEditorTurnoRapido();
+    } catch {
+      Alert.alert(
+        'Ripristino non riuscito',
+        'Non è stato possibile ripristinare i turni rapidi.'
+      );
+    }
   }
 
   function nuovoGiorno(
@@ -28165,119 +28303,338 @@ if (screen === 'profiloCollega') {
         {tipo ===
           'turno' && (
           <>
-            <Text
-              style={
-                styles.label
-              }
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                marginBottom: 8,
+              }}
             >
-              TURNO RAPIDO
-            </Text>
+              <Text
+                style={[
+                  styles.label,
+                  { marginBottom: 0 },
+                ]}
+              >
+                TURNO RAPIDO
+              </Text>
+
+              <TouchableOpacity
+                activeOpacity={0.8}
+                onPress={() =>
+                  setGestisciTurniRapidi((v) => !v)
+                }
+                style={{
+                  paddingVertical: 6,
+                  paddingHorizontal: 9,
+                  borderRadius: 11,
+                  borderWidth: 1,
+                  borderColor: 'rgba(105,223,255,0.34)',
+                  backgroundColor: '#10213A',
+                }}
+              >
+                <Text
+                  style={{
+                    color: '#8EDFFF',
+                    fontSize: 9,
+                    fontWeight: '900',
+                  }}
+                >
+                  {gestisciTurniRapidi ? 'CHIUDI' : 'PERSONALIZZA'}
+                </Text>
+              </TouchableOpacity>
+            </View>
 
             <View
               style={
                 styles.quickRow
               }
             >
-              <Quick
-                title="06–14"
-                onPress={() =>
-                  turnoRapido(
-                    '06:00',
-                    '14:00'
-                  )
-                }
-              />
-
-              <Quick
-                title="14–22"
-                onPress={() =>
-                  turnoRapido(
-                    '14:00',
-                    '22:00'
-                  )
-                }
-              />
-
-              <Quick
-                title="22–06"
-                onPress={() =>
-                  turnoRapido(
-                    '22:00',
-                    '06:00'
-                  )
-                }
-              />
-
-      <Quick
-        title="07–15"
-        onPress={() =>
-          turnoRapido(
-            '07:00',
-            '15:00'
-          )
-        }
-      />
-
-      <Quick
-        title="15–23"
-        onPress={() =>
-          turnoRapido(
-            '15:00',
-            '23:00'
-          )
-        }
-      />
-
-      <Quick
-        title="23–07"
-        onPress={() =>
-          turnoRapido(
-            '23:00',
-            '07:00'
-          )
-        }
-      />
-
-      <Quick
-        title="06:30–15"
-        onPress={() =>
-          turnoRapido(
-            '06:30',
-            '15:00'
-          )
-        }
-      />
-
-      <Quick
-        title="15–22:30"
-        onPress={() =>
-          turnoRapido(
-            '15:00',
-            '22:30'
-          )
-        }
-      />
-
-      <Quick
-        title="06–18"
-        onPress={() =>
-          turnoRapido(
-            '06:00',
-            '18:00'
-          )
-        }
-      />
-
-      <Quick
-        title="18–06"
-        onPress={() =>
-          turnoRapido(
-            '18:00',
-            '06:00'
-          )
-        }
-      />
+              {turniRapidi.map((voce) => (
+                <Quick
+                  key={voce.id}
+                  title={voce.nome}
+                  onPress={() =>
+                    turnoRapido(
+                      voce.inizio,
+                      voce.fine,
+                      voce.operativita,
+                      voce.postazione
+                    )
+                  }
+                />
+              ))}
             </View>
+
+            {gestisciTurniRapidi && (
+              <View
+                style={{
+                  marginTop: -4,
+                  marginBottom: 18,
+                  padding: 14,
+                  borderRadius: 18,
+                  backgroundColor: '#0B1930',
+                  borderWidth: 1,
+                  borderColor: 'rgba(105,223,255,0.28)',
+                }}
+              >
+                <Text
+                  style={{
+                    color: '#FFFFFF',
+                    fontSize: 14,
+                    fontWeight: '900',
+                    marginBottom: 4,
+                  }}
+                >
+                  I miei turni rapidi
+                </Text>
+
+                <Text
+                  style={{
+                    color: '#8FA5CC',
+                    fontSize: 10,
+                    lineHeight: 15,
+                    marginBottom: 12,
+                  }}
+                >
+                  Tocca un turno per modificarlo. Puoi salvare anche operatività e postazione: verranno compilate insieme agli orari.
+                </Text>
+
+                {turniRapidi.map((voce) => (
+                  <View
+                    key={`gestisci_${voce.id}`}
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      marginBottom: 7,
+                    }}
+                  >
+                    <TouchableOpacity
+                      activeOpacity={0.8}
+                      onPress={() => modificaTurnoRapido(voce)}
+                      style={{
+                        flex: 1,
+                        minHeight: 44,
+                        borderRadius: 13,
+                        paddingHorizontal: 12,
+                        justifyContent: 'center',
+                        backgroundColor:
+                          turnoRapidoInModifica === voce.id
+                            ? 'rgba(49,84,255,0.22)'
+                            : '#10213A',
+                        borderWidth: 1,
+                        borderColor:
+                          turnoRapidoInModifica === voce.id
+                            ? '#69DFFF'
+                            : '#294B70',
+                      }}
+                    >
+                      <Text
+                        style={{
+                          color: '#FFFFFF',
+                          fontSize: 11,
+                          fontWeight: '900',
+                        }}
+                      >
+                        {voce.nome} · {voce.inizio}–{voce.fine}
+                      </Text>
+
+                      {!!voce.operativita && (
+                        <Text
+                          numberOfLines={1}
+                          style={{
+                            color: '#8FA5CC',
+                            fontSize: 8.5,
+                            marginTop: 2,
+                          }}
+                        >
+                          {voce.operativita}
+                        </Text>
+                      )}
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      activeOpacity={0.8}
+                      onPress={() =>
+                        Alert.alert(
+                          'Elimina turno rapido',
+                          `Vuoi eliminare “${voce.nome}”?`,
+                          [
+                            { text: 'Annulla', style: 'cancel' },
+                            {
+                              text: 'Elimina',
+                              style: 'destructive',
+                              onPress: () =>
+                                eliminaTurnoRapidoPersonalizzato(voce.id),
+                            },
+                          ]
+                        )
+                      }
+                      style={{
+                        width: 42,
+                        height: 42,
+                        borderRadius: 13,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        marginLeft: 7,
+                        backgroundColor: 'rgba(255,91,116,0.09)',
+                        borderWidth: 1,
+                        borderColor: 'rgba(255,110,132,0.24)',
+                      }}
+                    >
+                      <Ionicons
+                        name="trash-outline"
+                        size={18}
+                        color="#FF98A9"
+                      />
+                    </TouchableOpacity>
+                  </View>
+                ))}
+
+                <Text
+                  style={{
+                    color: '#8EDFFF',
+                    fontSize: 9,
+                    fontWeight: '900',
+                    letterSpacing: 0.8,
+                    marginTop: 8,
+                    marginBottom: 7,
+                  }}
+                >
+                  {turnoRapidoInModifica ? 'MODIFICA TURNO' : 'NUOVO TURNO RAPIDO'}
+                </Text>
+
+                <Field
+                  label="NOME"
+                  value={turnoRapidoNome}
+                  onChange={setTurnoRapidoNome}
+                />
+
+                <View style={styles.row}>
+                  <View style={styles.half}>
+                    <Field
+                      label="INIZIO"
+                      value={turnoRapidoInizio}
+                      onChange={setTurnoRapidoInizio}
+                    />
+                  </View>
+
+                  <View style={{ width: 10 }} />
+
+                  <View style={styles.half}>
+                    <Field
+                      label="FINE"
+                      value={turnoRapidoFine}
+                      onChange={setTurnoRapidoFine}
+                    />
+                  </View>
+                </View>
+
+                <Field
+                  label="OPERATIVITÀ (FACOLTATIVA)"
+                  value={turnoRapidoOperativita}
+                  onChange={setTurnoRapidoOperativita}
+                />
+
+                <Field
+                  label="POSTAZIONE / INDIRIZZO (FACOLTATIVO)"
+                  value={turnoRapidoPostazione}
+                  onChange={setTurnoRapidoPostazione}
+                />
+
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    gap: 8,
+                    marginTop: 2,
+                  }}
+                >
+                  <TouchableOpacity
+                    activeOpacity={0.82}
+                    onPress={salvaTurnoRapidoPersonalizzato}
+                    style={{
+                      flex: 1,
+                      minHeight: 45,
+                      borderRadius: 14,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      backgroundColor: '#3154FF',
+                    }}
+                  >
+                    <Text
+                      style={{
+                        color: '#FFFFFF',
+                        fontSize: 10,
+                        fontWeight: '900',
+                      }}
+                    >
+                      {turnoRapidoInModifica ? 'SALVA MODIFICA' : 'AGGIUNGI'}
+                    </Text>
+                  </TouchableOpacity>
+
+                  {turnoRapidoInModifica && (
+                    <TouchableOpacity
+                      activeOpacity={0.82}
+                      onPress={azzeraEditorTurnoRapido}
+                      style={{
+                        minWidth: 88,
+                        minHeight: 45,
+                        borderRadius: 14,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        backgroundColor: '#10213A',
+                        borderWidth: 1,
+                        borderColor: '#315276',
+                      }}
+                    >
+                      <Text
+                        style={{
+                          color: '#DDF7FF',
+                          fontSize: 10,
+                          fontWeight: '900',
+                        }}
+                      >
+                        ANNULLA
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+
+                <TouchableOpacity
+                  activeOpacity={0.8}
+                  onPress={() =>
+                    Alert.alert(
+                      'Ripristina turni rapidi',
+                      'Vuoi ripristinare la lista predefinita?',
+                      [
+                        { text: 'Annulla', style: 'cancel' },
+                        {
+                          text: 'Ripristina',
+                          onPress: ripristinaTurniRapidiPredefiniti,
+                        },
+                      ]
+                    )
+                  }
+                  style={{
+                    alignSelf: 'center',
+                    paddingVertical: 9,
+                    paddingHorizontal: 12,
+                    marginTop: 10,
+                  }}
+                >
+                  <Text
+                    style={{
+                      color: '#8FA5CC',
+                      fontSize: 9,
+                      fontWeight: '800',
+                    }}
+                  >
+                    Ripristina turni predefiniti
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            )}
 
             <View
               style={
