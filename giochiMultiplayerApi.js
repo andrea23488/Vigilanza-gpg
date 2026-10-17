@@ -98,6 +98,25 @@ export async function caricaPartitaGioco(partitaId) {
   return data || null;
 }
 
+export async function inizializzaStatoPartitaGioco({
+  partitaId,
+  versione,
+  statoPartita,
+  turnoUserId,
+}) {
+  const { data, error } = await supabase.rpc('salva_stato_partita_gioco', {
+    p_partita_id: partitaId,
+    p_versione_attesa: Number(versione || 0),
+    p_stato_partita: statoPartita || {},
+    p_prossimo_turno_user_id: turnoUserId || null,
+    p_finita: false,
+    p_vincitore_id: null,
+  });
+
+  if (error) throw error;
+  return data;
+}
+
 export async function salvaStatoPartitaGioco({
   partitaId,
   versione,
