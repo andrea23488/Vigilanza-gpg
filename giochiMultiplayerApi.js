@@ -60,6 +60,11 @@ export async function rispondiSfidaGioco(partitaId, accetta) {
   });
 
   if (error) throw error;
+
+  if (accetta && data?.id) {
+    inviaPushGiocoSenzaBloccare('turno_gioco', data.id);
+  }
+
   return data;
 }
 
