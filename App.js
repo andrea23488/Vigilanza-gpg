@@ -30338,10 +30338,10 @@ if (screen === 'profiloCollega') {
                 marginBottom: 9,
               }}
             >
-              {/* STIPENDIO */}
+              {/* CALENDARIO */}
               <TouchableOpacity
                 activeOpacity={0.84}
-                onPress={() => setScreen('stipendio')}
+                onPress={() => setScreen('calendar')}
                 style={{
                   flex: 1,
                   minHeight: 105,
@@ -30350,10 +30350,10 @@ if (screen === 'profiloCollega') {
                   justifyContent: 'space-between',
                   backgroundColor: coloreHome(paletteHome, 'surface', '#0A1B31'),
                   borderWidth: 1.2,
-                  borderColor: coloreHome(paletteHome, 'border', 'rgba(92,255,126,0.52)'),
-                  shadowColor: coloreHome(paletteHome, 'accent', '#55E86E'),
-                  shadowOpacity: 0.18,
-                  shadowRadius: 12,
+                  borderColor: coloreHome(paletteHome, 'border', 'rgba(99,223,255,0.42)'),
+                  shadowColor: coloreHome(paletteHome, 'accent', '#63DFFF'),
+                  shadowOpacity: 0.14,
+                  shadowRadius: 10,
                   shadowOffset: { width: 0, height: 5 },
                 }}
               >
@@ -30362,15 +30362,15 @@ if (screen === 'profiloCollega') {
                     width: 40,
                     height: 40,
                     borderRadius: 14,
-                    backgroundColor: coloreHome(paletteHome, 'surface', 'rgba(85,232,110,0.12)'),
+                    backgroundColor: coloreHome(paletteHome, 'surface', 'rgba(99,223,255,0.11)'),
                     alignItems: 'center',
                     justifyContent: 'center',
                   }}
                 >
                   <Ionicons
-                    name="wallet-outline"
+                    name="calendar-number-outline"
                     size={23}
-                    color={coloreHome(paletteHome, 'text', "#55E86E")}
+                    color={coloreHome(paletteHome, 'text', "#63DFFF")}
                   />
                 </View>
 
@@ -30382,7 +30382,7 @@ if (screen === 'profiloCollega') {
                       fontWeight: '900',
                     }}
                   >
-                    STIPENDIO
+                    CALENDARIO
                   </Text>
                   <Text
                     style={{
@@ -30392,7 +30392,7 @@ if (screen === 'profiloCollega') {
                       marginTop: 3,
                     }}
                   >
-                    Riepilogo e stima
+                    Vista mensile turni
                   </Text>
                 </View>
               </TouchableOpacity>
@@ -30463,7 +30463,66 @@ if (screen === 'profiloCollega') {
                 gap: 9,
               }}
             >
-              {/* SETTIMANA COLLEGHI */}
+              {/* STIPENDIO */}
+              <TouchableOpacity
+                activeOpacity={0.84}
+                onPress={() => setScreen('stipendio')}
+                style={{
+                  flex: 1,
+                  minHeight: 105,
+                  borderRadius: 22,
+                  padding: 15,
+                  justifyContent: 'space-between',
+                  backgroundColor: coloreHome(paletteHome, 'surface', '#0A1B31'),
+                  borderWidth: 1.2,
+                  borderColor: coloreHome(paletteHome, 'border', 'rgba(92,255,126,0.52)'),
+                  shadowColor: coloreHome(paletteHome, 'accent', '#55E86E'),
+                  shadowOpacity: 0.18,
+                  shadowRadius: 12,
+                  shadowOffset: { width: 0, height: 5 },
+                }}
+              >
+                <View
+                  style={{
+                    width: 40,
+                    height: 40,
+                    borderRadius: 14,
+                    backgroundColor: coloreHome(paletteHome, 'surface', 'rgba(85,232,110,0.12)'),
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <Ionicons
+                    name="wallet-outline"
+                    size={23}
+                    color={coloreHome(paletteHome, 'text', "#55E86E")}
+                  />
+                </View>
+
+                <View>
+                  <Text
+                    style={{
+                      color: coloreHome(paletteHome, 'text', '#FFFFFF'),
+                      fontSize: 14,
+                      fontWeight: '900',
+                    }}
+                  >
+                    STIPENDIO
+                  </Text>
+                  <Text
+                    style={{
+                      color: coloreHome(paletteHome, 'text', '#8294B4'),
+                      fontSize: 9,
+                      fontWeight: '700',
+                      marginTop: 3,
+                    }}
+                  >
+                    Riepilogo e stima
+                  </Text>
+                </View>
+              </TouchableOpacity>
+
+              {/* COLLEGHI */}
               <TouchableOpacity
                 activeOpacity={0.84}
                 onPress={() => setScreen('calendarioColleghi')}
@@ -30493,7 +30552,7 @@ if (screen === 'profiloCollega') {
                   }}
                 >
                   <Ionicons
-                    name="calendar-outline"
+                    name="people-outline"
                     size={23}
                     color={coloreHome(paletteHome, 'text', "#8DB8FF")}
                   />
@@ -30507,7 +30566,7 @@ if (screen === 'profiloCollega') {
                       fontWeight: '900',
                     }}
                   >
-                    SETTIMANA
+                    COLLEGHI
                   </Text>
                   <Text
                     style={{
@@ -30517,66 +30576,7 @@ if (screen === 'profiloCollega') {
                       marginTop: 3,
                     }}
                   >
-                    Turni con i colleghi
-                  </Text>
-                </View>
-              </TouchableOpacity>
-
-              {/* CALENDARIO */}
-              <TouchableOpacity
-                activeOpacity={0.84}
-                onPress={() => setScreen('calendar')}
-                style={{
-                  flex: 1,
-                  minHeight: 105,
-                  borderRadius: 22,
-                  padding: 15,
-                  justifyContent: 'space-between',
-                  backgroundColor: coloreHome(paletteHome, 'surface', '#0A1B31'),
-                  borderWidth: 1.2,
-                  borderColor: coloreHome(paletteHome, 'border', 'rgba(99,223,255,0.42)'),
-                  shadowColor: coloreHome(paletteHome, 'accent', '#63DFFF'),
-                  shadowOpacity: 0.14,
-                  shadowRadius: 10,
-                  shadowOffset: { width: 0, height: 5 },
-                }}
-              >
-                <View
-                  style={{
-                    width: 40,
-                    height: 40,
-                    borderRadius: 14,
-                    backgroundColor: coloreHome(paletteHome, 'surface', 'rgba(99,223,255,0.11)'),
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
-                >
-                  <Ionicons
-                    name="calendar-number-outline"
-                    size={23}
-                    color={coloreHome(paletteHome, 'text', "#63DFFF")}
-                  />
-                </View>
-
-                <View>
-                  <Text
-                    style={{
-                      color: coloreHome(paletteHome, 'text', '#FFFFFF'),
-                      fontSize: 14,
-                      fontWeight: '900',
-                    }}
-                  >
-                    CALENDARIO
-                  </Text>
-                  <Text
-                    style={{
-                      color: coloreHome(paletteHome, 'text', '#8294B4'),
-                      fontSize: 9,
-                      fontWeight: '700',
-                      marginTop: 3,
-                    }}
-                  >
-                    Vista mensile turni
+                    Turni condivisi
                   </Text>
                 </View>
               </TouchableOpacity>
