@@ -91,6 +91,8 @@ function Anteprima({ palette: p }) {
 }
 
 export default function AspettoColoriScreen({ onBack, archivio, onSalvato, paletteAttuale = null }) {
+  const scrollRef = useRef(null);
+  const [mostraTornaSu, setMostraTornaSu] = useState(false);
   const controllore = useRef(null);
   if (!controllore.current) controllore.current = creaControlloreAspetto(archivio);
   const [stato, setStato] = useState(() => controllore.current.stato());
@@ -124,7 +126,17 @@ export default function AspettoColoriScreen({ onBack, archivio, onSalvato, palet
     ]); else onBack();
   }
   return <SafeAreaView style={[styles.safe, paletteAttuale && { backgroundColor: paletteAttuale.background }]}>
-    <ScrollView contentContainerStyle={styles.content}>
+    <ScrollView
+      ref={scrollRef}
+      showsVerticalScrollIndicator={false}
+      scrollEventThrottle={16}
+      onScroll={(event) => {
+        setMostraTornaSu(
+          event.nativeEvent.contentOffset.y > 350
+        );
+      }}
+      contentContainerStyle={[styles.content, { paddingBottom: 90 }]}
+    >
       <TouchableOpacity accessibilityRole="button" disabled={stato.occupato} onPress={indietro} style={styles.button}>
         <Text style={styles.testo}>‹ Torna al Profilo</Text>
       </TouchableOpacity>
@@ -154,6 +166,43 @@ export default function AspettoColoriScreen({ onBack, archivio, onSalvato, palet
         <Text style={{ color: '#07111F', fontWeight: '900' }}>Salva colori</Text>
       </TouchableOpacity>
     </ScrollView>
+
+    {mostraTornaSu && (
+      <TouchableOpacity
+        activeOpacity={0.82}
+        onPress={() =>
+          scrollRef.current?.scrollTo({
+            y: 0,
+            animated: true,
+          })
+        }
+        style={{
+          position: 'absolute',
+          right: 18,
+          bottom: 24,
+          width: 46,
+          height: 46,
+          borderRadius: 23,
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: paletteAttuale?.surface || 'rgba(20,45,85,0.96)',
+          borderWidth: 1,
+          borderColor: paletteAttuale?.accent || 'rgba(141,184,255,0.55)',
+          zIndex: 50,
+          elevation: 8,
+          shadowColor: paletteAttuale?.accent || '#8DB8FF',
+          shadowOpacity: 0.22,
+          shadowRadius: 9,
+          shadowOffset: { width: 0, height: 4 },
+        }}
+      >
+        <Ionicons
+          name="arrow-up"
+          size={22}
+          color={paletteAttuale?.text || '#FFFFFF'}
+        />
+      </TouchableOpacity>
+    )}
   </SafeAreaView>;
 }
 const styles = StyleSheet.create({
