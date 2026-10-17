@@ -1,3 +1,5 @@
+import { OFFLINE_TEST } from './runtimeMode';
+import { PROFILO_OFFLINE } from './offlineTest/fixtures';
 import TipoGiornataSection from './TipoGiornataSection';
 import TurniRapidiSection from './TurniRapidiSection';
 import { paletteHomeDaPreferenza, coloreHome, ripristinaAspetto } from './temi';
@@ -461,7 +463,7 @@ function HomeDigitalCore({
 }
 
 const invalidaContestoAppleWatch = () => {
-  if (Platform.OS !== 'ios') return;
+  if (OFFLINE_TEST || Platform.OS !== 'ios') return;
 
   try {
     updateApplicationContext({
@@ -786,8 +788,8 @@ export default function App() {
   }, []);
 
   const giorniSettimana = ["Dom", "Lun", "Mar", "Mer", "Gio", "Ven", "Sab"];
- const [accessoTest, setAccessoTest] = useState(false);
-  const [authInizializzata, setAuthInizializzata] = useState(false);
+ const [accessoTest, setAccessoTest] = useState(OFFLINE_TEST);
+  const [authInizializzata, setAuthInizializzata] = useState(OFFLINE_TEST);
   const [utenteAutenticato, setUtenteAutenticato] = useState(null);
   const [profiloCaricamento, setProfiloCaricamento] = useState(false);
   const [profiloErrore, setProfiloErrore] = useState('');
@@ -803,7 +805,7 @@ export default function App() {
   const [partitaOnlinePushId, setPartitaOnlinePushId] = useState(null);
 
   useEffect(() => {
-    if (!utenteAutenticato?.id) return undefined;
+    if (OFFLINE_TEST || !utenteAutenticato?.id) return undefined;
 
     registraPushDispositivo().catch((error) => {
       console.log('Registrazione push non disponibile:', error?.message || error);
@@ -937,6 +939,7 @@ export default function App() {
   }, [utenteAutenticato?.id]);
 
   useEffect(() => {
+    if (OFFLINE_TEST) return;
     let attivo = true;
 
     const applicaSessione = (sessione) => {
@@ -998,6 +1001,12 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    if (OFFLINE_TEST) {
+      setBiometriaAbilitata(false);
+      setBiometriaSbloccata(true);
+      setBiometriaInizializzata(true);
+      return;
+    }
     let attivo = true;
 
     leggiBiometriaAbilitata()
@@ -3042,6 +3051,7 @@ if (dati.tariffaStraordinario != null) {
   const [numeroNotifiche, setNumeroNotifiche] = useState(0);
 
   useEffect(() => {
+    if (OFFLINE_TEST) return;
     let attivo = true;
 
   const aggiornaNumeroNotifiche = async () => {
@@ -4780,6 +4790,7 @@ const cambiaStatoDotazione = (id, stato) => {
 
 
   const caricaMeteoServizio = async (zona) => {
+    if (OFFLINE_TEST) return;
     const luogo = String(zona || '').trim();
 
     if (!luogo) {
@@ -5141,6 +5152,7 @@ const cambiaStatoDotazione = (id, stato) => {
     useState(null);
 
   async function aggiornaColleghiInServizioOggi() {
+    if (OFFLINE_TEST) return;
     try {
       setLoadingServizio(true);
 
@@ -5201,6 +5213,7 @@ const cambiaStatoDotazione = (id, stato) => {
   }
 
   async function aggiornaColleghi() {
+    if (OFFLINE_TEST) return;
     try {
       setLoadingColleghi(true);
       const lista = await caricaColleghi();
@@ -5419,6 +5432,11 @@ useEffect(() => {
   }, []);
 
   useEffect(() => {
+    if (OFFLINE_TEST) {
+      applicaStatoProfilo(PROFILO_OFFLINE);
+      setProfiloCaricamento(false);
+      return;
+    }
     if (!accessoTest || !utenteAutenticato?.id) {
       setProfiloCaricamento(false);
       return;
@@ -6920,6 +6938,7 @@ console.log("🕒 ORA REALE:", new Date().toString());
      ETA SERVIZIO HOME - GLOBALE
      ============================================================ */
   useEffect(() => {
+    if (OFFLINE_TEST) return;
     let attivo = true;
 
     const creaDataInizioEta = (t) => {
@@ -7258,7 +7277,7 @@ console.log("🕒 ORA REALE:", new Date().toString());
      APPLE WATCH - SINCRONIZZAZIONE TURNO
      ============================================================ */
   useEffect(() => {
-    if (Platform.OS !== 'ios') return;
+    if (OFFLINE_TEST || Platform.OS !== 'ios') return;
 
     const rimuoviErroreContesto = watchEvents.addListener(
       'application-context-error',
@@ -7882,6 +7901,10 @@ console.log("🕒 ORA REALE:", new Date().toString());
   }
 
   async function applicaTurnoRapidoAlPeriodo() {
+    if (OFFLINE_TEST) {
+      Alert.alert('TEST OFFLINE', 'Applicazione al periodo disabilitata. Nessun turno è stato creato.');
+      return;
+    }
     if (salvataggioTurniPeriodo) return;
 
     const voce = turniRapidi.find(
@@ -8441,6 +8464,10 @@ console.log("🕒 ORA REALE:", new Date().toString());
     return await aggiornaTurnoUtente(id, payload);
   }
   async function salvaGiornata() {
+    if (OFFLINE_TEST) {
+      Alert.alert('TEST OFFLINE', 'Salvataggio cloud disabilitato. Nessuna giornata è stata salvata.');
+      return;
+    }
     if (saving) {
       return;
     }
@@ -9117,6 +9144,22 @@ async function logout() {
       </SafeAreaView>
     );
   }
+  if (OFFLINE_TEST && !['edit', 'strumenti', 'consegneServizio'].includes(screen)) {
+    return (
+      <Screen homePalette={paletteHome}>
+        <Text style={styles.title}>Vigilanza GPG Test</Text>
+        <Text style={styles.subtitle}>Dati fittizi · nessun account o collegamento cloud</Text>
+        <TouchableOpacity style={styles.type} onPress={() => nuovoGiorno(new Date().getDate())}>
+          <Text style={styles.typeText}>Nuova giornata</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.type} onPress={() => setScreen('strumenti')}>
+          <Text style={styles.typeText}>Strumenti → Consegne di servizio</Text>
+        </TouchableOpacity>
+        <Text style={styles.typeText}>Le altre schermate non sono disponibili in questa prova. I salvataggi di giornate e gli invii cloud sono bloccati. Modelli rapidi e archivio consegne possono essere salvati soltanto sul dispositivo, nell’app Test.</Text>
+      </Screen>
+    );
+  }
+
   if (screen === 'dettaglioConsegna') {
     return (
       <SafeAreaView
@@ -34546,6 +34589,10 @@ function ConsegneServizioScreen({
   };
 
   const inviaConsegnaACollega = async (collega) => {
+    if (OFFLINE_TEST) {
+      Alert.alert('TEST OFFLINE', 'Invio consegne disabilitato. Nessuna consegna è stata inviata.');
+      return;
+    }
     const destinatarioId =
       collega?.altro_user_id;
 
@@ -44546,6 +44593,13 @@ function Screen({
         homePalette ? [styles.safe, { backgroundColor: homePalette.background }] : styles.safe
       }
     >
+      {OFFLINE_TEST && (
+        <View style={{ padding: 10, backgroundColor: '#FFF3CD' }}>
+          <Text style={{ color: '#352A00', fontSize: 12, fontWeight: '800' }}>
+            TEST OFFLINE · Dati fittizi · Cloud, push e Watch disabilitati
+          </Text>
+        </View>
+      )}
       <ScrollView
         keyboardDismissMode="interactive"
         automaticallyAdjustKeyboardInsets={true}

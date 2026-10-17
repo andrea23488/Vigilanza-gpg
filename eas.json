@@ -16,6 +16,21 @@
     },
     "production": {
       "autoIncrement": true
+    },
+    "offline-test": {
+      "distribution": "internal",
+      "developmentClient": false,
+      "environment": "preview",
+      "autoIncrement": false,
+      "env": {
+        "APP_VARIANT": "offline-test",
+        "EXPO_NO_DOTENV": "1",
+        "EXPO_PUBLIC_SUPABASE_URL": "",
+        "EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY": ""
+      },
+      "ios": {
+        "buildConfiguration": "Release"
+      }
     }
   },
   "submit": {
