@@ -25226,7 +25226,7 @@ if (screen === 'profiloCollega') {
         <Back
           onPress={() => {
             setCollegaSelezionato(null);
-            setScreen('home');
+            setScreen('colleghi');
           }}
         />
 
