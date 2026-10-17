@@ -28254,6 +28254,26 @@ if (screen === 'profiloCollega') {
       />
 
       <Quick
+        title="06:30–15"
+        onPress={() =>
+          turnoRapido(
+            '06:30',
+            '15:00'
+          )
+        }
+      />
+
+      <Quick
+        title="15–22:30"
+        onPress={() =>
+          turnoRapido(
+            '15:00',
+            '22:30'
+          )
+        }
+      />
+
+      <Quick
         title="06–18"
         onPress={() =>
           turnoRapido(
