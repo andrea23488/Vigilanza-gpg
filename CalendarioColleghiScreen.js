@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -162,6 +162,8 @@ function turnoInCorsoAdesso(turno) {
 }
 
 export default function CalendarioColleghiScreen({ onBack }) {
+  const scrollRef = useRef(null);
+  const [mostraTornaSu, setMostraTornaSu] = useState(false);
   const [inizioSettimana, setInizioSettimana] = useState(
     lunediDellaSettimana(new Date())
   );
@@ -463,10 +465,18 @@ export default function CalendarioColleghiScreen({ onBack }) {
       }}
     >
       <ScrollView
+        ref={scrollRef}
+        showsVerticalScrollIndicator={false}
+        scrollEventThrottle={16}
+        onScroll={(event) => {
+          setMostraTornaSu(
+            event.nativeEvent.contentOffset.y > 350
+          );
+        }}
         contentContainerStyle={{
           paddingHorizontal: 17,
           paddingTop: 56,
-          paddingBottom: 70,
+          paddingBottom: 90,
         }}
       >
         <View
@@ -1137,6 +1147,43 @@ export default function CalendarioColleghiScreen({ onBack }) {
           })
         )}
       </ScrollView>
+
+      {mostraTornaSu && !modalCondivisione && (
+        <TouchableOpacity
+          activeOpacity={0.82}
+          onPress={() =>
+            scrollRef.current?.scrollTo({
+              y: 0,
+              animated: true,
+            })
+          }
+          style={{
+            position: 'absolute',
+            right: 18,
+            bottom: 24,
+            width: 46,
+            height: 46,
+            borderRadius: 23,
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: 'rgba(20,45,85,0.96)',
+            borderWidth: 1,
+            borderColor: 'rgba(141,184,255,0.55)',
+            zIndex: 50,
+            elevation: 8,
+            shadowColor: '#8DB8FF',
+            shadowOpacity: 0.22,
+            shadowRadius: 9,
+            shadowOffset: { width: 0, height: 4 },
+          }}
+        >
+          <Ionicons
+            name="arrow-up"
+            size={22}
+            color="#FFFFFF"
+          />
+        </TouchableOpacity>
+      )}
 
       <Modal
         visible={modalCondivisione}
