@@ -90,7 +90,7 @@ function Anteprima({ palette: p }) {
   </View>;
 }
 
-export default function AspettoColoriScreen({ onBack, archivio, onSalvato }) {
+export default function AspettoColoriScreen({ onBack, archivio, onSalvato, paletteAttuale = null }) {
   const controllore = useRef(null);
   if (!controllore.current) controllore.current = creaControlloreAspetto(archivio);
   const [stato, setStato] = useState(() => controllore.current.stato());
@@ -114,7 +114,7 @@ export default function AspettoColoriScreen({ onBack, archivio, onSalvato }) {
     const r = await pending;
     if (r.ok && onSalvato) onSalvato(r.preferenza);
     if (!montato.current) return;
-    aggiorna(); setMessaggio(r.ok ? 'Colori salvati sul dispositivo e applicati alla Home.'
+    aggiorna(); setMessaggio(r.ok ? 'Colori salvati sul dispositivo e applicati all’app.'
       : 'Salvataggio non riuscito. La selezione è ancora disponibile: riprova.');
   }
   function indietro() {
@@ -123,13 +123,13 @@ export default function AspettoColoriScreen({ onBack, archivio, onSalvato }) {
       { text: 'Resta', style: 'cancel' }, { text: 'Esci senza salvare', onPress: onBack },
     ]); else onBack();
   }
-  return <SafeAreaView style={styles.safe}>
+  return <SafeAreaView style={[styles.safe, paletteAttuale && { backgroundColor: paletteAttuale.background }]}>
     <ScrollView contentContainerStyle={styles.content}>
       <TouchableOpacity accessibilityRole="button" disabled={stato.occupato} onPress={indietro} style={styles.button}>
         <Text style={styles.testo}>‹ Torna al Profilo</Text>
       </TouchableOpacity>
-      <Text style={styles.title}>Aspetto e colori</Text>
-      <Text style={styles.secondario}>Personalizza l’anteprima. Salva per applicare i colori alla Home.</Text>
+      <Text style={[styles.title, paletteAttuale && { color: paletteAttuale.text }]}>Aspetto e colori</Text>
+      <Text style={[styles.secondario, paletteAttuale && { color: paletteAttuale.textMuted }]}>Personalizza l’anteprima. Salva per applicare i colori a tutta l’app.</Text>
       {stato.occupato && <ActivityIndicator color="#55B8FF" accessibilityLabel="Operazione in corso" />}
       {!!messaggio && <Text accessibilityLiveRegion="polite" style={styles.secondario}>{messaggio}</Text>}
       {!stato.pronto && !stato.occupato && <TouchableOpacity onPress={carica} accessibilityRole="button" style={styles.button}><Text style={styles.testo}>Riprova caricamento</Text></TouchableOpacity>}
@@ -143,7 +143,7 @@ export default function AspettoColoriScreen({ onBack, archivio, onSalvato }) {
       <Text style={styles.heading}>Cerchio ed evidenze</Text>
       <View style={styles.griglia}>{ACCENTI_ASPETTO.map(colore => <Scelta key={colore} label={`Accento ${colore}`} disabled={disabled}
         colori={[colore]} selezionato={palette.homeAccent === colore} onPress={() => cambia(() => controllore.current.personalizza({ accent: colore }))} />)}</View>
-      <Text style={styles.heading}>Anteprima Home</Text>
+      <Text style={[styles.heading, paletteAttuale && { color: paletteAttuale.text }]}>Anteprima app</Text>
       <Anteprima palette={palette} />
       <TouchableOpacity accessibilityRole="button" disabled={disabled} onPress={() => cambia(() => controllore.current.ripristina())} style={styles.button}>
         <Text style={styles.testo}>Ripristina colori originali</Text>
