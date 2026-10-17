@@ -10136,7 +10136,7 @@ if (screen === 'colleghi') {
           >
             <Text
               style={{
-                color: coloreHome(paletteHome, 'accent', '#5a8cff'),
+                color: '#5a8cff',
                 fontSize: 30,
                 fontWeight: '900',
                 marginTop: -3,
@@ -10164,14 +10164,14 @@ if (screen === 'colleghi') {
               width: 44,
               height: 44,
               borderRadius: 14,
-              backgroundColor: coloreHome(paletteHome, 'surfaceRaised', '#07101F'),
+              backgroundColor: '#07101F',
               alignItems: 'center',
               justifyContent: 'center',
             }}
           >
             <Text
               style={{
-                color: coloreHome(paletteHome, 'accent', '#5a8cff'),
+                color: '#5a8cff',
                 fontSize: 30,
                 fontWeight: '900',
                 marginTop: -3,
@@ -10184,7 +10184,7 @@ if (screen === 'colleghi') {
 
         <Text
           style={{
-            color: coloreHome(paletteHome, 'textMuted', '#9fb2d9'),
+            color: '#9fb2d9',
             fontSize: 14,
             marginBottom: 22,
           }}
@@ -10204,7 +10204,7 @@ if (screen === 'colleghi') {
             borderWidth: 1,
             borderColor: '#3E9B58',
           }}>
-  <Text style={{ color: coloreHome(paletteHome, 'text', '#dfe6ff'), fontSize: 14 }}>
+  <Text style={{ color: '#dfe6ff', fontSize: 14 }}>
     🛌 Riposo lavorato
   </Text>
   <Text style={{ color: '#FFFFFF', fontSize: 15, fontWeight: '900' }}>
@@ -10231,7 +10231,7 @@ if (screen === 'colleghi') {
         >
           <Text
             style={{
-              color: coloreHome(paletteHome, 'accent', '#5a8cff'),
+              color: '#5a8cff',
               fontSize: 11,
               fontWeight: '900',
             }}
@@ -10252,7 +10252,7 @@ if (screen === 'colleghi') {
 
           <Text
             style={{
-              color: coloreHome(paletteHome, 'textMuted', '#9fb2d9'),
+              color: '#9fb2d9',
               fontSize: 13,
               marginTop: 8,
             }}
@@ -10266,7 +10266,7 @@ if (screen === 'colleghi') {
         {isFiduciario ? (
           <View
             style={{
-              backgroundColor: coloreHome(paletteHome, 'surface', '#0B2038'),
+              backgroundColor: '#0B2038',
               borderRadius: 20,
               padding: 16,
               marginBottom: 16,
@@ -10319,7 +10319,7 @@ if (screen === 'colleghi') {
               ],
             ].map(([label, value]) => (
               <View key={label} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4 }}>
-                <Text style={{ color: coloreHome(paletteHome, 'textMuted', '#9FB2D9'), fontSize: 11 }}>{label}</Text>
+                <Text style={{ color: '#9FB2D9', fontSize: 11 }}>{label}</Text>
                 <Text style={{ color: '#FFFFFF', fontSize: 11, fontWeight: '900' }}>{value}</Text>
               </View>
             ))}
@@ -10391,7 +10391,7 @@ if (screen === 'colleghi') {
           <>
 <Text
             style={{
-              color: coloreHome(paletteHome, 'text', '#dfe6ff'),
+              color: '#dfe6ff',
               fontSize: 11,
               fontWeight: '900',
             }}
@@ -10412,7 +10412,7 @@ if (screen === 'colleghi') {
 
     <Text
       style={{
-        color: coloreHome(paletteHome, 'textMuted', '#9fb2d9'),
+        color: '#9fb2d9',
         fontSize: 13,
         fontWeight: '700',
         marginTop: 8,
@@ -10458,7 +10458,7 @@ if (screen === 'colleghi') {
 
         <Text
           style={{
-            color: coloreHome(paletteHome, 'textMuted', '#9FB2D9'),
+            color: '#9FB2D9',
             fontSize: 11,
             lineHeight: 16,
             marginTop: 5,
@@ -10475,7 +10475,7 @@ if (screen === 'colleghi') {
           }}
           style={{
             marginTop: 11,
-            backgroundColor: coloreHome(paletteHome, 'accent', '#3154ff'),
+            backgroundColor: '#3154ff',
             borderRadius: 12,
             paddingVertical: 11,
             paddingHorizontal: 14,
@@ -10544,7 +10544,7 @@ if (screen === 'colleghi') {
         >
           <Text
             style={{
-              color: coloreHome(paletteHome, 'accent', '#5a8cff'),
+              color: '#5a8cff',
               fontSize: 11,
               fontWeight: '900',
             }}
@@ -10567,7 +10567,7 @@ if (screen === 'colleghi') {
         <View style={{ marginTop: 7 }}>
           <Text
             style={{
-              color: coloreHome(paletteHome, 'textMuted', '#8FA5CC'),
+              color: '#8FA5CC',
               fontSize: 10,
               fontWeight: '800',
             }}
@@ -10592,7 +10592,7 @@ if (screen === 'colleghi') {
 
           <Text
             style={{
-              color: coloreHome(paletteHome, 'textMuted', '#9fb2d9'),
+              color: '#9fb2d9',
               fontSize: 12,
               marginTop: 7,
             }}
@@ -10683,7 +10683,7 @@ if (screen === 'colleghi') {
 
         <View
           style={{
-          backgroundColor: coloreHome(paletteHome, 'surface', '#09182C'),
+          backgroundColor: '#09182C',
           borderRadius: 22,
           padding: 18,
           marginBottom: 16,
@@ -10697,7 +10697,7 @@ if (screen === 'colleghi') {
         >
           <Text
             style={{
-              color: coloreHome(paletteHome, 'accent', '#5a8cff'),
+              color: '#5a8cff',
               fontSize: 11,
               fontWeight: '900',
               marginBottom: 14,
@@ -10720,7 +10720,7 @@ if (screen === 'colleghi') {
             borderColor: '#31506F',
           }}
           >
-            <Text style={{ color: coloreHome(paletteHome, 'text', '#dfe6ff'), fontSize: 14 }}>
+            <Text style={{ color: '#dfe6ff', fontSize: 14 }}>
               🕐 Ore totali
             </Text>
             <Text style={{ color: 'white', fontSize: 15, fontWeight: '900' }}>
@@ -10742,7 +10742,7 @@ if (screen === 'colleghi') {
             borderColor: '#2B4663',
           }}
           >
-            <Text style={{ color: coloreHome(paletteHome, 'text', '#dfe6ff'), fontSize: 14 }}>
+            <Text style={{ color: '#dfe6ff', fontSize: 14 }}>
               ○ Ore ordinarie
             </Text>
             <Text style={{ color: 'white', fontSize: 15, fontWeight: '900' }}>
@@ -10764,7 +10764,7 @@ if (screen === 'colleghi') {
             borderColor: '#B67A22',
           }}
           >
-            <Text style={{ color: coloreHome(paletteHome, 'text', '#dfe6ff'), fontSize: 14 }}>
+            <Text style={{ color: '#dfe6ff', fontSize: 14 }}>
               ⭐ Straordinari
             </Text>
             <Text style={{ color: '#ffd54a', fontSize: 15, fontWeight: '900' }}>
@@ -10878,7 +10878,7 @@ if (screen === 'colleghi') {
                     <View>
                       <Text
                         style={{
-                          color: coloreHome(paletteHome, 'text', '#dfe6ff'),
+                          color: '#dfe6ff',
                           fontSize: 12,
                           fontWeight: '700',
                         }}
@@ -10925,7 +10925,7 @@ if (screen === 'colleghi') {
             >
               <Text
                 style={{
-                  color: coloreHome(paletteHome, 'text', '#dfe6ff'),
+                  color: '#dfe6ff',
                   fontWeight: '800',
                   fontSize: 12,
                 }}
@@ -10955,7 +10955,7 @@ if (screen === 'colleghi') {
               marginBottom: 12,
             }}
           >
-            <Text style={{ color: coloreHome(paletteHome, 'text', '#dfe6ff'), fontSize: 14 }}>
+            <Text style={{ color: '#dfe6ff', fontSize: 14 }}>
               🌙 Turni notturni
             </Text>
             <Text style={{ color: '#c7b8ff', fontSize: 15, fontWeight: '900' }}>
@@ -10964,7 +10964,7 @@ if (screen === 'colleghi') {
           </View>
 
 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-  <Text style={{ color: coloreHome(paletteHome, 'text', '#dfe6ff'), fontSize: 14 }}>
+  <Text style={{ color: '#dfe6ff', fontSize: 14 }}>
     ☀️ Ore domenicali
   </Text>
   <Text style={{ color: '#FFFFFF', fontSize: 15, fontWeight: '900' }}>
@@ -10975,7 +10975,7 @@ if (screen === 'colleghi') {
           <View
             style={{
               height: 1,
-              backgroundColor: coloreHome(paletteHome, 'accent', '#284cff'),
+              backgroundColor: '#284cff',
               marginVertical: 4,
               marginBottom: 12,
             }}
@@ -10988,7 +10988,7 @@ if (screen === 'colleghi') {
               alignItems: 'center',
             }}
           >
-            <Text style={{ color: coloreHome(paletteHome, 'text', '#dfe6ff'), fontSize: 14 }}>
+            <Text style={{ color: '#dfe6ff', fontSize: 14 }}>
               📅 Giorni lavorati
             </Text>
             <Text style={{ color: '#35e58b', fontSize: 15, fontWeight: '900' }}>
@@ -11002,7 +11002,7 @@ if (screen === 'colleghi') {
         <TouchableOpacity
           onPress={() => setScreen('configuraStipendio')}
           style={{
-            backgroundColor: coloreHome(paletteHome, 'accent', '#284cff'),
+            backgroundColor: '#284cff',
             borderRadius: 14,
             padding: 14,
             marginTop: 8,
@@ -17961,7 +17961,7 @@ if (screen === 'strumenti') {
 
           <Text
             style={{
-              color: coloreHome(paletteHome, 'text', '#FFFFFF'),
+              color: '#FFFFFF',
               fontSize: 27,
               fontWeight: '900',
               marginTop: 6,
@@ -18041,7 +18041,7 @@ if (screen === 'strumenti') {
 
               <Text
                 style={{
-                  color: coloreHome(paletteHome, 'text', '#FFFFFF'),
+                  color: '#FFFFFF',
                   fontSize: 15,
                   fontWeight: '900',
                   marginTop: 13,
@@ -26159,17 +26159,13 @@ if (screen === 'profiloCollega') {
         />
 
         <Text
-          style={
-            [styles.title, { color: coloreHome(paletteHome, 'text', '#FFFFFF'), textShadowColor: coloreHome(paletteHome, 'accent', 'rgba(66,140,255,0.35)') }]
-          }
+          style={[styles.title, { color: coloreHome(paletteHome, 'text', '#FFFFFF') }]}
         >
           Il mio profilo
         </Text>
 
         <Text
-          style={
-            [styles.subtitle, { color: coloreHome(paletteHome, 'textMuted', '#8FA6C9') }]
-          }
+          style={[styles.subtitle, { color: coloreHome(paletteHome, 'textMuted', '#8FA6C9') }]}
         >
           Identità professionale
         </Text>
@@ -26183,14 +26179,10 @@ if (screen === 'profiloCollega') {
         </TouchableOpacity>
 
         <View
-          style={
-            [styles.profileHero, { backgroundColor: coloreHome(paletteHome, 'surfaceRaised', 'rgba(30,39,104,0.92)'), borderColor: coloreHome(paletteHome, 'accent', '#756CFF'), shadowColor: coloreHome(paletteHome, 'accent', '#7367FF') }]
-          }
+          style={[styles.profileHero, { backgroundColor: coloreHome(paletteHome, 'surfaceRaised', 'rgba(30,39,104,0.92)'), borderColor: coloreHome(paletteHome, 'accent', '#756CFF'), shadowColor: coloreHome(paletteHome, 'accent', '#7367FF') }]}
         >
           <TouchableOpacity
-            style={
-              [styles.profileAvatar, { backgroundColor: coloreHome(paletteHome, 'surface', '#17355A'), borderColor: coloreHome(paletteHome, 'accent', '#62E8FF'), shadowColor: coloreHome(paletteHome, 'accent', '#56E6FF') }]
-            }
+            style={[styles.profileAvatar, { backgroundColor: coloreHome(paletteHome, 'surface', '#17355A'), borderColor: coloreHome(paletteHome, 'accent', '#62E8FF') }]}
             onPress={
               scegliFotoProfilo
             }
@@ -26202,13 +26194,13 @@ if (screen === 'profiloCollega') {
                     fotoProfilo,
                 }}
                 style={
-                  [styles.profileAvatar, { backgroundColor: coloreHome(paletteHome, 'surface', '#17355A'), borderColor: coloreHome(paletteHome, 'accent', '#62E8FF'), shadowColor: coloreHome(paletteHome, 'accent', '#56E6FF') }]Image
+                  styles.profileAvatarImage
                 }
               />
             ) : (
               <Text
                 style={
-                  [styles.profileAvatar, { backgroundColor: coloreHome(paletteHome, 'surface', '#17355A'), borderColor: coloreHome(paletteHome, 'accent', '#62E8FF'), shadowColor: coloreHome(paletteHome, 'accent', '#56E6FF') }]Text
+                  styles.profileAvatarText
                 }
               >
                 {iniziali}
@@ -26217,12 +26209,12 @@ if (screen === 'profiloCollega') {
 
             <View
               style={
-                [styles.cameraBadge, { backgroundColor: coloreHome(paletteHome, 'surfaceRaised', '#262D70'), borderColor: coloreHome(paletteHome, 'accent', '#74EBFF'), shadowColor: coloreHome(paletteHome, 'accent', '#5DEAFF') }]
+                styles.cameraBadge
               }
             >
               <Text
                 style={
-                  [styles.cameraBadge, { backgroundColor: coloreHome(paletteHome, 'surfaceRaised', '#262D70'), borderColor: coloreHome(paletteHome, 'accent', '#74EBFF'), shadowColor: coloreHome(paletteHome, 'accent', '#5DEAFF') }]Text
+                  styles.cameraBadgeText
                 }
               >
                 📷
@@ -26233,38 +26225,30 @@ if (screen === 'profiloCollega') {
 
           <Text
             style={
-              [styles.photoHint, { color: coloreHome(paletteHome, 'textMuted', '#91A3BA') }]
+              styles.photoHint
             }
           >
             Tocca per scegliere la foto
           </Text>
 
           <Text
-            style={
-              [styles.profileName, { color: coloreHome(paletteHome, 'text', '#FFFFFF'), textShadowColor: coloreHome(paletteHome, 'accent', 'rgba(92,235,255,0.32)') }]
-            }
+            style={[styles.profileName, { color: coloreHome(paletteHome, 'text', '#FFFFFF') }]}
           >
             {profilo.nome}{' '}
             {profilo.cognome}
           </Text>
 
           <Text
-            style={
-              [styles.profileRole, { color: coloreHome(paletteHome, 'textMuted', '#B5CBE1') }]
-            }
+            style={[styles.profileRole, { color: coloreHome(paletteHome, 'textMuted', '#B5CBE1') }]}
           >
             {profilo.ruolo}
           </Text>
 
           <View
-            style={
-              [styles.companyBadge, { backgroundColor: coloreHome(paletteHome, 'surfaceRaised', 'rgba(58,78,174,0.72)'), borderColor: coloreHome(paletteHome, 'accent', '#638FEF'), shadowColor: coloreHome(paletteHome, 'accent', '#5CEAFF') }]
-            }
+            style={[styles.companyBadge, { backgroundColor: coloreHome(paletteHome, 'surfaceRaised', 'rgba(58,78,174,0.72)'), borderColor: coloreHome(paletteHome, 'accent', '#638FEF') }]}
           >
             <Text
-              style={
-                [styles.companyBadge, { backgroundColor: coloreHome(paletteHome, 'surfaceRaised', 'rgba(58,78,174,0.72)'), borderColor: coloreHome(paletteHome, 'accent', '#638FEF'), shadowColor: coloreHome(paletteHome, 'accent', '#5CEAFF') }]Text
-              }
+              style={[styles.companyBadgeText, { color: coloreHome(paletteHome, 'text', '#BDEEFF') }]}
             >
               {profilo.azienda}
             </Text>
@@ -26273,7 +26257,7 @@ if (screen === 'profiloCollega') {
 
         <Text
           style={
-            [styles.profileSectionTitle, { color: coloreHome(paletteHome, 'accent', '#8FE8FF') }]
+            styles.profileSectionTitle
           }
         >
           DATI PERSONALI
@@ -26313,13 +26297,13 @@ if (screen === 'profiloCollega') {
 
       {/* MATRICOLA PROFILO */}
       <View style={styles.profileFieldWrap}>
-        <Text style={[styles.profileFieldLabel, { color: coloreHome(paletteHome, 'accent', '#8FE8FF') }]}>
+        <Text style={styles.profileFieldLabel}>
           MATRICOLA
         </Text>
 
         <View
           style={[
-            [styles.profileFieldInput, { backgroundColor: coloreHome(paletteHome, 'surface', 'rgba(25,31,78,0.90)'), borderColor: coloreHome(paletteHome, 'border', '#65DFF5'), color: coloreHome(paletteHome, 'text', '#FFFFFF'), shadowColor: coloreHome(paletteHome, 'accent', '#58E4FF') }],
+            styles.profileFieldInput,
             {
               flexDirection: 'row',
               alignItems: 'center',
@@ -26380,7 +26364,7 @@ if (screen === 'profiloCollega') {
 
         <Text
           style={
-            [styles.profileSectionTitle, { color: coloreHome(paletteHome, 'accent', '#8FE8FF') }]
+            styles.profileSectionTitle
           }
         >
           RUOLO
@@ -27033,15 +27017,15 @@ if (screen === 'profiloCollega') {
       <Screen homePalette={paletteHome}>
         <Back onPress={tornaHome} />
 
-        <Text style={[styles.title, { color: coloreHome(paletteHome, 'text', '#FFFFFF'), textShadowColor: coloreHome(paletteHome, 'accent', 'rgba(66,140,255,0.35)') }]}>
+        <Text style={styles.title}>
           Agenda
         </Text>
 
-        <Text style={[styles.subtitle, { color: coloreHome(paletteHome, 'textMuted', '#8FA6C9') }]}>
+        <Text style={styles.subtitle}>
           Lavoro e vita personale, in un solo calendario
         </Text>
 
-        <View style={[[styles.month, { color: coloreHome(paletteHome, 'text', '#FFFFFF') }]Box, { backgroundColor: coloreHome(paletteHome, 'surface', '#101F38'), borderColor: coloreHome(paletteHome, 'border', '#294E83'), shadowColor: coloreHome(paletteHome, 'accent', '#2E7DFF') }]}>
+        <View style={styles.monthBox}>
           <TouchableOpacity
             onPress={mesePrecedente}
           >
@@ -27051,11 +27035,11 @@ if (screen === 'profiloCollega') {
           </TouchableOpacity>
 
           <View>
-            <Text style={[styles.month, { color: coloreHome(paletteHome, 'text', '#FFFFFF') }]}>
+            <Text style={styles.month}>
               {MESI[mese]}
             </Text>
 
-            <Text style={[styles.year, { color: coloreHome(paletteHome, 'textMuted', '#91A3BA') }]}>
+            <Text style={styles.year}>
               {anno}
             </Text>
           </View>
