@@ -1,5 +1,5 @@
-import React from 'react';
-import { Text, TouchableOpacity, View } from 'react-native';
+import React, { useState } from 'react';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 export default function TurniRapidiSection({
@@ -37,82 +37,73 @@ export default function TurniRapidiSection({
   applicaTurnoRapidoAlPeriodo,
   confermaRipristinoTurniRapidi,
 }) {
-  return (
-    <>
-      <View
-        style={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          marginBottom: 8,
-        }}
-      >
-        <Text
-          style={[
-            styles.label,
-            { marginBottom: 0 },
-          ]}
-        >
-          TURNO RAPIDO
-        </Text>
+  const [periodoAperto, setPeriodoAperto] = useState(false);
 
-        <TouchableOpacity
-          activeOpacity={0.8}
-          onPress={() =>
-            setGestisciTurniRapidi((v) => !v)
-          }
-          style={{
-            paddingVertical: 6,
-            paddingHorizontal: 9,
-            borderRadius: 11,
-            borderWidth: 1,
-            borderColor: 'rgba(105,223,255,0.34)',
-            backgroundColor: '#10213A',
-          }}
-        >
-          <Text
-            style={{
-              color: '#8EDFFF',
-              fontSize: 9,
-              fontWeight: '900',
-            }}
-          >
-            {gestisciTurniRapidi ? 'CHIUDI' : 'PERSONALIZZA'}
-          </Text>
-        </TouchableOpacity>
+  return (
+    <View style={[styles.type, localStyles.section]}>
+      <View style={localStyles.headingRow}>
+        <View style={localStyles.iconBadge}>
+          <Ionicons name="flash-outline" size={22} color="#D8C5FF" accessible={false} />
+        </View>
+        <View style={localStyles.headingText}>
+          <Text style={localStyles.title}>Turni rapidi</Text>
+          <Text style={localStyles.subtitle}>Scegli un modello per compilare il turno.</Text>
+        </View>
       </View>
 
-      <View
-        style={
-          styles.quickRow
-        }
-      >
+      <View style={[styles.quickRow, localStyles.grid]}>
         {turniRapidi.map((voce) => (
-          <Quick
-            key={voce.id}
-            title={voce.nome}
-            onPress={() =>
-              turnoRapido(
-                voce.inizio,
-                voce.fine,
-                voce.operativita,
-                voce.postazione
-              )
-            }
-          />
+          <View key={voce.id} style={localStyles.modelCard}>
+            <View style={localStyles.applyArea}>
+              <Quick
+                title={`${voce.nome} · ${voce.inizio}–${voce.fine}`}
+                onPress={() =>
+                  turnoRapido(voce.inizio, voce.fine, voce.operativita, voce.postazione)
+                }
+              />
+            </View>
+            <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityLabel={`Modifica ${voce.nome}`}
+              activeOpacity={0.8}
+              onPress={() => {
+                setGestisciTurniRapidi(true);
+                modificaTurnoRapido(voce);
+              }}
+              style={localStyles.editButton}
+            >
+              <Ionicons name="create-outline" size={20} color="#D8C5FF" accessible={false} />
+            </TouchableOpacity>
+          </View>
         ))}
       </View>
+
+      <TouchableOpacity
+        accessibilityRole="button"
+        accessibilityLabel="Gestisci modelli"
+        accessibilityState={{ expanded: gestisciTurniRapidi }}
+        activeOpacity={0.8}
+        onPress={() => setGestisciTurniRapidi((aperto) => !aperto)}
+        style={localStyles.disclosure}
+      >
+        <Ionicons name="options-outline" size={20} color="#D8C5FF" accessible={false} />
+        <View style={localStyles.headingText}>
+          <Text style={localStyles.disclosureTitle}>Gestisci modelli</Text>
+          <Text style={localStyles.subtitle}>Crea, modifica o ripristina i tuoi turni</Text>
+        </View>
+        <Ionicons name={gestisciTurniRapidi ? 'chevron-up' : 'chevron-down'} size={18} color="#D8C5FF" accessible={false} />
+      </TouchableOpacity>
 
       {gestisciTurniRapidi && (
         <View
           style={{
-            marginTop: -4,
-            marginBottom: 18,
-            padding: 14,
+            marginTop: 8,
+            marginBottom: 0,
+            padding: 10,
             borderRadius: 18,
             backgroundColor: '#0B1930',
             borderWidth: 1,
-            borderColor: 'rgba(105,223,255,0.28)',
+            borderColor: '#665080',
           }}
         >
           <Text
@@ -128,7 +119,7 @@ export default function TurniRapidiSection({
 
           <Text
             style={{
-              color: '#8FA5CC',
+              color: '#BDC9DE',
               fontSize: 10,
               lineHeight: 15,
               marginBottom: 12,
@@ -148,6 +139,9 @@ export default function TurniRapidiSection({
             >
               <TouchableOpacity
                 activeOpacity={0.8}
+                accessibilityRole="button"
+                accessibilityLabel={`Modifica ${voce.nome}`}
+                accessibilityState={{ selected: turnoRapidoInModifica === voce.id }}
                 onPress={() => modificaTurnoRapido(voce)}
                 style={{
                   flex: 1,
@@ -157,12 +151,12 @@ export default function TurniRapidiSection({
                   justifyContent: 'center',
                   backgroundColor:
                     turnoRapidoInModifica === voce.id
-                      ? 'rgba(49,84,255,0.22)'
+                      ? '#38294D'
                       : '#10213A',
                   borderWidth: 1,
                   borderColor:
                     turnoRapidoInModifica === voce.id
-                      ? '#69DFFF'
+                      ? '#D8C5FF'
                       : '#294B70',
                 }}
               >
@@ -180,7 +174,7 @@ export default function TurniRapidiSection({
                   <Text
                     numberOfLines={1}
                     style={{
-                      color: '#8FA5CC',
+                      color: '#BDC9DE',
                       fontSize: 8.5,
                       marginTop: 2,
                     }}
@@ -192,10 +186,12 @@ export default function TurniRapidiSection({
 
               <TouchableOpacity
                 activeOpacity={0.8}
+                accessibilityRole="button"
+                accessibilityLabel={`Elimina ${voce.nome}`}
                 onPress={() => confermaEliminazioneTurnoRapido(voce)}
                 style={{
-                  width: 42,
-                  height: 42,
+                  width: 48,
+                  height: 48,
                   borderRadius: 13,
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -216,7 +212,7 @@ export default function TurniRapidiSection({
 
           <Text
             style={{
-              color: '#8EDFFF',
+              color: '#D8C5FF',
               fontSize: 9,
               fontWeight: '900',
               letterSpacing: 0.8,
@@ -281,7 +277,7 @@ export default function TurniRapidiSection({
                 borderRadius: 14,
                 alignItems: 'center',
                 justifyContent: 'center',
-                backgroundColor: '#3154FF',
+                backgroundColor: '#6941A5',
               }}
             >
               <Text
@@ -324,28 +320,54 @@ export default function TurniRapidiSection({
           </View>
 
 
-          <View
+          <TouchableOpacity
+            activeOpacity={0.8}
+            accessibilityRole="button"
+            accessibilityLabel="Ripristina turni predefiniti"
+            onPress={confermaRipristinoTurniRapidi}
             style={{
-              height: 1,
-              backgroundColor: '#294B70',
-              marginTop: 16,
-              marginBottom: 14,
-            }}
-          />
-
-          <Text
-            style={{
-              color: '#FFFFFF',
-              fontSize: 14,
-              fontWeight: '900',
+              minHeight: 48,
+              justifyContent: 'center',
+              alignSelf: 'center',
+              paddingVertical: 9,
+              paddingHorizontal: 12,
+              marginTop: 10,
             }}
           >
-            Applica a più giorni
-          </Text>
+            <Text
+              style={{
+                color: '#BDC9DE',
+                fontSize: 9,
+                fontWeight: '800',
+              }}
+            >
+              Ripristina turni predefiniti
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
+      <TouchableOpacity
+        accessibilityRole="button"
+        accessibilityLabel="Applica a più giorni"
+        accessibilityState={{ expanded: periodoAperto }}
+        activeOpacity={0.8}
+        onPress={() => setPeriodoAperto((aperto) => !aperto)}
+        style={localStyles.disclosure}
+      >
+        <Ionicons name="calendar-outline" size={20} color="#D8C5FF" accessible={false} />
+        <View style={localStyles.headingText}>
+          <Text style={localStyles.disclosureTitle}>Applica a più giorni</Text>
+          <Text style={localStyles.subtitle}>Scegli modello, periodo e giorni</Text>
+        </View>
+        <Ionicons name={periodoAperto ? 'chevron-up' : 'chevron-down'} size={18} color="#D8C5FF" accessible={false} />
+      </TouchableOpacity>
+
+      {periodoAperto && (
+        <View style={localStyles.panel}>
           <Text
             style={{
-              color: '#8FA5CC',
+              color: '#BDC9DE',
               fontSize: 10,
               lineHeight: 15,
               marginTop: 4,
@@ -357,7 +379,7 @@ export default function TurniRapidiSection({
 
           <Text
             style={{
-              color: '#8EDFFF',
+              color: '#D8C5FF',
               fontSize: 9,
               fontWeight: '900',
               letterSpacing: 0.7,
@@ -382,21 +404,26 @@ export default function TurniRapidiSection({
                 <TouchableOpacity
                   key={`periodo_${voce.id}`}
                   activeOpacity={0.82}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Usa ${voce.nome} per il periodo`}
+                  accessibilityState={{ selected: selezionato }}
                   onPress={() =>
                     setTurnoRapidoPeriodoId(voce.id)
                   }
                   style={{
+                    minHeight: 44,
+                    justifyContent: 'center',
                     paddingVertical: 8,
                     paddingHorizontal: 10,
                     marginRight: 7,
                     marginBottom: 7,
                     borderRadius: 12,
                     backgroundColor: selezionato
-                      ? '#3154FF'
+                      ? '#6941A5'
                       : '#10213A',
                     borderWidth: 1,
                     borderColor: selezionato
-                      ? '#69DFFF'
+                      ? '#D8C5FF'
                       : '#294B70',
                   }}
                 >
@@ -438,7 +465,7 @@ export default function TurniRapidiSection({
 
           <Text
             style={{
-              color: '#8EDFFF',
+              color: '#D8C5FF',
               fontSize: 9,
               fontWeight: '900',
               letterSpacing: 0.7,
@@ -471,23 +498,27 @@ export default function TurniRapidiSection({
                 <TouchableOpacity
                   key={`weekday_${indice}`}
                   activeOpacity={0.82}
+                  accessibilityRole="button"
+                  accessibilityLabel={['Domenica', 'Lunedì', 'Martedì', 'Mercoledì', 'Giovedì', 'Venerdì', 'Sabato'][indice]}
+                  accessibilityState={{ selected: attivo }}
                   onPress={() =>
                     alternaGiornoSettimanaTurnoRapido(indice)
                   }
                   style={{
-                    width: 38,
-                    height: 38,
+                    minWidth: 44,
+                    minHeight: 44,
+                    padding: 8,
                     borderRadius: 12,
                     alignItems: 'center',
                     justifyContent: 'center',
                     marginRight: posizione === 6 ? 0 : 6,
                     marginBottom: 6,
                     backgroundColor: attivo
-                      ? '#3154FF'
+                      ? '#6941A5'
                       : '#10213A',
                     borderWidth: 1,
                     borderColor: attivo
-                      ? '#69DFFF'
+                      ? '#D8C5FF'
                       : '#294B70',
                   }}
                 >
@@ -507,6 +538,8 @@ export default function TurniRapidiSection({
 
           <TouchableOpacity
             activeOpacity={0.84}
+            accessibilityRole="button"
+            accessibilityState={{ disabled: salvataggioTurniPeriodo, busy: salvataggioTurniPeriodo }}
             disabled={salvataggioTurniPeriodo}
             onPress={applicaTurnoRapidoAlPeriodo}
             style={{
@@ -514,7 +547,7 @@ export default function TurniRapidiSection({
               borderRadius: 14,
               alignItems: 'center',
               justifyContent: 'center',
-              backgroundColor: '#3154FF',
+              backgroundColor: '#6941A5',
               opacity: salvataggioTurniPeriodo ? 0.55 : 1,
             }}
           >
@@ -531,28 +564,49 @@ export default function TurniRapidiSection({
             </Text>
           </TouchableOpacity>
 
-          <TouchableOpacity
-            activeOpacity={0.8}
-            onPress={confermaRipristinoTurniRapidi}
-            style={{
-              alignSelf: 'center',
-              paddingVertical: 9,
-              paddingHorizontal: 12,
-              marginTop: 10,
-            }}
-          >
-            <Text
-              style={{
-                color: '#8FA5CC',
-                fontSize: 9,
-                fontWeight: '800',
-              }}
-            >
-              Ripristina turni predefiniti
-            </Text>
-          </TouchableOpacity>
         </View>
       )}
-    </>
+    </View>
   );
 }
+
+const localStyles = StyleSheet.create({
+  section: {
+    alignItems: 'stretch',
+    backgroundColor: '#19162D',
+    borderColor: '#756099',
+    borderRadius: 20,
+    padding: 12,
+    marginRight: 0,
+    marginBottom: 18,
+  },
+  headingRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12 },
+  iconBadge: {
+    width: 48, height: 42, borderRadius: 13,
+    alignItems: 'center', justifyContent: 'center', backgroundColor: '#302443',
+  },
+  headingText: { flex: 1, minWidth: 0 },
+  title: { color: '#F5EFFF', fontSize: 16, fontWeight: '900' },
+  subtitle: { color: '#C8BEDB', fontSize: 11, lineHeight: 16, marginTop: 3 },
+  grid: { gap: 8, marginBottom: 4 },
+  modelCard: {
+    flexDirection: 'row', alignItems: 'stretch', flexGrow: 1, flexBasis: 240,
+    minWidth: 0, maxWidth: '100%', padding: 4, borderRadius: 16,
+    backgroundColor: '#241D38', borderWidth: 1, borderColor: '#665080',
+  },
+  applyArea: { flex: 1, minWidth: 0, minHeight: 48 },
+  editButton: {
+    width: 48, minHeight: 48, marginLeft: 4, borderRadius: 12,
+    alignItems: 'center', justifyContent: 'center', backgroundColor: '#38294D',
+  },
+  disclosure: {
+    flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 58,
+    padding: 10, marginTop: 8, borderRadius: 14,
+    backgroundColor: '#302443', borderWidth: 1, borderColor: '#665080',
+  },
+  disclosureTitle: { color: '#F5EFFF', fontSize: 12, fontWeight: '900' },
+  panel: {
+    marginTop: 8, padding: 10, borderRadius: 14,
+    backgroundColor: '#0B1930', borderWidth: 1, borderColor: '#665080',
+  },
+});
