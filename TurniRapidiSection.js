@@ -1,10 +1,32 @@
 import React, { useState } from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+
+// Compare display labels only; stored times and callbacks remain untouched.
+function nomeDescriveOrario(voce) {
+  const parti = String(voce.nome).trim().match(
+    /^(\d{1,2})(?:[.:]([0-5]\d))?\s*[-–—−]\s*(\d{1,2})(?:[.:]([0-5]\d))?$/
+  );
+  if (!parti) return false;
+  const inizio = `${String(Number(parti[1])).padStart(2, '0')}:${parti[2] || '00'}`;
+  const fine = `${String(Number(parti[3])).padStart(2, '0')}:${parti[4] || '00'}`;
+  return inizio === voce.inizio && fine === voce.fine;
+}
+
+function EtichettaModello({ voce }) {
+  const soloOrario = nomeDescriveOrario(voce);
+  return (
+    <View style={localStyles.modelLabel}>
+      {!soloOrario && <Text style={localStyles.modelName}>{voce.nome}</Text>}
+      <Text style={soloOrario ? localStyles.modelTimePrimary : localStyles.modelTime}>
+        {voce.inizio}–{voce.fine}
+      </Text>
+    </View>
+  );
+}
 
 export default function TurniRapidiSection({
   styles,
-  Quick,
   Field,
   gestisciTurniRapidi,
   setGestisciTurniRapidi,
@@ -38,6 +60,10 @@ export default function TurniRapidiSection({
   confermaRipristinoTurniRapidi,
 }) {
   const [periodoAperto, setPeriodoAperto] = useState(false);
+  const [larghezzaGriglia, setLarghezzaGriglia] = useState(0);
+  const { fontScale } = useWindowDimensions();
+  const dueColonne = larghezzaGriglia >= 2 * 210 * Math.max(1, fontScale) + 8;
+  const larghezzaCard = dueColonne ? (larghezzaGriglia - 8) / 2 : '100%';
 
   return (
     <View style={[styles.type, localStyles.section]}>
@@ -51,17 +77,25 @@ export default function TurniRapidiSection({
         </View>
       </View>
 
-      <View style={[styles.quickRow, localStyles.grid]}>
+      <View
+        style={[styles.quickRow, localStyles.grid]}
+        onLayout={({ nativeEvent }) => setLarghezzaGriglia(nativeEvent.layout.width)}
+      >
         {turniRapidi.map((voce) => (
-          <View key={voce.id} style={localStyles.modelCard}>
-            <View style={localStyles.applyArea}>
-              <Quick
-                title={`${voce.nome} · ${voce.inizio}–${voce.fine}`}
-                onPress={() =>
-                  turnoRapido(voce.inizio, voce.fine, voce.operativita, voce.postazione)
-                }
-              />
-            </View>
+          <View key={voce.id} style={[localStyles.modelCard, { width: larghezzaCard }]}>
+            <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityLabel={nomeDescriveOrario(voce)
+                ? `Applica turno ${voce.inizio}–${voce.fine}`
+                : `Applica ${voce.nome}, ${voce.inizio}–${voce.fine}`}
+              activeOpacity={0.8}
+              style={localStyles.applyArea}
+              onPress={() =>
+                turnoRapido(voce.inizio, voce.fine, voce.operativita, voce.postazione)
+              }
+            >
+              <EtichettaModello voce={voce} />
+            </TouchableOpacity>
             <TouchableOpacity
               accessibilityRole="button"
               accessibilityLabel={`Modifica ${voce.nome}`}
@@ -145,7 +179,9 @@ export default function TurniRapidiSection({
                 onPress={() => modificaTurnoRapido(voce)}
                 style={{
                   flex: 1,
-                  minHeight: 44,
+                  minHeight: 48,
+                  minWidth: 0,
+                  paddingVertical: 10,
                   borderRadius: 13,
                   paddingHorizontal: 12,
                   justifyContent: 'center',
@@ -160,19 +196,10 @@ export default function TurniRapidiSection({
                       : '#294B70',
                 }}
               >
-                <Text
-                  style={{
-                    color: '#FFFFFF',
-                    fontSize: 11,
-                    fontWeight: '900',
-                  }}
-                >
-                  {voce.nome} · {voce.inizio}–{voce.fine}
-                </Text>
+                <EtichettaModello voce={voce} />
 
                 {!!voce.operativita && (
                   <Text
-                    numberOfLines={1}
                     style={{
                       color: '#BDC9DE',
                       fontSize: 8.5,
@@ -264,6 +291,7 @@ export default function TurniRapidiSection({
           <View
             style={{
               flexDirection: 'row',
+              flexWrap: 'wrap',
               gap: 8,
               marginTop: 2,
             }}
@@ -272,8 +300,10 @@ export default function TurniRapidiSection({
               activeOpacity={0.82}
               onPress={salvaTurnoRapidoPersonalizzato}
               style={{
-                flex: 1,
-                minHeight: 45,
+                flexGrow: 1,
+                flexBasis: 130,
+                minHeight: 48,
+                padding: 10,
                 borderRadius: 14,
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -297,7 +327,8 @@ export default function TurniRapidiSection({
                 onPress={azzeraEditorTurnoRapido}
                 style={{
                   minWidth: 88,
-                  minHeight: 45,
+                  minHeight: 48,
+                  padding: 10,
                   borderRadius: 14,
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -411,7 +442,9 @@ export default function TurniRapidiSection({
                     setTurnoRapidoPeriodoId(voce.id)
                   }
                   style={{
-                    minHeight: 44,
+                    minHeight: 48,
+                    maxWidth: '100%',
+                    flexShrink: 1,
                     justifyContent: 'center',
                     paddingVertical: 8,
                     paddingHorizontal: 10,
@@ -427,15 +460,7 @@ export default function TurniRapidiSection({
                       : '#294B70',
                   }}
                 >
-                  <Text
-                    style={{
-                      color: '#FFFFFF',
-                      fontSize: 9.5,
-                      fontWeight: '900',
-                    }}
-                  >
-                    {voce.nome}
-                  </Text>
+                  <EtichettaModello voce={voce} />
                 </TouchableOpacity>
               );
             })}
@@ -590,11 +615,18 @@ const localStyles = StyleSheet.create({
   subtitle: { color: '#C8BEDB', fontSize: 11, lineHeight: 16, marginTop: 3 },
   grid: { gap: 8, marginBottom: 4 },
   modelCard: {
-    flexDirection: 'row', alignItems: 'stretch', flexGrow: 1, flexBasis: 240,
+    flexDirection: 'row', alignItems: 'stretch', flexShrink: 1,
     minWidth: 0, maxWidth: '100%', padding: 4, borderRadius: 16,
     backgroundColor: '#241D38', borderWidth: 1, borderColor: '#665080',
   },
-  applyArea: { flex: 1, minWidth: 0, minHeight: 48 },
+  applyArea: {
+    flex: 1, minWidth: 0, minHeight: 52, padding: 10,
+    justifyContent: 'center', borderRadius: 12, backgroundColor: '#302443',
+  },
+  modelLabel: { minWidth: 0, flexShrink: 1, alignSelf: 'stretch' },
+  modelName: { color: '#F5EFFF', fontSize: 13, fontWeight: '800', flexShrink: 1 },
+  modelTimePrimary: { color: '#F5EFFF', fontSize: 15, fontWeight: '900', flexShrink: 1 },
+  modelTime: { color: '#D8C5FF', fontSize: 12, fontWeight: '600', marginTop: 4, flexShrink: 1 },
   editButton: {
     width: 48, minHeight: 48, marginLeft: 4, borderRadius: 12,
     alignItems: 'center', justifyContent: 'center', backgroundColor: '#38294D',
