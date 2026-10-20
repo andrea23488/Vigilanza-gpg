@@ -1,0 +1,7 @@
+{
+  "name": "@vigilanza/importazione-turni-ios",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Lettura locale iOS dei prospetti turni con PDFKit e Vision",
+  "license": "UNLICENSED"
+}
