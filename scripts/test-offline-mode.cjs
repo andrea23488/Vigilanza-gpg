@@ -75,7 +75,8 @@ async function main() {
   assert.equal(eas.build['offline-test'].developmentClient, false);
   assert.equal(eas.build['offline-test'].distribution, 'internal');
   assert.equal(eas.build['offline-test'].env.EXPO_NO_DOTENV, '1');
-  assert.equal(eas.build['offline-test'].env.EXPO_PUBLIC_SUPABASE_URL, '');
+  assert.equal(Object.hasOwn(eas.build['offline-test'].env, 'EXPO_PUBLIC_SUPABASE_URL'), false);
+  assert.equal(Object.hasOwn(eas.build['offline-test'].env, 'EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY'), false);
   console.log('PASS config: production manifest unchanged; test identity isolated; credentials and production EAS fallback refused.');
 
   const mods = {};

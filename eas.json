@@ -24,9 +24,7 @@
       "autoIncrement": false,
       "env": {
         "APP_VARIANT": "offline-test",
-        "EXPO_NO_DOTENV": "1",
-        "EXPO_PUBLIC_SUPABASE_URL": "",
-        "EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY": ""
+        "EXPO_NO_DOTENV": "1"
       },
       "ios": {
         "buildConfiguration": "Release"
