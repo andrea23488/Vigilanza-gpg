@@ -29,7 +29,6 @@ const pulisci = (s: string) => s.trim().toLocaleLowerCase('it-IT').replace(/\s+/
 const identita = new Set(['nome', 'cognome', 'dipendente', 'matricola', 'badge']);
 const data = new Set(['data', 'giorno', 'date']);
 const orario = new Set(['inizio', 'entrata', 'dalle', 'fine', 'uscita', 'alle', 'servizio', 'turno', 'orario', 'causale', 'assenza']);
-const etichette = new Set([...identita, ...data, ...orario, 'data fine', 'postazione', 'sede', 'posto']);
 function rettangolo(ts: readonly Token[]): Token['rettangolo'] {
   const x = Math.min(...ts.map(t => t.rettangolo[0])), y = Math.min(...ts.map(t => t.rettangolo[1]));
   return [x, y, Math.max(...ts.map(t => t.rettangolo[0] + t.rettangolo[2])) - x,
@@ -55,8 +54,8 @@ function header(tokens: readonly Token[]) {
   const plausibile = (colonne.some(c => data.has(c.testo)) && colonne.some(c => orario.has(c.testo))) ||
     (colonne.some(c => identita.has(c.testo)) && haDate);
   if (!plausibile) return null;
-  // Non eliminare titoli/colonne sconosciute per far sembrare riconosciuto un layout.
-  if (colonne.some(c => !etichette.has(c.testo) && !normalizzaData(c.testo).valore && !normalizzaData(c.testo).alternative.length)) return null;
+  // Colonne aggiuntive restano nella griglia: l'interprete segnala quelle senza ruolo.
+  // Non rifiutare l'intera tabella per una colonna Note o un titolo aziendale.
   return colonne;
 }
 
@@ -80,7 +79,7 @@ export function strutturaPaginaIOS(p: PaginaIOS): { pagina: PaginaDocumento; avv
     const cy = t.rettangolo[1] + t.rettangolo[3] / 2;
     const candidati = gruppi.filter(g => {
       const primo = g[0];
-      return Math.abs(cy - primo.rettangolo[1] - primo.rettangolo[3] / 2) <= Math.min(primo.rettangolo[3], t.rettangolo[3]) * 0.4;
+      return Math.abs(cy - primo.rettangolo[1] - primo.rettangolo[3] / 2) <= Math.min(primo.rettangolo[3], t.rettangolo[3]) * 0.6;
     });
     if (candidati.length === 1) candidati[0].push(t);
     else { gruppi.push([t]); if (candidati.length > 1) avvisi.add('ALLINEAMENTO_RIGHE_AMBIGUO'); }

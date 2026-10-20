@@ -41,7 +41,7 @@ function schermata(opzioni = {}) {
       }
     },
   };
-  const nativi = Object.fromEntries(['ActivityIndicator', 'Button', 'ScrollView', 'Text', 'TextInput', 'View'].map(n => [n, n]));
+  const nativi = Object.fromEntries(['ActivityIndicator', 'Pressable', 'Button', 'ScrollView', 'Text', 'TextInput', 'View'].map(n => [n, n]));
   nativi.Platform = { OS: opzioni.os ?? 'ios' };
   const acquisitore = {
     async acquisisci(o) {
@@ -59,13 +59,14 @@ function schermata(opzioni = {}) {
     } };
   } };
   const modulo = { exports: {} };
-  vm.runInNewContext(compilato, { exports: modulo.exports, module: modulo, require(id) {
+  vm.runInNewContext(compilato, { __DEV__: false, exports: modulo.exports, module: modulo, require(id) {
     if (id === 'react') return react;
     if (id === 'react-native') return nativi;
     if (id === './acquisizioneNativa') return { creaAcquisitoreNativo: () => acquisitore };
     if (id === './letturaNativa') return { creaLettoreNativo: () => lettore };
     if (id === './revisione') return revisione;
     if (id === './modello') return modello;
+    if (['./geometriaIOS', './prospetto', './interpretazione'].includes(id)) return require(`../importazioneTurni/${id.slice(2)}.ts`);
     throw new Error(`Import inatteso: ${id}`);
   } });
   const props = { modalitaVerifica: true, identita: { nome: 'Persona due', cognome: null, matricola: null },
@@ -114,42 +115,37 @@ test('Agenda: pulsante visibile apre la schermata di verifica con ritorno al cal
 });
 test('avviso di verifica e salvataggio disabilitato presenti prima della selezione', () => {
   const h = schermata(), tree = h.render();
-  assert.match(testi(tree), /Funzione in fase di verifica/);
-  assert.match(testi(tree), /salvataggio definitivo nel calendario è disabilitato/i);
-  assert.equal(bottone(tree, 'Salvataggio nel calendario non disponibile').disabled, true);
+  assert.match(testi(tree), /Anteprima turni/);
+  assert.match(testi(tree), /salvataggio definitivo è disabilitato/i);
+  assert.equal(bottone(tree, 'Salvataggio definitivo disabilitato').disabled, true);
   assert.ok(!elementi(tree).some(e => e.props.title === 'Confermo esplicitamente la bozza e le esclusioni'));
 });
 test('PDF, foto, screenshot e fotocamera aprono i canali corretti e rilasciano i file', async () => {
   for (const [titolo, canale, tipoImmagine] of [
-    ['Scegli PDF o immagine', 'documento', 'immagine'],
-    ['Fotografia dalla galleria', 'galleria', 'immagine'],
-    ['Screenshot dalla galleria', 'galleria', 'screenshot'],
-    ['Scatta fotografia', 'fotocamera', 'immagine'],
+    ['Scegli PDF o immagine', 'documento'],
+    ['Scegli o ritaglia foto / screenshot', 'galleria'],
+    ['Fotografa il prospetto', 'fotocamera'],
   ]) {
     const h = schermata(); await bottone(h.render(), titolo).onPress();
-    assert.deepEqual(JSON.parse(JSON.stringify(h.chiamate.selezioni)), [{ canale, tipoImmagine }]);
+    assert.deepEqual(JSON.parse(JSON.stringify(h.chiamate.selezioni)), [{ canale }]);
     assert.equal(h.chiamate.letture, 1); assert.equal(h.chiamate.rilasci, 1);
-    assert.match(testi(h.render()), /ore nominali provvisorie/);
+    assert.match(testi(h.render()), /Giorno/);
   }
 });
 test('anteprima modificabile: due servizi separati, correzione e nessuna conferma finale', async () => {
   const h = schermata(); await bottone(h.render(), 'Scegli PDF o immagine').onPress();
-  const editor = elementi(h.render()).filter(e => typeof e.type === 'function');
-  assert.equal(editor.length, 2);
-  assert.notEqual(editor[0].props.voce.id, editor[1].props.voce.id);
-  editor[0].props.aggiorna({ ...modello.datiEffettivi(editor[0].props.voce), postazione: 'Sede corretta' });
-  const dopo = elementi(h.render()).find(e => typeof e.type === 'function');
-  assert.equal(modello.datiEffettivi(dopo.props.voce).postazione, 'Sede corretta');
-  bottone(h.render(), 'Conferma identità del dipendente').onPress();
-  for (const e of elementi(h.render()).filter(e => typeof e.type === 'function')) e.props.aggiorna(modello.datiEffettivi(e.props.voce));
-  assert.ok(elementi(h.render()).filter(e => typeof e.type === 'function').every(e => e.props.voce.confermati));
-  assert.equal(bottone(h.render(), 'Salvataggio nel calendario non disponibile').disabled, true);
-  assert.ok(!elementi(h.render()).some(e => e.props.title === 'Confermo esplicitamente la bozza e le esclusioni'));
+  const campi = elementi(h.render()).filter(e => e.type === 'TextInput' && e.props.accessibilityLabel === 'postazione giorno 19');
+  assert.equal(campi.length, 2);
+  campi[0].props.onChangeText('Sede corretta');
+  const dopo = elementi(h.render()).filter(e => e.type === 'TextInput' && e.props.accessibilityLabel === 'postazione giorno 19');
+  assert.equal(dopo[0].props.value, 'Sede corretta');
+  assert.equal(bottone(h.render(), 'Salvataggio definitivo disabilitato').disabled, true);
+  assert.ok(!testi(h.render()).includes('INTESTAZIONE_GEOMETRICA'));
   assert.equal(h.chiamate.calendario, 0); assert.equal(h.chiamate.callback, 0);
 });
 test('Android senza decoder: messaggio comprensibile, niente falsa anteprima, pulizia eseguita', async () => {
   const h = schermata({ os: 'android', lettura: { stato: 'bloccato', codice: 'DECODER_LOCALE_NON_DISPONIBILE' } });
-  await bottone(h.render(), 'Screenshot dalla galleria').onPress();
+  await bottone(h.render(), 'Scegli o ritaglia foto / screenshot').onPress();
   assert.match(testi(h.render()), /non è ancora disponibile su Android/);
   assert.ok(!elementi(h.render()).some(e => typeof e.type === 'function'));
   assert.equal(h.chiamate.rilasci, 1); assert.equal(h.chiamate.callback, 0);

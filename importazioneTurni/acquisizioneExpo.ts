@@ -56,7 +56,7 @@ export function creaPorteAcquisizioneExpo(moduli: ModuliAcquisizioneExpo): Porte
           if (!p.granted) return { stato: 'permesso_negato' };
         }
         // I selettori di sistema moderni non richiedono un accesso generale alla galleria.
-        const opzioni: ImagePicker.ImagePickerOptions = { mediaTypes: ['images'], allowsEditing: false,
+        const opzioni: ImagePicker.ImagePickerOptions = { mediaTypes: ['images'], allowsEditing: true,
           allowsMultipleSelection: false, quality: 1, exif: false, base64: false };
         const r = canale === 'fotocamera' ? await moduli.immagini.launchCameraAsync(opzioni) :
           await moduli.immagini.launchImageLibraryAsync(opzioni);

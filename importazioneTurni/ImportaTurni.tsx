@@ -1,15 +1,18 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Button, Platform, ScrollView, Text, TextInput, View } from 'react-native';
+import React, { useState } from 'react';
+import { ActivityIndicator, Button, Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { creaAcquisitoreNativo } from './acquisizioneNativa';
 import { creaLettoreNativo } from './letturaNativa';
-import { creaRegistroRevisioni, creaRevisioneImportazione, suggerisciDipendenti } from './revisione';
+import { creaRegistroRevisioni } from './revisione';
 import type { RicevutaRevisione } from './revisione';
+import type { Bozza, Confronto, Dipendente } from './modello';
 import type { CanaleAcquisizione } from './acquisizione';
-import { datiEffettivi, statoVoce } from './modello';
-import type { Bozza, Confronto, DatiVoce, Dipendente, Voce } from './modello';
-
-type Revisione = ReturnType<typeof creaRevisioneImportazione>;
-type Anteprima = ReturnType<Revisione['anteprima']>;
+import type { DocumentoLetto } from './lettura';
+import type { EstrazioneIOS } from './geometriaIOS';
+import { strutturaPaginaIOS } from './geometriaIOS';
+import { leggiProspetto, nellaRegione } from './prospetto';
+import type { Contesto, Regione, RigaAnteprima } from './prospetto';
+import { interpretaDocumento } from './interpretazione';
+import { problemiDati } from './modello';
 interface PropsComuni {
   /** Matricola aziendale, se nota: non passare automaticamente codice_gpg. */
   identita?: Dipendente;
@@ -28,213 +31,140 @@ export type ImportaTurniProps = PropsComuni & ({
   /** Evento di sola revisione. Questo componente non importa e non salva turni. */
   onBozzaConfermata(bozza: Bozza, ricevuta: RicevutaRevisione): void;
 });
-const campo = { borderWidth: 1, borderColor: '#777', padding: 8, marginVertical: 4 };
-const identitaVuota: Dipendente = { nome: null, cognome: null, matricola: null };
+const campo = { borderWidth: 1, borderColor: '#94A3B8', padding: 10, marginVertical: 4, borderRadius: 6 };
+const vuoto: Dipendente = { nome: null, cognome: null, matricola: null };
 
-function EditorVoce({ voce, aggiorna, escludi, modificata }: {
-  voce: Voce; aggiorna(d: DatiVoce): void; escludi(v: boolean): void; modificata(): void;
-}) {
-  const [dati, setDati] = useState(() => datiEffettivi(voce));
-  const versione = JSON.stringify(voce);
-  useEffect(() => { setDati(datiEffettivi(voce)); }, [versione]);
-  const edit = (k: keyof DatiVoce, valore: unknown) => { modificata(); setDati(d => ({ ...d, [k]: valore })); };
-  return <View style={{ padding: 12, borderWidth: 1, marginVertical: 8 }}>
-    <Text>{voce.id} — {statoVoce(voce)}</Text>
-    {Object.entries(voce.rilevati).filter(([, c]) => c.testoOriginale).map(([k, c]) =>
-      <Text key={k}>{k}: «{c.testoOriginale}» (pagina {c.provenienza.pagina ?? '?'}, {c.provenienza.riferimento ?? '?'})
-        {c.alternative.length ? ` — alternative: ${JSON.stringify(c.alternative)}` : ''}</Text>)}
-    {(['data', 'dataFine', 'inizio', 'fine', 'postazione'] as const).map(k => <View key={k}>
-      <Text>{k}{k.startsWith('data') ? ' (AAAA-MM-GG)' : ''}</Text>
-      <TextInput accessibilityLabel={k} style={campo} value={dati[k] ?? ''} editable={!voce.esclusa}
-        onChangeText={s => edit(k, s || null)} />
-    </View>)}
-    <Text>Tipo di voce</Text>
-    {(['turno', 'riposo', 'assenza', 'causale'] as const).map(tipo => <Button key={tipo} title={`${dati.tipo === tipo ? '✓ ' : ''}${tipo}`}
-      disabled={voce.esclusa} onPress={() => { modificata(); setDati(d => tipo === 'turno' ? { ...d, tipo, causale: null } : {
-        ...d, tipo, inizio: null, fine: null, dataFine: null,
-        causale: tipo === 'riposo' ? null : d.causale ?? { codice: '', descrizione: null, associazioneConfermata: null },
-      }); }} />)}
-    {(dati.tipo === 'assenza' || dati.tipo === 'causale') && <>
-      <Text>Codice originale</Text>
-      <TextInput style={campo} value={dati.causale?.codice ?? ''} onChangeText={s => edit('causale', {
-        ...dati.causale, codice: s, descrizione: dati.causale?.descrizione ?? null,
-        associazioneConfermata: dati.causale?.associazioneConfermata ?? null,
-      })} />
-      <Text>Associazione semantica da verificare (nessun trattamento economico)</Text>
-      <TextInput style={campo} value={dati.causale?.associazioneConfermata ?? ''} onChangeText={s => edit('causale', {
-        codice: dati.causale?.codice ?? '', descrizione: dati.causale?.descrizione ?? null, associazioneConfermata: s || null,
-      })} />
-    </>}
-    <Button title="Conferma questa voce" disabled={voce.esclusa} onPress={() => aggiorna(dati)} />
-    <Button title={voce.esclusa ? 'Includi voce' : 'Escludi voce'} onPress={() => escludi(!voce.esclusa)} />
-  </View>;
-}
-
-/** Accessibile dal calendario in modalità di sola anteprima.
- * Nessun import da App.js, API calendario, Supabase o motore economico. */
+/** Solo anteprima locale: nessun percorso di conferma/salvataggio definitivo. */
 export default function ImportaTurni(props: ImportaTurniProps) {
   const [acquisitore] = useState(creaAcquisitoreNativo);
   const [lettore] = useState(creaLettoreNativo);
-  const [registroLocale] = useState(creaRegistroRevisioni);
-  const sessione = useRef<Revisione | null>(null);
-  const [anteprima, setAnteprima] = useState<Anteprima | null>(null);
-  const [identita, setIdentita] = useState<Dipendente>(props.identita ?? identitaVuota);
+  const montato = React.useRef(true), inCorso = React.useRef(false);
+  React.useEffect(() => { montato.current = true; return () => { montato.current = false; }; }, []);
+  const larghezzaSchema = React.useRef(1);
+  const [originale, setOriginale] = useState<DocumentoLetto | null>(null);
+  const [contesto, setContesto] = useState<Contesto>({ mese: '', anno: '', dipendente: props.identita ?? vuoto, confermato: false });
+  const [righe, setRighe] = useState<RigaAnteprima[]>([]);
   const [busy, setBusy] = useState(false);
   const [errore, setErrore] = useState('');
-  const [puliziaFallita, setPuliziaFallita] = useState(false);
-  const [righeScelte, setRigheScelte] = useState<string[]>([]);
-  const [mappa, setMappa] = useState<Record<string, string>>({});
-  const [pendenti, setPendenti] = useState<string[]>([]);
-  const [identitaPendente, setIdentitaPendente] = useState(false);
-  const [limiteRighe, setLimiteRighe] = useState(50);
-  const [limiteVoci, setLimiteVoci] = useState(50);
-  const [selezionePendente, setSelezionePendente] = useState(false);
-  const montato = useRef(true), inCorso = useRef(false);
-  useEffect(() => { montato.current = true; return () => { montato.current = false; }; }, []);
-  const aggiorna = () => {
-    if (!montato.current) return;
-    const prossima = sessione.current?.anteprima() ?? null;
-    setAnteprima(prossima);
-    setPendenti(ids => ids.filter(id => prossima?.bozza?.voci.some(v => v.id === id)));
-  };
-  const strutturaPendente = selezionePendente || Object.values(mappa).some(t => t.trim().length > 0);
-  const azione = (f: (s: Revisione) => void) => {
-    try { setErrore(''); if (sessione.current) { f(sessione.current); aggiorna(); } }
-    catch { setErrore('Operazione non valida: verifica selezione, campi obbligatori e causali.'); }
-  };
-  async function acquisisci(canale: CanaleAcquisizione, screenshot = false) {
-    if (inCorso.current) return;
-    inCorso.current = true; setBusy(true); setErrore('');
+  const [pulizia, setPulizia] = useState(false);
+  const [regione, setRegione] = useState<Regione>();
+  const [seleziona, setSeleziona] = useState(false);
+  const [pagina, setPagina] = useState(1);
+  const [angolo, setAngolo] = useState<{x: number; y: number} | null>(null);
+  const candidati = originale ? interpretaDocumento(originale.documento).candidati : [];
+  const raw = (originale as (DocumentoLetto & { evidenzeIOS?: EstrazioneIOS }) | null)?.evidenzeIOS;
+  function riconosci(o: DocumentoLetto, c: Contesto, r?: Regione) {
+    const evidenze = (o as DocumentoLetto & { evidenzeIOS?: EstrazioneIOS }).evidenzeIOS;
+    const documento = evidenze ? { ...o.documento, pagine: evidenze.pagine.filter(p => !r || p.numero === r.pagina).map(p =>
+      strutturaPaginaIOS({ ...p, elementi: p.elementi.filter(t => nellaRegione(t.rettangolo, p.numero, r)),
+        // In regione il fallback non deve reintrodurre testo esterno.
+        testo: r ? null : p.testo, righeOriginali: p.righeOriginali.filter(t => nellaRegione(t.rettangolo, p.numero, r)) }).pagina) } : o.documento;
+    const prossime = leggiProspetto(documento, r ? { ...c, candidatoId: undefined } : c);
+    setRighe(prossime);
+    if (__DEV__) console.debug('[Importa turni]', { pagine: documento.pagine.length, voci: prossime.length, avvisi: o.avvisi });
+  }
+  async function acquisisci(canale: CanaleAcquisizione) {
+    if (inCorso.current || pulizia) return;
+    inCorso.current = true;
+    setBusy(true); setErrore('');
     try {
-      const r = await acquisitore.acquisisci({ canale, tipoImmagine: screenshot ? 'screenshot' : 'immagine' });
-      if (r.stato === 'errore') {
-        if (montato.current) { setErrore(r.codice); setPuliziaFallita(!r.puliziaRiuscita); }
-        return;
-      }
-      if (r.stato !== 'pronto') return;
+      const r = await acquisitore.acquisisci({ canale });
+      if (!montato.current) { if (r.stato === 'pronto') await r.rilascia(); return; }
+      if (r.stato === 'annullato') return;
+      if (r.stato !== 'pronto') { setPulizia(!r.puliziaRiuscita); setErrore('Non è stato possibile aprire il documento. Scegli un PDF o un’immagine leggibile.'); return; }
       try {
-        if (montato.current) { sessione.current = null; setAnteprima(null); }
+        setOriginale(null); setRighe([]); setRegione(undefined); setAngolo(null); setSeleziona(false); setPagina(1);
         const esito = await lettore.leggi(r.documento);
         if (!montato.current) return;
-        if (esito.stato === 'bloccato') {
-          setErrore(esito.codice === 'DECODER_LOCALE_NON_DISPONIBILE'
-            ? Platform.OS === 'android'
-              ? 'File selezionato. La lettura di PDF e immagini non è ancora disponibile su Android. Nessun turno è stato salvato.'
-              : 'File selezionato. La lettura richiede una versione iOS dell’app con i moduli di riconoscimento inclusi. Nessun turno è stato salvato.'
-            : esito.codice === 'PDF_PROTETTO' ? 'Il PDF è protetto da password e non può essere letto in questa versione.'
-              : 'Impossibile leggere il documento. Prova un file leggibile più piccolo o un PDF non protetto. Nessun turno è stato salvato.');
-          return;
+        if (esito.stato !== 'letto') {
+          setErrore(esito.codice === 'PDF_PROTETTO' ? 'Il PDF è protetto da password. Scegli una copia non protetta.' :
+            esito.codice === 'DECODER_LOCALE_NON_DISPONIBILE' ? Platform.OS === 'android' ? 'La lettura non è ancora disponibile su Android.' : 'La lettura richiede una versione iOS aggiornata con i moduli di riconoscimento inclusi.' :
+            'Non riusciamo a leggere il documento. Prova un altro file o una foto più nitida.'); return;
         }
-        sessione.current = creaRevisioneImportazione(esito.risultato, props.registro ?? registroLocale);
-        setMappa({}); setRigheScelte([]); setPendenti([]); setIdentitaPendente(false); setSelezionePendente(false); setLimiteRighe(50); setLimiteVoci(50);
-        setIdentita(props.identita ?? identitaVuota); aggiorna();
-      } finally {
-        const pulizia = await r.rilascia();
-        if (montato.current) setPuliziaFallita(!pulizia.riuscita);
-      }
-    } catch { if (montato.current) setErrore('LETTURA_FALLITA'); }
+        const c = { ...contesto, candidatoId: undefined, confermato: false };
+        setContesto(c); setOriginale(esito.risultato); riconosci(esito.risultato, c);
+      } finally { const esito = await r.rilascia(); if (montato.current) setPulizia(!esito.riuscita); }
+    } catch { if (montato.current) setErrore('Lettura non riuscita. Prova di nuovo o scegli un altro documento.'); }
     finally { inCorso.current = false; if (montato.current) setBusy(false); }
   }
-  async function conferma() {
-    if (props.modalitaVerifica) return;
-    if (inCorso.current || !sessione.current || pendenti.length || identitaPendente || strutturaPendente) return;
-    inCorso.current = true; setBusy(true); setErrore('');
-    try {
-      const esistenti = await props.leggiEsistenti();
-      if (!montato.current) return;
-      const risultato = sessione.current.conferma(true, esistenti);
-      aggiorna();
-      props.onBozzaConfermata(risultato.bozza, risultato.ricevuta);
-    } catch { if (montato.current) setErrore('Conferma bloccata: verificare dipendente, voci, duplicati e conflitti con i turni esistenti.'); }
-    finally { inCorso.current = false; if (montato.current) setBusy(false); }
-  }
-  const suggerimenti = anteprima && props.identita ? suggerisciDipendenti(anteprima.esito.candidati, props.identita) : [];
-  return <ScrollView style={{ flex: 1, backgroundColor: '#F8FAFC' }} contentContainerStyle={{ padding: 16 }} keyboardShouldPersistTaps="handled"
-    automaticallyAdjustKeyboardInsets={true}>
-    <Text accessibilityRole="header" style={{ fontSize: 22 }}>Importa turni — revisione</Text>
-    {props.modalitaVerifica && <View style={{ marginVertical: 12, padding: 14, borderRadius: 12, backgroundColor: '#FFF1C2', borderWidth: 1, borderColor: '#98721A' }}>
-      <Text style={{ color: '#513900', fontSize: 16, fontWeight: '800' }}>Funzione in fase di verifica</Text>
-      <Text style={{ color: '#513900', marginTop: 4 }}>Puoi selezionare PDF, fotografie e screenshot e modificare l’anteprima dei turni riconosciuti.
-        Il salvataggio definitivo nel calendario è disabilitato. La bozza viene scartata quando torni al calendario.</Text>
-    </View>}
-    <Text>La lettura locale richiede i moduli iOS. Android e PDF scannerizzati non sono supportati in questa versione.
-      Nessun turno viene salvato nel calendario.</Text>
-    <Button title="Scegli PDF o immagine" disabled={busy || puliziaFallita} onPress={() => acquisisci('documento')} />
-    <Button title="Fotografia dalla galleria" disabled={busy || puliziaFallita} onPress={() => acquisisci('galleria')} />
-    <Button title="Screenshot dalla galleria" disabled={busy || puliziaFallita} onPress={() => acquisisci('galleria', true)} />
-    <Button title="Scatta fotografia" disabled={busy || puliziaFallita} onPress={() => acquisisci('fotocamera')} />
-    {busy && <ActivityIndicator accessibilityLabel="Lettura o verifica in corso" />}
+  const modifica = (id: string, patch: Partial<RigaAnteprima>) => setRighe(rs => rs.map(r => r.id === id ? { ...r, ...patch, verificata: false } : r));
+  return <ScrollView contentContainerStyle={{ padding: 16 }} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets>
+    <Text accessibilityRole="header" style={{ fontSize: 24, fontWeight: '700' }}>Anteprima turni</Text>
+    <Text>Controlla e modifica i dati riconosciuti. Il salvataggio definitivo è disabilitato.</Text>
+    <Button title="Scegli PDF o immagine" disabled={busy || pulizia} onPress={() => acquisisci('documento')} />
+    <Button title="Scegli o ritaglia foto / screenshot" disabled={busy || pulizia} onPress={() => acquisisci('galleria')} />
+    <Button title="Fotografa il prospetto" disabled={busy || pulizia} onPress={() => acquisisci('fotocamera')} />
+    {busy && <ActivityIndicator accessibilityLabel="Lettura in corso" />}
     {!!errore && <Text accessibilityRole="alert">{errore}</Text>}
-    {puliziaFallita && <Button title="Riprova pulizia del file temporaneo" disabled={busy} onPress={async () => {
-      const r = await acquisitore.riprovaPulizia(); if (montato.current) setPuliziaFallita(!r.riuscita);
-    }} />}
-    {anteprima && <View pointerEvents={busy || anteprima.bozza?.conferma ? 'none' : 'auto'}>
-      <Text>{anteprima.originale.avvisi.join(' · ')}</Text>
-      <Text>Copertura: {anteprima.esito.stato}</Text>
-      {anteprima.esito.segnalazioni.map((s, i) => <Text key={i}>{s.codice} — {s.paginaId}/{s.rigaId}</Text>)}
-      <Text>Ordine delle date numeriche</Text>
-      <Button title="Giorno / mese / anno" onPress={() => azione(s => s.ordineDate('DMY'))} />
-      <Button title="Mese / giorno / anno" onPress={() => azione(s => s.ordineDate('MDY'))} />
-      <Text>Scegli il dipendente del prospetto</Text>
-      {anteprima.esito.candidati.map(c => <Button key={c.id}
-        title={[c.rilevati.nome.valore, c.rilevati.cognome.valore, c.rilevati.matricola.valore,
-          suggerimenti.some(s => s.id === c.id) ? '(corrispondenza da verificare)' : ''].filter(Boolean).join(' ')}
-        onPress={() => azione(s => { s.scegliDipendente(c.id); setIdentita({ nome: c.rilevati.nome.valore,
-          cognome: c.rilevati.cognome.valore, matricola: c.rilevati.matricola.valore }); setIdentitaPendente(false); setPendenti([]);
-          setRigheScelte([]); setSelezionePendente(false); })} />)}
-      <Text>Alternativa manuale: scegli le righe e verifica la loro associazione al dipendente.
-        Se mancano le colonne, mappa anche un’intestazione esistente. Usa | tra le celle; lascia vuote le celle mancanti.
-        Esempio intestazione: Data|Nome|Matricola|Servizio|Postazione</Text>
-      {anteprima.documento.pagine.map(p => <View key={p.id}>
-        <Text>Pagina {p.numero ?? '?'}</Text>
-        <TextInput style={campo} accessibilityLabel={`Intestazione manuale ${p.id}`} placeholder="Data|Nome|Matricola|Servizio|Postazione"
-          value={mappa[`header:${p.id}`] ?? ''} onChangeText={t => setMappa(m => ({ ...m, [`header:${p.id}`]: t }))} />
-        <Button title="Aggiungi intestazione manuale" disabled={!mappa[`header:${p.id}`]} onPress={() =>
-          azione(s => { s.intestazioneManuale(p.id, mappa[`header:${p.id}`].split('|').map(t => t.trim()));
-            setMappa(m => ({ ...m, [`header:${p.id}`]: '' })); setRigheScelte([]); setSelezionePendente(false); })} />
-        {p.righe?.slice(0, limiteRighe).map(r => {
-          const id = `${p.id}/${r.id}`;
-          return <View key={id} style={{ marginVertical: 8 }}>
-            <Text selectable>{id}: {r.testo ?? r.celle?.map(c => c.testo).join(' | ')}</Text>
-            <Button title={righeScelte.includes(id) ? '✓ Riga selezionata' : 'Seleziona riga'} onPress={() => {
-              setSelezionePendente(true); setRigheScelte(ids => ids.includes(id) ? ids.filter(v => v !== id) : [...ids, id]); }} />
-            <TextInput accessibilityLabel={`Mappatura ${id}`} style={campo} placeholder="Celle separate da |"
-              value={mappa[id] ?? ''} onChangeText={t => setMappa(m => ({ ...m, [id]: t }))} />
-            <Button title="Applica mappatura manuale" disabled={!mappa[id]} onPress={() =>
-              azione(s => { s.mappaRiga(p.id, r.id, mappa[id].split('|').map(t => t.trim() || null));
-                setMappa(m => ({ ...m, [id]: '' })); setRigheScelte([]); setSelezionePendente(false); })} />
-          </View>;
-        })}
-        {(p.righe?.length ?? 0) > limiteRighe && <Button title="Mostra altre 50 righe" onPress={() => setLimiteRighe(n => n + 50)} />}
+    {pulizia && <Button title="Riprova chiusura del documento" onPress={async () => { setPulizia(!(await acquisitore.riprovaPulizia()).riuscita); }} />}
+    {originale && <>
+      <Text style={{ fontWeight: '700', marginTop: 16 }}>Conferma periodo e dipendente</Text>
+      {candidati.map(c => <Button key={c.id} title={`Usa dipendente: ${[c.rilevati.nome.valore, c.rilevati.cognome.valore, c.rilevati.matricola.valore].filter(Boolean).join(' ')}`} onPress={() => {
+        const prossimo = { ...contesto, candidatoId: c.id, confermato: false, dipendente: { nome: c.rilevati.nome.valore, cognome: c.rilevati.cognome.valore, matricola: c.rilevati.matricola.valore } };
+        setContesto(prossimo); riconosci(originale, prossimo, regione);
+      }} />)}
+      <Text>Per i giorni senza data completa indica mese e anno. Le sigle richiedono una verifica separata.</Text>
+      {(['mese', 'anno'] as const).map(k => <View key={k}><Text>{k === 'mese' ? 'Mese (1–12)' : 'Anno (4 cifre)'}</Text>
+        <TextInput accessibilityLabel={k} style={campo} keyboardType="number-pad" value={contesto[k]}
+          onChangeText={v => setContesto(c => ({ ...c, [k]: v, confermato: false }))} /></View>)}
+      {(['nome', 'cognome', 'matricola'] as const).map(k => <View key={k}><Text>{k}</Text>
+        <TextInput accessibilityLabel={k} style={campo} value={contesto.dipendente[k] ?? ''}
+          onChangeText={v => setContesto(c => ({ ...c, confermato: false, dipendente: { ...c.dipendente, [k]: v || null } }))} /></View>)}
+      <Button title={contesto.confermato ? 'Periodo e dipendente confermati' : 'Conferma periodo e dipendente e rileggi'} disabled={busy}
+        onPress={() => {
+          if (!/^(?:[1-9]|1[0-2])$/.test(contesto.mese) || !/^[1-9]\d{3}$/.test(contesto.anno) || !Object.values(contesto.dipendente).some(v => v?.trim())) {
+            setErrore('Indica un mese valido, l’anno e il dipendente.'); return;
+          }
+          const c = { ...contesto, confermato: true }; setContesto(c); setErrore(''); riconosci(originale, c, regione);
+        }} />
+      <Text>La rilettura sostituisce l’anteprima: completa prima la selezione e il periodo, poi modifica i turni.</Text>
+      {raw && <>
+        <Button title="Seleziona solo la regione del prospetto" onPress={() => { setSeleziona(!seleziona); setAngolo(null); }} />
+        {seleziona && <>
+          <Text>Schema del testo estratto: tocca l’angolo in alto a sinistra e poi quello in basso a destra del prospetto.</Text>
+          {raw.pagine.map(p => <Button key={p.numero} title={`Pagina ${p.numero}`} onPress={() => { setPagina(p.numero); setAngolo(null); }} />)}
+          <View onLayout={e => { larghezzaSchema.current = e.nativeEvent.layout.width; }}>
+            <Pressable accessibilityLabel="Selezione regione del prospetto" style={{ height: 400, backgroundColor: '#EDF2F7', overflow: 'hidden' }} onPress={e => {
+              const x = Math.max(0, Math.min(1, e.nativeEvent.locationX / larghezzaSchema.current));
+              const y = Math.max(0, Math.min(1, e.nativeEvent.locationY / 400));
+              if (!angolo) { setAngolo({ x, y }); return; }
+              const r = { pagina, x: Math.min(x, angolo.x), y: Math.min(y, angolo.y), larghezza: Math.abs(x - angolo.x), altezza: Math.abs(y - angolo.y) };
+              if (r.larghezza < .02 || r.altezza < .02) { setErrore('Seleziona una regione più ampia.'); setAngolo(null); return; }
+              setRegione(r); setAngolo(null); setSeleziona(false); riconosci(originale, contesto, r);
+            }}>
+              {raw.pagine.find(p => p.numero === pagina)?.elementi.map(t => t.rettangolo && <Text pointerEvents="none" key={t.id}
+                style={{ position: 'absolute', left: `${t.rettangolo[0] * 100}%`, top: `${t.rettangolo[1] * 100}%`, fontSize: 8 }}>{t.testo}</Text>)}
+              {angolo && <View pointerEvents="none" style={{ position: 'absolute', left: `${angolo.x * 100}%`, top: `${angolo.y * 100}%`, width: 10, height: 10, backgroundColor: '#2563EB' }} />}
+            </Pressable>
+          </View>
+        </>}
+        {regione && <Button title="Usa di nuovo l’intero documento" onPress={() => { setRegione(undefined); riconosci(originale, contesto); }} />}
+      </>}
+      {!righe.length && <View><Text>Non riusciamo a riconoscere i turni. Seleziona solo il prospetto oppure prova il PDF originale o una foto più nitida. Per prospetti con più dipendenti seleziona la regione di una sola persona.</Text>
+        <Button title="Riprova lettura" onPress={() => riconosci(originale, contesto, regione)} /></View>}
+      {righe.map(r => <View key={r.id} style={{ borderWidth: 1, borderColor: '#CBD5E1', padding: 12, marginVertical: 8 }}>
+        <Text style={{ fontWeight: '700' }}>Giorno {r.giorno}{r.verificata ? ' · Verificato' : ' · Da verificare'}</Text>
+        {!!r.sigla && <Text>Sigla «{r.sigla}»: scegli il significato corretto.</Text>}
+        {(['data', 'inizio', 'fine', 'dataFine', 'postazione'] as const).map(k => <View key={k}>
+          <Text>{{ data: 'Data (AAAA-MM-GG)', inizio: 'Inizio', fine: 'Fine', dataFine: 'Data fine (per turni notturni)', postazione: 'Postazione' }[k]}</Text>
+          <TextInput accessibilityLabel={`${k} giorno ${r.giorno}`} style={campo} value={r[k] ?? ''} onChangeText={v => modifica(r.id, { [k]: v || null })} />
+        </View>)}
+        <Text>Tipo</Text>
+        {(['turno', 'riposo', 'assenza', 'causale'] as const).map(tipo => <Button key={tipo} title={`${r.tipo === tipo ? '✓ ' : ''}${tipo}`} onPress={() => modifica(r.id, {
+          tipo, ...(tipo !== 'turno' ? { inizio: null, fine: null, dataFine: null } : {}),
+          causale: tipo === 'assenza' || tipo === 'causale' ? { codice: r.sigla ?? '', descrizione: null, associazioneConfermata: null } : null,
+        })} />)}
+        {(r.tipo === 'assenza' || r.tipo === 'causale') && <TextInput accessibilityLabel="Significato della sigla" placeholder="Conferma il significato della sigla" style={campo}
+          value={r.causale?.associazioneConfermata ?? ''} onChangeText={v => modifica(r.id, { causale: { codice: r.sigla ?? r.causale?.codice ?? '', descrizione: null, associazioneConfermata: v || null } })} />}
+        {r.tipo === 'turno' && r.inizio && r.fine && r.fine <= r.inizio && !r.dataFine && <Text>Verifica la data di fine: il servizio può terminare il giorno successivo.</Text>}
+        <Button title="Verifica questa voce" onPress={() => {
+          if (!contesto.confermato || problemiDati(r, true).length) { setErrore('Conferma periodo e dipendente, poi controlla data, tipo, orari, postazione e significato delle sigle.'); return; }
+          setErrore(''); setRighe(rs => rs.map(v => v.id === r.id ? { ...v, verificata: true } : v));
+        }} />
+        <Button title="Aggiungi un servizio nello stesso giorno" onPress={() => setRighe(rs => [...rs, { ...r, id: `${r.id}/manuale-${Date.now()}`, tipo: 'turno', inizio: null, fine: null, dataFine: null, sigla: null, causale: null, verificata: false }])} />
+        <Button title="Escludi questa voce" onPress={() => setRighe(rs => rs.filter(v => v.id !== r.id))} />
       </View>)}
-      <Button title="Usa le righe selezionate manualmente" disabled={!righeScelte.length}
-        onPress={() => azione(s => { s.selezionaRighe(righeScelte); setSelezionePendente(false); })} />
-      {(['nome', 'cognome', 'matricola'] as const).map(k => <View key={k}>
-        <Text>{k} del dipendente da confermare</Text>
-        <TextInput style={campo} value={identita[k] ?? ''} onChangeText={v => { setIdentitaPendente(true); setIdentita(d => ({ ...d, [k]: v || null })); }} />
-      </View>)}
-      <Button title="Conferma identità del dipendente" disabled={!anteprima.bozza} onPress={() => azione(s => {
-        s.correggiDipendente(identita); setIdentitaPendente(false);
-      })} />
-      {anteprima.bozza?.voci.slice(0, limiteVoci).map(v => <EditorVoce key={v.id} voce={v}
-        modificata={() => setPendenti(ids => ids.includes(v.id) ? ids : [...ids, v.id])}
-        aggiorna={d => azione(s => { s.correggiVoce(v.id, d); setPendenti(ids => ids.filter(id => id !== v.id)); })}
-        escludi={e => azione(s => { s.escludi(v.id, e); setPendenti(ids => ids.filter(id => id !== v.id)); })} />)}
-      {(anteprima.bozza?.voci.length ?? 0) > limiteVoci && <Button title="Mostra altre 50 voci" onPress={() => setLimiteVoci(n => n + 50)} />}
-      {anteprima.riepilogo && <Text>Giorni: {anteprima.riepilogo.giorni}; servizi: {anteprima.riepilogo.servizi};
-        ore nominali provvisorie: {anteprima.riepilogo.oreProgrammate}; esclusi: {anteprima.riepilogo.esclusi};
-        intervalli non quantificabili: {anteprima.riepilogo.intervalliNonQuantificabili}.</Text>}
-      {anteprima.esito.stato !== 'completo' && <Button title={anteprima.letturaParzialeAccettata
-        ? '✓ Lettura parziale accettata' : 'Accetto esplicitamente che pagine o righe non lette restino fuori dalla bozza'}
-        onPress={() => azione(s => s.accettaLetturaParziale(true))} />}
-      {!!(pendenti.length || identitaPendente || strutturaPendente) && <Text>Applica o svuota le modifiche in corso prima di confermare la bozza.</Text>}
-      {!props.modalitaVerifica && <Button title="Confermo esplicitamente la bozza e le esclusioni" disabled={!anteprima.bozza || busy || puliziaFallita || !!pendenti.length || identitaPendente || strutturaPendente}
-        onPress={conferma} />}
-    </View>}
-    {props.modalitaVerifica && <View style={{ marginVertical: 16 }}>
-      <Button title="Salvataggio nel calendario non disponibile" disabled={true} />
-      <Text style={{ color: '#513900', marginTop: 8 }}>Solo verifica dell’anteprima: nessuna modifica ai turni esistenti.</Text>
-    </View>}
-    {anteprima?.bozza?.conferma && <Text>Bozza confermata. Nessun turno salvato.</Text>}
+    </>}
+    <Button title="Salvataggio definitivo disabilitato" disabled />
   </ScrollView>;
 }

@@ -3,6 +3,7 @@ import Foundation
 import PDFKit
 import Vision
 import ImageIO
+import UIKit
 
 // Nessun decoder simulato, servizio remoto o accesso al calendario.
 public class TurniDocumentiIOSModule: Module {
@@ -87,6 +88,39 @@ public class TurniDocumentiIOSModule: Module {
                              "rettangolo": box, "confidenza": NSNull(), "gruppo": NSNull()])
           }
         }
+        // Il testo presente può essere solo una cornice. Valutazione per pagina:
+        // OCR quando mancano servizi plausibili o la geometria non è disponibile.
+        let patternServizi = "\\b[0-9]{1,2}(?:[:.][0-9]{2})?\\s*[-–—/]\\s*[0-9]{1,2}(?:[:.][0-9]{2})?\\b"
+        let serviziPDF = (try NSRegularExpression(pattern: patternServizi)).numberOfMatches(in: testo, range: NSRange(testo.startIndex..., in: testo))
+        if ruotata || serviziPDF < 2 {
+          let dimensione = CGSize(width: max(1, bounds.width), height: max(1, bounds.height))
+          let scala = min(3, 4096 / max(dimensione.width, dimensione.height))
+          let format = UIGraphicsImageRendererFormat()
+          format.scale = scala
+          format.opaque = true
+          let renderer = UIGraphicsImageRenderer(size: dimensione, format: format)
+          let immagine = renderer.image { context in
+            UIColor.white.setFill()
+            context.fill(CGRect(origin: .zero, size: dimensione))
+            // PDFKit applica orientamento e crop nella thumbnail.
+            let thumb = pagina.thumbnail(of: CGSize(width: dimensione.width * scala, height: dimensione.height * scala), for: .cropBox)
+            thumb.draw(in: CGRect(origin: .zero, size: dimensione))
+          }
+          if let cg = immagine.cgImage {
+            let ocr = try riconosci(cg)
+            let testoOCR = ocr.righe.compactMap { $0["testo"] as? String }.joined(separator: "\n")
+            let serviziOCR = (try NSRegularExpression(pattern: patternServizi)).numberOfMatches(in: testoOCR, range: NSRange(testoOCR.startIndex..., in: testoOCR))
+            // Una sola rappresentazione per pagina: nessuna concatenazione PDF/OCR.
+            if testo.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || ruotata || serviziOCR > serviziPDF {
+              caratteri += testoOCR.utf16.count
+              quanti += ocr.elementi.count
+              guard caratteri <= maxTesto, quanti <= maxElementi else { throw errore("LIMITE_TESTO") }
+              return ["numero": indice + 1, "larghezza": Double(cg.width), "altezza": Double(cg.height),
+                      "testo": NSNull(), "elementi": ocr.elementi, "righeOriginali": ocr.righe,
+                      "errore": NSNull()]
+            }
+          }
+        }
         var problema: Any = NSNull()
         if testo.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { problema = "PDF_SCANSIONE_NON_SUPPORTATA" }
         else if ruotata { problema = "GEOMETRIA_PDF_RUOTATO_NON_DISPONIBILE" }
@@ -109,6 +143,14 @@ public class TurniDocumentiIOSModule: Module {
     let options: [CFString: Any] = [kCGImageSourceCreateThumbnailFromImageAlways: true,
       kCGImageSourceCreateThumbnailWithTransform: true, kCGImageSourceThumbnailMaxPixelSize: 4096]
     guard let image = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary) else { throw errore("IMMAGINE_NON_VALIDA") }
+    let lettura = try riconosci(image)
+    return ["versione": 1, "metodo": "vision", "pagineAttese": 1, "pagine": [[
+      "numero": 1, "larghezza": image.width, "altezza": image.height, "testo": NSNull(),
+      "elementi": lettura.elementi, "righeOriginali": lettura.righe, "errore": NSNull(),
+    ]]]
+  }
+
+  private func riconosci(_ image: CGImage) throws -> (elementi: [[String: Any]], righe: [[String: Any]]) {
     let request = VNRecognizeTextRequest()
     request.recognitionLevel = .accurate
     request.recognitionLanguages = ["it-IT", "en-US"]
@@ -135,9 +177,6 @@ public class TurniDocumentiIOSModule: Module {
                          "confidenza": NSNull(), "gruppo": gruppo])
       }
     }
-    return ["versione": 1, "metodo": "vision", "pagineAttese": 1, "pagine": [[
-      "numero": 1, "larghezza": image.width, "altezza": image.height, "testo": NSNull(),
-      "elementi": elementi, "righeOriginali": righe, "errore": NSNull(),
-    ]]]
+    return (elementi, righe)
   }
 }

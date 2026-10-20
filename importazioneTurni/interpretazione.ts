@@ -110,7 +110,7 @@ export function interpretaDocumento(input: DocumentoEstratto, opzioni: OpzioniIn
     let ti = token('inizio'), tf = token('fine'), td = token('dataFine');
     const frammento = (originale: Token, testo: string): Token => ({ ...originale, originale: originale.originale ?? originale.testo, testo });
     // Celle orario intere, con eventuale data finale esplicita. Nessun testo ignorato.
-    const pattern = /^(\d{1,2}[:.]\d{2})\s*[-–—/]\s*(\d{1,2}[:.]\d{2})(?:\s+(?:del|al)\s+(\d{4}-\d{2}-\d{2}|\d{1,2}[/.\-]\d{1,2}[/.\-]\d{4}))?$/;
+    const pattern = /^(\d{1,2}(?:[:.]\d{2})?)\s*[-–—/]\s*(\d{1,2}(?:[:.]\d{2})?)(?:\s+(?:del|al)\s+(\d{4}-\d{2}-\d{2}|\d{1,2}[/.\-]\d{1,2}[/.\-]\d{4}))?$/;
     const pezzi = contenuto ? testo.split(/\s*\+\s*/) : [];
     if (pezzi.length > 1 && pezzi.every(s => pattern.test(s))) {
       for (let i = 0; i < pezzi.length; i++) leggiVoce(ts, c, dataToken, frammento(contenuto!, pezzi[i]), candidato, `${suffisso}/servizio-${i + 1}`);
@@ -120,7 +120,8 @@ export function interpretaDocumento(input: DocumentoEstratto, opzioni: OpzioniIn
     if (intervallo && contenuto) {
       if (ti?.testo?.trim() || tf?.testo?.trim()) segnala('orari_concorrenti_da_verificare', contenuto);
       else {
-        ti = frammento(contenuto, intervallo[1]); tf = frammento(contenuto, intervallo[2]);
+        ti = frammento(contenuto, intervallo[1].includes(':') || intervallo[1].includes('.') ? intervallo[1] : `${intervallo[1]}:00`);
+        tf = frammento(contenuto, intervallo[2].includes(':') || intervallo[2].includes('.') ? intervallo[2] : `${intervallo[2]}:00`);
         if (intervallo[3]) td = frammento(contenuto, intervallo[3]);
       }
       tipo = 'turno';

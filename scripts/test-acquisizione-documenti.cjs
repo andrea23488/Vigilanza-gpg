@@ -154,7 +154,7 @@ test('fotocamera JPEG e opzioni minimizzate, senza EXIF o base64 dell’immagine
   const s = scenario({ formato: 'jpeg', uri: 'file:///cache/ImagePicker/test.jpg' });
   const r = await s.acquisitore.acquisisci({ canale: 'fotocamera' }); assert.equal(r.stato, 'pronto');
   const o = s.registro.find(x => x[0] === 'fotocamera')[1];
-  assert.equal(o.exif, false); assert.equal(o.base64, false); assert.equal(o.allowsEditing, false);
+  assert.equal(o.exif, false); assert.equal(o.base64, false); assert.equal(o.allowsEditing, true);
   assert.equal(r.documento.larghezza, 200); assert.equal(r.documento.altezza, 100); await r.rilascia();
 });
 test('URI esterni, permanenti, percorsi traversal non vengono letti né cancellati', async () => {

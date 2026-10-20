@@ -142,7 +142,7 @@ test('notte con data esplicita: otto ore, fonte originale conservata', () => {
   assert.ok(codici(e).includes('attraversamento_mezzanotte'));
 });
 test('orari uguali e testo residuo non producono durate inventate', () => {
-  for (const testo of ['06:00-06:00', '6-14', '06:00-14:00 ???']) {
+  for (const testo of ['06:00-06:00', '26-34', '06:00-14:00 ???']) {
     const e = interpretaDocumento(singola(testo));
     assert.equal(m.riepilogaBozza(e.bozza).oreProgrammate, 0);
   }
