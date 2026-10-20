@@ -2,6 +2,7 @@ import { OFFLINE_TEST } from './runtimeMode';
 import { PROFILO_OFFLINE } from './offlineTest/fixtures';
 import TipoGiornataSection from './TipoGiornataSection';
 import TurniRapidiSection from './TurniRapidiSection';
+import ImportaTurni from './importazioneTurni/ImportaTurni';
 import { paletteHomeDaPreferenza, coloreHome, ripristinaAspetto } from './temi';
 import { creaArchivioAspetto } from './preferenzeAspetto';
 import AspettoColoriScreen from './AspettoColoriScreen';
@@ -27438,6 +27439,25 @@ if (screen === 'profiloCollega') {
     );
   }
 
+  if (screen === 'importaTurniVerifica') {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: '#F8FAFC' }}>
+        <TouchableOpacity
+          accessibilityRole="button"
+          accessibilityLabel="Torna al calendario"
+          onPress={tornaCalendario}
+          style={{ minHeight: 48, paddingHorizontal: 16, justifyContent: 'center' }}
+        >
+          <Text style={{ color: '#123A68', fontSize: 16, fontWeight: '800' }}>‹ Torna al calendario</Text>
+        </TouchableOpacity>
+        <ImportaTurni
+          modalitaVerifica={true}
+          identita={{ nome: profilo?.nome || null, cognome: profilo?.cognome || null, matricola: null }}
+        />
+      </SafeAreaView>
+    );
+  }
+
   if (
     screen ===
     'calendar'
@@ -27501,6 +27521,26 @@ if (screen === 'profiloCollega') {
         <Text style={styles.subtitle}>
           Lavoro e vita personale, in un solo calendario
         </Text>
+
+        <TouchableOpacity
+          accessibilityRole="button"
+          accessibilityLabel="Importa turni, funzione in fase di verifica"
+          activeOpacity={0.85}
+          onPress={() => setScreen('importaTurniVerifica')}
+          style={{
+            marginTop: 16, marginBottom: 8, padding: 16, minHeight: 76,
+            borderRadius: 18, backgroundColor: '#123A68', borderWidth: 1.5, borderColor: '#75DFFF',
+            flexDirection: 'row', alignItems: 'center', gap: 12,
+          }}
+        >
+          <Ionicons name="document-text-outline" size={30} color="#95EAFF" />
+          <View style={{ flex: 1 }}>
+            <Text style={{ color: '#FFFFFF', fontSize: 18, fontWeight: '900' }}>Importa turni</Text>
+            <Text style={{ color: '#B6EEFF', fontSize: 12, fontWeight: '800', marginTop: 4 }}>IN VERIFICA · PDF, foto e screenshot</Text>
+            <Text style={{ color: '#E1EDFA', fontSize: 12, marginTop: 4 }}>Solo anteprima modificabile. Salvataggio disabilitato.</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={22} color="#95EAFF" />
+        </TouchableOpacity>
 
         <View style={styles.monthBox}>
           <TouchableOpacity

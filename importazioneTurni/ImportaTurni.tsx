@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Button, ScrollView, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Button, Platform, ScrollView, Text, TextInput, View } from 'react-native';
 import { creaAcquisitoreNativo } from './acquisizioneNativa';
 import { creaLettoreNativo } from './letturaNativa';
 import { creaRegistroRevisioni, creaRevisioneImportazione, suggerisciDipendenti } from './revisione';
@@ -10,15 +10,24 @@ import type { Bozza, Confronto, DatiVoce, Dipendente, Voce } from './modello';
 
 type Revisione = ReturnType<typeof creaRevisioneImportazione>;
 type Anteprima = ReturnType<Revisione['anteprima']>;
-export interface ImportaTurniProps {
+interface PropsComuni {
   /** Matricola aziendale, se nota: non passare automaticamente codice_gpg. */
   identita?: Dipendente;
+}
+export type ImportaTurniProps = PropsComuni & ({
+  /** Blocco 2E: nessuna conferma finale, lettura calendario o callback di salvataggio. */
+  modalitaVerifica: true;
+  registro?: ReturnType<typeof creaRegistroRevisioni>;
+  leggiEsistenti?: never;
+  onBozzaConfermata?: never;
+} | {
+  modalitaVerifica?: false;
   registro: ReturnType<typeof creaRegistroRevisioni>;
   /** Deve restituire record aggiornati e normalizzati dello stesso utente. Nessuna scrittura. */
   leggiEsistenti(): Promise<readonly Confronto[]>;
   /** Evento di sola revisione. Questo componente non importa e non salva turni. */
   onBozzaConfermata(bozza: Bozza, ricevuta: RicevutaRevisione): void;
-}
+});
 const campo = { borderWidth: 1, borderColor: '#777', padding: 8, marginVertical: 4 };
 const identitaVuota: Dipendente = { nome: null, cognome: null, matricola: null };
 
@@ -61,11 +70,12 @@ function EditorVoce({ voce, aggiorna, escludi, modificata }: {
   </View>;
 }
 
-/** Schermata autonoma: da montare solo nel futuro punto d'ingresso autorizzato.
+/** Accessibile dal calendario in modalità di sola anteprima.
  * Nessun import da App.js, API calendario, Supabase o motore economico. */
 export default function ImportaTurni(props: ImportaTurniProps) {
   const [acquisitore] = useState(creaAcquisitoreNativo);
   const [lettore] = useState(creaLettoreNativo);
+  const [registroLocale] = useState(creaRegistroRevisioni);
   const sessione = useRef<Revisione | null>(null);
   const [anteprima, setAnteprima] = useState<Anteprima | null>(null);
   const [identita, setIdentita] = useState<Dipendente>(props.identita ?? identitaVuota);
@@ -106,8 +116,16 @@ export default function ImportaTurni(props: ImportaTurniProps) {
         if (montato.current) { sessione.current = null; setAnteprima(null); }
         const esito = await lettore.leggi(r.documento);
         if (!montato.current) return;
-        if (esito.stato === 'bloccato') { setErrore(esito.codice); return; }
-        sessione.current = creaRevisioneImportazione(esito.risultato, props.registro);
+        if (esito.stato === 'bloccato') {
+          setErrore(esito.codice === 'DECODER_LOCALE_NON_DISPONIBILE'
+            ? Platform.OS === 'android'
+              ? 'File selezionato. La lettura di PDF e immagini non è ancora disponibile su Android. Nessun turno è stato salvato.'
+              : 'File selezionato. La lettura richiede una versione iOS dell’app con i moduli di riconoscimento inclusi. Nessun turno è stato salvato.'
+            : esito.codice === 'PDF_PROTETTO' ? 'Il PDF è protetto da password e non può essere letto in questa versione.'
+              : 'Impossibile leggere il documento. Prova un file leggibile più piccolo o un PDF non protetto. Nessun turno è stato salvato.');
+          return;
+        }
+        sessione.current = creaRevisioneImportazione(esito.risultato, props.registro ?? registroLocale);
         setMappa({}); setRigheScelte([]); setPendenti([]); setIdentitaPendente(false); setSelezionePendente(false); setLimiteRighe(50); setLimiteVoci(50);
         setIdentita(props.identita ?? identitaVuota); aggiorna();
       } finally {
@@ -118,6 +136,7 @@ export default function ImportaTurni(props: ImportaTurniProps) {
     finally { inCorso.current = false; if (montato.current) setBusy(false); }
   }
   async function conferma() {
+    if (props.modalitaVerifica) return;
     if (inCorso.current || !sessione.current || pendenti.length || identitaPendente || strutturaPendente) return;
     inCorso.current = true; setBusy(true); setErrore('');
     try {
@@ -130,10 +149,16 @@ export default function ImportaTurni(props: ImportaTurniProps) {
     finally { inCorso.current = false; if (montato.current) setBusy(false); }
   }
   const suggerimenti = anteprima && props.identita ? suggerisciDipendenti(anteprima.esito.candidati, props.identita) : [];
-  return <ScrollView contentContainerStyle={{ padding: 16 }} keyboardShouldPersistTaps="handled">
+  return <ScrollView style={{ flex: 1, backgroundColor: '#F8FAFC' }} contentContainerStyle={{ padding: 16 }} keyboardShouldPersistTaps="handled"
+    automaticallyAdjustKeyboardInsets={true}>
     <Text accessibilityRole="header" style={{ fontSize: 22 }}>Importa turni — revisione</Text>
+    {props.modalitaVerifica && <View style={{ marginVertical: 12, padding: 14, borderRadius: 12, backgroundColor: '#FFF1C2', borderWidth: 1, borderColor: '#98721A' }}>
+      <Text style={{ color: '#513900', fontSize: 16, fontWeight: '800' }}>Funzione in fase di verifica</Text>
+      <Text style={{ color: '#513900', marginTop: 4 }}>Puoi selezionare PDF, fotografie e screenshot e modificare l’anteprima dei turni riconosciuti.
+        Il salvataggio definitivo nel calendario è disabilitato. La bozza viene scartata quando torni al calendario.</Text>
+    </View>}
     <Text>La lettura locale richiede i moduli iOS. Android e PDF scannerizzati non sono supportati in questa versione.
-      La conferma produce una bozza revisionata: nessun turno viene salvato nel calendario.</Text>
+      Nessun turno viene salvato nel calendario.</Text>
     <Button title="Scegli PDF o immagine" disabled={busy || puliziaFallita} onPress={() => acquisisci('documento')} />
     <Button title="Fotografia dalla galleria" disabled={busy || puliziaFallita} onPress={() => acquisisci('galleria')} />
     <Button title="Screenshot dalla galleria" disabled={busy || puliziaFallita} onPress={() => acquisisci('galleria', true)} />
@@ -203,8 +228,12 @@ export default function ImportaTurni(props: ImportaTurniProps) {
         ? '✓ Lettura parziale accettata' : 'Accetto esplicitamente che pagine o righe non lette restino fuori dalla bozza'}
         onPress={() => azione(s => s.accettaLetturaParziale(true))} />}
       {!!(pendenti.length || identitaPendente || strutturaPendente) && <Text>Applica o svuota le modifiche in corso prima di confermare la bozza.</Text>}
-      <Button title="Confermo esplicitamente la bozza e le esclusioni" disabled={!anteprima.bozza || busy || puliziaFallita || !!pendenti.length || identitaPendente || strutturaPendente}
-        onPress={conferma} />
+      {!props.modalitaVerifica && <Button title="Confermo esplicitamente la bozza e le esclusioni" disabled={!anteprima.bozza || busy || puliziaFallita || !!pendenti.length || identitaPendente || strutturaPendente}
+        onPress={conferma} />}
+    </View>}
+    {props.modalitaVerifica && <View style={{ marginVertical: 16 }}>
+      <Button title="Salvataggio nel calendario non disponibile" disabled={true} />
+      <Text style={{ color: '#513900', marginTop: 8 }}>Solo verifica dell’anteprima: nessuna modifica ai turni esistenti.</Text>
     </View>}
     {anteprima?.bozza?.conferma && <Text>Bozza confermata. Nessun turno salvato.</Text>}
   </ScrollView>;
