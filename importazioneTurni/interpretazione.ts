@@ -24,6 +24,8 @@ export interface OpzioniInterpretazione {
   ordineDate?: 'DMY' | 'MDY' | null;
   /** Scelta del chiamante, mai una conferma utente registrata nel modello. */
   dipendenteId?: string;
+  /** Selezione esplicita di righe sorgente (paginaId/rigaId), senza identità dedotta. */
+  righeManuali?: readonly string[];
 }
 const etichette: Record<string, Ruolo> = {
   data: 'data', giorno: 'data', date: 'data', 'data fine': 'dataFine',
@@ -47,6 +49,7 @@ function celle(r: RigaDocumento, p: PaginaDocumento): Token[] {
 }
 export function interpretaDocumento(input: DocumentoEstratto, opzioni: OpzioniInterpretazione = {}): EsitoInterpretazione {
   const doc = copia(input), problemi: SegnalazioneDocumento[] = [];
+  if (opzioni.righeManuali && (opzioni.dipendenteId || !opzioni.righeManuali.length)) throw new Error('Selezione manuale non valida.');
   const segnala = (codice: string, t?: Token, campo: string | null = null, pagina?: PaginaDocumento) => {
     problemi.push({ codice, paginaId: t?.pagina.id ?? pagina?.id ?? null, rigaId: t?.riga.id ?? null, campo });
   };
@@ -80,7 +83,8 @@ export function interpretaDocumento(input: DocumentoEstratto, opzioni: OpzioniIn
       t?.confidenza ?? null, alternative);
   };
   const candidati = new Map<string, CandidatoDipendente>();
-  const voci: { voce: { id: string; rilevati: CampiEstratti<DatiVoce> }; candidato: string | null }[] = [];
+  if (opzioni.righeManuali?.some(id => !idRighe.has(id))) throw new Error('Riga manuale non presente.');
+  const voci: { voce: { id: string; rilevati: CampiEstratti<DatiVoce> }; candidato: string | null; riga: string }[] = [];
   const identita = (ts: Token[], c: Colonne): string | null => {
     const token = (k: Ruolo) => c[k] === undefined ? undefined : ts[c[k]!];
     const n = token('nome'), co = token('cognome'), ma = token('matricola');
@@ -159,7 +163,7 @@ export function interpretaDocumento(input: DocumentoEstratto, opzioni: OpzioniIn
     const id = `${ts[0].pagina.id}/${ts[0].riga.id}/${suffisso}`;
     const voce = { id, rilevati };
     problemiDati(datiEffettivi({ ...voce, confermati: null, esclusa: false } as Voce), true).forEach(codice => segnala(codice, base));
-    voci.push({ voce, candidato });
+    voci.push({ voce, candidato, riga: `${ts[0].pagina.id}/${ts[0].riga.id}` });
   };
   for (const p of doc.pagine) {
     if (p.errore) segnala('errore_estrazione_pagina', undefined, null, p);
@@ -201,11 +205,13 @@ export function interpretaDocumento(input: DocumentoEstratto, opzioni: OpzioniIn
     if (omonimi.length) segnala('omonimi_selezione_obbligatoria');
     if (!c.rilevati.matricola.valore) segnala('identita_senza_matricola_da_verificare');
   }
-  const scelto = opzioni.dipendenteId ? candidati.get(opzioni.dipendenteId) : elenco.length === 1 ? elenco[0] : null;
+  const scelto = opzioni.righeManuali ? null : opzioni.dipendenteId ? candidati.get(opzioni.dipendenteId) : elenco.length === 1 ? elenco[0] : null;
   if (opzioni.dipendenteId && !scelto) throw new Error('Dipendente selezionato non presente.');
-  const selezioneRichiesta = elenco.length > 1 && !scelto;
+  const selezioneRichiesta = !opzioni.righeManuali && elenco.length > 1 && !scelto;
   if (selezioneRichiesta) segnala('selezione_dipendente_obbligatoria');
-  const incluse = selezioneRichiesta ? [] : voci.filter(v => scelto ? v.candidato === scelto.id : v.candidato === null);
+  const incluse = opzioni.righeManuali ? voci.filter(v => opzioni.righeManuali!.includes(v.riga)) :
+    selezioneRichiesta ? [] : voci.filter(v => scelto ? v.candidato === scelto.id : v.candidato === null);
+  if (opzioni.righeManuali) segnala('selezione_righe_manuale_da_confermare');
   if (scelto && voci.some(v => v.candidato === null)) segnala('voci_senza_dipendente_non_associate');
   const ignoto: CampiEstratti<Dipendente> = { nome: dato<string>(null), cognome: dato<string>(null), matricola: dato<string>(null) };
   if (doc.testoOriginale === null) segnala('testo_originale_documento_non_disponibile');

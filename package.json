@@ -17,8 +17,10 @@
     "expo-image-picker": "~17.0.11",
     "expo-local-authentication": "~17.0.9",
     "expo-notifications": "~0.32.17",
+    "expo-pdf-text-extract": "1.1.0",
     "expo-sharing": "~14.0.8",
     "expo-status-bar": "~3.0.9",
+    "expo-text-extractor": "2.0.0",
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "react-native": "0.81.5",
@@ -43,6 +45,13 @@
     "test:fiduciari": "node scripts/test-fiduciari-ore.cjs",
     "test:fiduciari-economia": "node scripts/test-fiduciari-economia.cjs",
     "postinstall": "patch-package"
+  },
+  "expo": {
+    "autolinking": {
+      "android": {
+        "exclude": ["expo-pdf-text-extract", "expo-text-extractor"]
+      }
+    }
   },
   "private": true,
   "devDependencies": {
