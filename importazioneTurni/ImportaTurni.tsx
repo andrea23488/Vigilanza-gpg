@@ -238,6 +238,14 @@ export default function ImportaTurni(props: ImportaTurniProps) {
       {!righe.length && <View><Text colori={colori}>Non riusciamo a riconoscere i turni. Seleziona solo il prospetto oppure prova il PDF originale o una foto più nitida. Per prospetti con più dipendenti seleziona la regione di una sola persona.</Text>
         <Button colori={colori} title="Riprova lettura" onPress={() => riconosci(originale, contesto, regione)} /></View>}
     </>}
+    {originale && righe.length > 0 && <View style={[scheda, { padding: 12, backgroundColor: colori.surfaceRaised }]}>
+      <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 8 }}>
+        <Text colori={colori} accessible={false} accessibilityElementsHidden importantForAccessibility="no" style={{ fontWeight: '800' }}>ⓘ</Text>
+        <Text colori={colori} accessibilityRole="header" style={{ flex: 1, fontWeight: '800' }}>Verifica sempre i turni importati</Text>
+      </View>
+      <Text colori={colori} style={{ marginTop: 8 }}>Il riconoscimento automatico è uno strumento di supporto che velocizza l’inserimento dei turni, ma può commettere errori o non rilevare alcune informazioni.</Text>
+      <Text colori={colori} style={{ marginTop: 8 }}>Controlla sempre date, orari, riposi e postazioni confrontandoli con il prospetto originale. La responsabilità della verifica e della conferma dei dati inseriti resta all’utente.</Text>
+    </View>}
   </View>;
   return <View style={{ flex: 1, backgroundColor: colori.background }}>
     <FlatList data={gruppi} keyExtractor={g => g.id} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets

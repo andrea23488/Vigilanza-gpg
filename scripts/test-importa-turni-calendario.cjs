@@ -311,6 +311,20 @@ test('tutte le palette e sfondi personalizzati sono rispettati anche nel pannell
     const palette = temi.generaPalette(preferenza);
     const h = await caricaRighe(['18 7/19 Sede A', '19 riposo'], { palette });
     assert.equal(h.render().props.style.backgroundColor, palette.background);
+    const lista = elementi(h.render()).find(e => e.type === 'FlatList');
+    const banner = lista.props.ListHeaderComponent.children.at(-1);
+    assert.match(testi(banner), /Verifica sempre i turni importati/);
+    assert.match(testi(banner), /può commettere errori o non rilevare alcune informazioni\./);
+    assert.match(testi(banner), /La responsabilità della verifica e della conferma dei dati inseriti resta all’utente\./);
+    const stileBanner = Object.assign({}, ...banner.props.style);
+    assert.equal(stileBanner.backgroundColor, palette.surfaceRaised);
+    assert.equal(stileBanner.borderColor, palette.border);
+    for (const e of elementi(banner).filter(e => e.type === 'Text')) {
+      const stile = Object.assign({}, ...e.props.style.flat(Infinity));
+      assert.equal(stile.color, palette.text);
+      assert.equal(e.props.numberOfLines, undefined);
+      assert.notEqual(e.props.allowFontScaling, false);
+    }
     apriGiornata(h, '18');
     const input = campo(h, 'postazione giorno 18');
     assert.equal(input.style.color, palette.text); assert.equal(input.style.backgroundColor, palette.surfaceRaised);
