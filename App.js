@@ -3,7 +3,7 @@ import { PROFILO_OFFLINE } from './offlineTest/fixtures';
 import TipoGiornataSection from './TipoGiornataSection';
 import TurniRapidiSection from './TurniRapidiSection';
 import ImportaTurni from './importazioneTurni/ImportaTurni';
-import { paletteHomeDaPreferenza, coloreHome, ripristinaAspetto } from './temi';
+import { paletteHomeDaPreferenza, coloreHome, ripristinaAspetto, PALETTE_ORIGINALE } from './temi';
 import { creaArchivioAspetto } from './preferenzeAspetto';
 import AspettoColoriScreen from './AspettoColoriScreen';
 import { classificaTurniGpg, leggiManualeGpg, riapriManualeGpg, formattaOreGpg } from './straordinariGpg';
@@ -27441,17 +27441,18 @@ if (screen === 'profiloCollega') {
 
   if (screen === 'importaTurniVerifica') {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: '#F8FAFC' }}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: (paletteHome ?? PALETTE_ORIGINALE).background }}>
         <TouchableOpacity
           accessibilityRole="button"
           accessibilityLabel="Torna al calendario"
           onPress={tornaCalendario}
           style={{ minHeight: 48, paddingHorizontal: 16, justifyContent: 'center' }}
         >
-          <Text style={{ color: '#123A68', fontSize: 16, fontWeight: '800' }}>‹ Torna al calendario</Text>
+          <Text style={{ color: (paletteHome ?? PALETTE_ORIGINALE).accent, fontSize: 16, fontWeight: '800' }}>‹ Torna al calendario</Text>
         </TouchableOpacity>
         <ImportaTurni
           modalitaVerifica={true}
+          palette={paletteHome ?? PALETTE_ORIGINALE}
           identita={{ nome: profilo?.nome || null, cognome: profilo?.cognome || null, matricola: null }}
         />
       </SafeAreaView>
