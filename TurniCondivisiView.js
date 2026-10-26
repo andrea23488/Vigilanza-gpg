@@ -13,6 +13,8 @@ export default function TurniCondivisiView({ palette, elementi, adesso, giornoSe
   const dayShifts = loading ? [] : elementiDelGiorno(elementi, giornoSelezionato, adesso);
   const inService = loading ? [] : inServizioAdesso(elementi, adesso);
   const [layoutWidth, setLayoutWidth] = useState(320), scroll = useRef(null);
+  const pageScroll = useRef(null);
+  const [mostraTornaSu, setMostraTornaSu] = useState(false);
   const selectedIndex = days.findIndex(d => chiaveData(d) === activeKey);
   const slotWidth = Math.max(52, 52 * fontScale) + 7;
   useEffect(() => {
@@ -25,7 +27,7 @@ export default function TurniCondivisiView({ palette, elementi, adesso, giornoSe
       <Pressable accessibilityRole="button" accessibilityLabel={backLabel === 'Social' ? 'Torna al menu Social' : 'Torna alla Home'} onPress={onBack} style={styles.back}><Ionicons name="arrow-back" size={23} color={palette.text} /><Text style={[styles.backText, { color: palette.text }]}>{backLabel}</Text></Pressable>
       {onHome && backLabel !== 'Home' && <Pressable accessibilityRole="button" accessibilityLabel="Torna alla Home" onPress={onHome} style={styles.back}><Ionicons name="home-outline" size={23} color={palette.text} /></Pressable>}
     </View>
-    <ScrollView contentContainerStyle={styles.page}>
+    <ScrollView ref={pageScroll} onScroll={event => setMostraTornaSu(event.nativeEvent.contentOffset.y > 350)} scrollEventThrottle={32} contentContainerStyle={styles.page}>
       <Text accessibilityRole="header" style={[styles.title, { color: palette.text }]}>Turni condivisi</Text>
       <View style={[styles.weekSelector, { borderColor: palette.border, backgroundColor: palette.surface }]}>
         <Pressable accessibilityRole="button" accessibilityLabel="Settimana precedente" onPress={() => onSettimana(-1)} style={styles.weekArrow}><Ionicons name="chevron-back" size={22} color={palette.text} /></Pressable>
@@ -54,6 +56,10 @@ export default function TurniCondivisiView({ palette, elementi, adesso, giornoSe
         {onGestioneColleghi && <Pressable accessibilityRole="button" accessibilityLabel="Gestisci collegamenti colleghi" onPress={onGestioneColleghi} style={styles.back}><Text style={[styles.backText, { color: palette.text }]}>Gestisci colleghi</Text></Pressable>}
       </View>
     </ScrollView>
+    {mostraTornaSu && <Pressable accessibilityRole="button" accessibilityLabel="Torna su" onPress={() => pageScroll.current?.scrollTo({ y: 0, animated: false })}
+      style={{ position: 'absolute', right: 18, bottom: 18, minWidth: 48, minHeight: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', backgroundColor: palette.surface, borderWidth: 1, borderColor: palette.border }}>
+      <Ionicons name="arrow-up" size={24} color={palette.text} />
+    </Pressable>}
   </SafeAreaView>;
 }
 function ColleagueRow({ shift, palette, stacked }) {

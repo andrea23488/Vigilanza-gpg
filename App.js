@@ -504,6 +504,7 @@ export default function App() {
   const richiestaBiometriaRef = useRef(false);
   const [screen, setScreen] = useState("home");
   const [origineSocial, setOrigineSocial] = useState(false);
+  const [ritornoListaTurni, setRitornoListaTurni] = useState('home');
   const [ritornoAspetto, setRitornoAspetto] = useState('profile');
   useThemeDecorationPage(preferenzaAspetto, screen, accessoTest && authInizializzata && biometriaInizializzata && (!biometriaAbilitata || biometriaSbloccata));
   const [partitaOnlinePushId, setPartitaOnlinePushId] = useState(null);
@@ -529,7 +530,7 @@ export default function App() {
     if (Platform.OS !== 'android' || OFFLINE_TEST || !accessoTest ||
         !biometriaInizializzata || (biometriaAbilitata && !biometriaSbloccata)) return undefined;
     const destinazioni = {
-      calendar: 'home', turni: 'home', strumenti: 'home', stipendio: 'home',
+      calendar: 'home', turni: ritornoListaTurni, strumenti: 'home', stipendio: 'home',
       listaChat: origineSocial ? 'social' : 'home', calendarioColleghi: origineSocial ? 'social' : 'home', colleghi: origineSocial ? 'social' : 'home',
       social: 'home', profiliSocial: 'social', cercaCollegaSocial: 'social',
       ...(origineSocial ? { profiloCollega: 'profiliSocial' } : {}),
@@ -541,7 +542,7 @@ export default function App() {
       return true;
     });
     return () => subscription.remove();
-  }, [screen, origineSocial, accessoTest, biometriaInizializzata, biometriaAbilitata, biometriaSbloccata]);
+  }, [screen, origineSocial, ritornoListaTurni, accessoTest, biometriaInizializzata, biometriaAbilitata, biometriaSbloccata]);
 
   useEffect(() => {
     if (OFFLINE_TEST || !utenteAutenticato?.id) return undefined;
@@ -27121,6 +27122,9 @@ if (screen === 'profiloCollega') {
         }}
         operazioniRapide={operazioniRapideRef.current}
         onManualDay={apriGiornoCalendario}
+        onOpenShiftList={() => { setRitornoListaTurni('calendar'); setScreen('turni'); }}
+        onAddToDay={() => apriSceltaAgenda(giornoAgendaSelezionato)}
+        onConfigureQuickShifts={() => { nuovoGiorno(giornoAgendaSelezionato); setGestisciTurniRapidi(true); }}
         onSelectDay={(g) => { setGiorno(Number(g)); setGiornoAgendaSelezionato(Number(g)); }}
         onMonthChange={(delta) => delta < 0 ? mesePrecedente() : meseSuccessivo()}
         onBack={tornaHome}
@@ -28919,7 +28923,7 @@ if (screen === 'profiloCollega') {
     >
         <Back
           onPress={
-            tornaHome
+            ritornoListaTurni === 'calendar' ? tornaCalendario : tornaHome
           }
         />
 
@@ -29636,7 +29640,7 @@ if (screen === 'profiloCollega') {
       numeroNotifiche={numeroNotifiche}
       etaServizio={etaServizio}
       etaServizioLoading={etaServizioLoading}
-      etaTurno={turnoInCorso?.indirizzo_servizio ? turnoInCorso : turnoOggi}
+      etaTurno={turnoInCorso || turnoOggi || prossimoServizioMeteo?.turno || null}
       turni={turni}
       ore={oreHome}
       extra={extraHome}
@@ -29652,6 +29656,7 @@ if (screen === 'profiloCollega') {
       onSocial={() => { setOrigineSocial(true); setScreen('social'); }}
       onSettings={() => setScreen('impostazioni')}
       onNavigate={destinazione => {
+        if (destinazione === 'turni') setRitornoListaTurni('home');
         if (destinazione === 'aspettoColori') setRitornoAspetto('profile');
         setScreen(destinazione);
       }}

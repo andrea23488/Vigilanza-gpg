@@ -251,3 +251,30 @@ test('Altro mantiene le opzioni Home precedenti, compreso il risparmio energia',
  r.presses.get('Impostazioni')();assert.equal(opened,0);assert.equal(r.setters.at(-1),'settings');
  assert.ok(render('settings').html.includes('Risparmio energia'));
 });
+
+
+test('percorsi visibili della Home reale: riepilogo e nucleo conservano Lista turni senza cambiare i quattro accessi', () => {
+  const props = {onCalendar:()=>{},onSocial:()=>{},onSettings:()=>{}};
+  const home=render(null,{props});
+  home.interactions.get('Calendario').onPress();
+  assert.equal(home.setters.length,0); // Il calendario resta diretto, nessun menu intermedio.
+  const summary=home.nodes.find(n=>n.testID==='home-monthly-summary');
+  summary.onPress();assert.equal(home.setters.at(-1),'summary');
+  const core=home.nodes.find(n=>n.testID==='home-core-content');
+  core.onPress();assert.equal(home.setters.at(-1),'service');
+  for(const menu of ['summary','service']){
+    const opened=render(menu,{props});
+    opened.presses.get('Lista turni')();opened.presses.get('Apri calendario')();
+    assert.deepEqual(opened.calls,['turni','calendar']);
+    opened.nodes.find(n=>n.name==='Modal').onRequestClose();assert.equal(opened.setters.at(-1),null);
+  }
+});
+test('indicazioni del prossimo servizio anche senza turni oggi: dati reali ricevuti, origine e destinazione codificate', async () => {
+  const future={id:'future',anno:2026,mese:11,giorno:3,tipo:'turno',inizio:'06:00',fine:'14:00',indirizzo_servizio:'Via Roma 1 & ingresso B'};
+  const opened=render('service',{props:{turni:[],etaTurno:future,etaServizio:{minuti:32,ritardo_traffico:4}}});
+  assert.match(opened.html,/Prossimo servizio/);assert.match(opened.html,/32 min/);
+  await opened.presses.get('Indicazioni stradali')();
+  const url=new URL(opened.calls[0][1]);assert.equal(url.searchParams.get('destination'),future.indirizzo_servizio);
+  assert.equal(url.searchParams.get('origin'),'Partenza');assert.equal(url.searchParams.get('travelmode'),'driving');
+  assert.ok(!render('service',{props:{turni:[],etaTurno:null}}).presses.has('Indicazioni stradali'));
+});

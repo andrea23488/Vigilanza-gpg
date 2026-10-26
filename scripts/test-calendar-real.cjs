@@ -72,7 +72,7 @@ function realApp(initial=[]) {
     cancellaPromemoriaTurno:async id=>calls.push(['cancel-reminder',id]),
   };
   Object.defineProperty(env,'turniMese',{get:()=>env.turni.filter(t=>Number(t.mese)===env.mese+1&&Number(t.anno)===env.anno)});
-  const functions=['caricaTurni','nuovoGiorno','apriGiornoCalendario','modificaGiorno','creaPayload','inserisciTurno','aggiornaTurno','salvaGiornata','confermaEliminazione','eliminaGiornata','mesePrecedente','meseSuccessivo','fasciaTurno'];
+  const functions=['caricaTurni','nuovoGiorno','apriGiornoCalendario','apriSceltaAgenda','modificaGiorno','creaPayload','inserisciTurno','aggiornaTurno','salvaGiornata','confermaEliminazione','eliminaGiornata','mesePrecedente','meseSuccessivo','fasciaTurno'];
   const code=functions.map(original).join('\n');
   for(const name of new Set(code.match(/\bset[A-Z]\w+/g))) {
     const key=name[3].toLowerCase()+name.slice(4);
@@ -202,4 +202,42 @@ test('ramo Calendario reale passa record e riepiloghi originali e mantiene timel
   const workRow=all.find(n=>n.type==='TouchableOpacity'&&n.props.style?.minHeight===66);
   assert.ok(workRow);assert.equal(workRow.props.style.backgroundColor,palette.surfaceRaised);
   assert.ok(all.some(n=>typeof n==='object'&&n.type==='TouchableOpacity'&&n.props.onPress?.toString().includes('caricaTurni')));
+});
+
+
+test('menu Agenda collega Lista turni, scelta lavoro/personale ed editor rapido originali senza scrivere dati',()=>{
+ const calls=[];
+ const ui=renderCalendar({menu:true,props:{onOpenShiftList:()=>calls.push('list'),onAddToDay:()=>calls.push('agenda'),onConfigureQuickShifts:()=>calls.push('models')}});
+ for(const label of ['Lista turni','Aggiungi turno o impegno','CONFIGURA TURNI RAPIDI'])ui.press(label);
+ assert.deepEqual(calls,['list','agenda','models']);
+ assert.equal(ui.setters.filter(([i,v])=>i===0&&v===false).length,3);
+ assert.ok(!ui.setters.some(([i,v])=>i===1&&v===true));
+ // Verifica i callback effettivi del ramo App, oltre alle props della vista.
+ const r=realApp([record(1,2),record(2,2,'16:00','20:00')]);
+ r.env.giornoAgendaSelezionato=2;
+ r.env.setRitornoListaTurni=value=>r.env.ritornoListaTurni=value;
+ r.env.setGestisciTurniRapidi=value=>r.env.gestisciTurniRapidi=value;
+ const branch=appNode.body.body.find(n=>n.type==='IfStatement'&&/screen\s*===\s*'calendar'/.test(app.slice(n.test.start,n.test.end)));
+ const code=app.slice(branch.start,branch.end);
+ for(const name of ['onOpenShiftList','onAddToDay','onConfigureQuickShifts']){
+   const attr=code.match(new RegExp(name+'=\\{(\\(\\) => (?:\\{[^}]*\\}|[^\\n]+))\\}'));
+   assert.ok(attr,name);vm.runInContext('this.callback='+attr[1],r.env);r.env.callback();
+   if(name==='onOpenShiftList'){assert.equal(r.env.screen,'turni');assert.equal(r.env.ritornoListaTurni,'calendar');}
+   if(name==='onAddToDay'){assert.equal(r.env.sceltaAgendaVisibile,true);assert.equal(r.env.giorno,2);}
+   if(name==='onConfigureQuickShifts'){assert.equal(r.env.screen,'edit');assert.equal(r.env.editingId,null);assert.equal(r.env.giorno,2);assert.equal(r.env.gestisciTurniRapidi,true);}
+ }
+ assert.equal(r.calls.length,0);assert.equal(r.records().length,2);
+});
+
+
+test('persistenza dei modelli originali: salvataggio e nuova istanza leggono la stessa chiave, errori non dichiarano successo',async()=>{
+ const stored=new Map(),writes=[];let fail=false;
+ const storage={getItem:async k=>stored.get(k)??null,setItem:async(k,v)=>{if(fail)throw Error('memoria non disponibile');writes.push(k);stored.set(k,v);}};
+ const load=()=>{const context={exports:{},require:name=>{assert.equal(name,'@react-native-async-storage/async-storage');return{__esModule:true,default:storage};}};vm.runInNewContext(compile(fs.readFileSync('turniRapidi.js','utf8')),context);return context.exports;};
+ const model={id:'persisted',nome:'Notte personalizzata',inizio:'22:00',fine:'06:00',operativita:'Piantonamento',postazione:'Via reale'};
+ const api=load();assert.ok((await api.caricaTurniRapidi()).length);assert.equal(writes.length,0);
+ await api.salvaTurniRapidi([model]);assert.deepEqual(writes,['@vigilanza_turni_rapidi_v1']);
+ assert.equal(JSON.stringify(await load().caricaTurniRapidi()),JSON.stringify([model]));
+ fail=true;await assert.rejects(api.salvaTurniRapidi([{...model,nome:'Non salvato'}]),/memoria/);
+ assert.equal((await load().caricaTurniRapidi())[0].nome,model.nome);
 });

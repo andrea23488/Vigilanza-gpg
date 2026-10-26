@@ -134,7 +134,8 @@ function renderView({date=now(),selected=date,items=rows(),scale=1}={}) {
   const Scroll=React.forwardRef(({children,...props},ref)=>{if(ref)ref.current={scrollTo:x=>scrolls.push(x)};nodes.push({name:'ScrollView',...props});return React.createElement('div',null,children);});
   const Native={...Object.fromEntries(['ActivityIndicator','Image','Pressable','Text','View'].map(n=>[n,host(n)])),ScrollView:Scroll,StyleSheet:{create:x=>x},useWindowDimensions:()=>({width:320,height:568,fontScale:scale})};
   const Component=load('TurniCondivisiView.js',{react:h.react,'react-native':Native,'react-native-safe-area-context':{SafeAreaView:host('SafeAreaView')},'@expo/vector-icons':{Ionicons:host('Ionicons')},'./turniCondivisiModel':model,'./temi':themes}).default;
-  h.start();const html=renderToStaticMarkup(React.createElement(Component,{palette:themes.PALETTE_ORIGINALE,elementi:items,adesso:date,giornoSelezionato:selected,inizioSettimana:model.lunediDellaSettimana(selected),onGiorno:d=>calls.push(key(d)),onSettimana:d=>calls.push(d),onBack:()=>calls.push('social'),onHome:()=>calls.push('home'),onCondividi:()=>calls.push('share'),onRefresh:()=>calls.push('refresh'),loading:false,errore:''}));h.effects();return{nodes,calls,html,scrolls};
+  const render=()=>{h.start();nodes.length=0;const html=renderToStaticMarkup(React.createElement(Component,{palette:themes.PALETTE_ORIGINALE,elementi:items,adesso:date,giornoSelezionato:selected,inizioSettimana:model.lunediDellaSettimana(selected),onGiorno:d=>calls.push(key(d)),onSettimana:d=>calls.push(d),onBack:()=>calls.push('social'),onHome:()=>calls.push('home'),onCondividi:()=>calls.push('share'),onRefresh:()=>calls.push('refresh'),loading:false,errore:''}));h.effects();return html;};
+  const html=render();return{nodes,calls,html,scrolls,render};
 }
 test('vista approvata: OGGI selezionato, sette pulsanti, righe compatte, tema globale, nessuna demo',()=>{
   const r=renderView();assert.equal(r.nodes.find(n=>n.testID==='shared-day-today').accessibilityState.selected,true);
@@ -165,4 +166,14 @@ test('notturno al cambio dell’ora e lista di un giorno futuro indipendenti dal
   assert.equal(model.turnoNelGiorno(night,new Date(2026,9,25)),true);
   const r=renderView({selected:new Date(2026,9,28)});
   assert.match(r.html,/a Rossi/);assert.equal(r.nodes.filter(n=>n.testID==='shared-colleague-row').length,0);
+});
+
+
+test('Torna su recuperato: compare dopo lo scroll e risale senza alterare date o dati condivisi',()=>{
+ const r=renderView();assert.ok(!r.nodes.some(n=>n.accessibilityLabel==='Torna su'));
+ r.nodes.find(n=>n.name==='ScrollView'&&!n.horizontal).onScroll({nativeEvent:{contentOffset:{y:400}}});r.render();
+ const button=r.nodes.find(n=>n.accessibilityLabel==='Torna su');assert.ok(button);button.onPress();
+ assert.equal(JSON.stringify(r.scrolls.at(-1)),JSON.stringify({y:0,animated:false}));assert.equal(r.calls.length,0);
+ r.nodes.find(n=>n.name==='ScrollView'&&!n.horizontal).onScroll({nativeEvent:{contentOffset:{y:0}}});r.render();
+ assert.ok(!r.nodes.some(n=>n.accessibilityLabel==='Torna su'));
 });

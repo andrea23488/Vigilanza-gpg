@@ -94,8 +94,10 @@ export default function HomeScreen({ paletteHome, profilo, fotoProfilo, numeroNo
     notificaRisparmioHome(value);
     AsyncStorage.setItem(ENERGY_KEY, value ? '1' : '0').catch(() => {});
   };
+  // Stessa selezione del percorso originale, anche quando il prossimo servizio è futuro.
+  const routeShift = etaTurno || shift;
   const route = async () => {
-    const destination = String(shift?.indirizzo_servizio || '').trim();
+    const destination = String(routeShift?.indirizzo_servizio || '').trim();
     if (!destination) return;
     const origin = String(profilo?.punto_partenza || '').trim();
     const url = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(destination)}${origin ? `&origin=${encodeURIComponent(origin)}` : ''}&travelmode=driving`;
@@ -223,16 +225,20 @@ export default function HomeScreen({ paletteHome, profilo, fotoProfilo, numeroNo
               </>}
               {menu === 'service' && <>
                 <Text style={[styles.detail, { color: palette.text }]}>{service.titolo}{'\n'}{shiftTime}{'\n'}{service.label}: {service.countdown}{'\n'}{place}{shift?.indirizzo_servizio ? `\n${shift.indirizzo_servizio}` : ''}</Text>
-                {shift?.indirizzo_servizio ? <>
-                  <Text style={{ color: palette.textMuted }}>{shift === etaTurno && etaServizioLoading ? 'Calcolo traffico in corso…' : shift === etaTurno && Number(etaServizio?.minuti) > 0 ? `${etaServizio.minuti} min · traffico +${Number(etaServizio.ritardo_traffico || 0)} min` : 'Percorso al servizio'}</Text>
+                {routeShift?.indirizzo_servizio ? <>
+                  {routeShift !== shift && <Text style={{ color: palette.textMuted }}>Prossimo servizio · {routeShift.giorno}/{routeShift.mese}/{routeShift.anno} · {routeShift.indirizzo_servizio}</Text>}
+                  <Text style={{ color: palette.textMuted }}>{routeShift === etaTurno && etaServizioLoading ? 'Calcolo traffico in corso…' : routeShift === etaTurno && Number(etaServizio?.minuti) > 0 ? `${etaServizio.minuti} min · traffico +${Number(etaServizio.ritardo_traffico || 0)} min` : 'Percorso al servizio'}</Text>
                   {row('Indicazioni stradali', route, 'navigate-outline')}
                 </> : null}
                 {row('Apri calendario', () => navigate('calendar'))}
+                {row('Lista turni', () => navigate('turni'))}
                 {row('Aggiungi turno', () => { setMenu(null); onAddShift(); }, 'add-circle-outline')}
               </>}
               {menu === 'summary' && <>
                 <Text style={[styles.detail, { color: palette.text }]}>Ore totali: {ore}{'\n'}Extra: {extra}{'\n'}Notti: {notti}</Text>
                 <Text style={{ color: palette.textMuted }}>Notti indica il numero di turni che attraversano mezzanotte. I valori si riferiscono al mese mostrato.</Text>
+                {row('Lista turni', () => navigate('turni'))}
+                {row('Apri calendario', () => navigate('calendar'))}
                 {row('Dettaglio stipendio', () => navigate('stipendio'))}
               </>}
               {menu === 'routeError' && <Text style={[styles.detail, { color: palette.text }]}>Impossibile aprire le indicazioni. Riprova dal dettaglio del servizio.</Text>}

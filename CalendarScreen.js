@@ -10,7 +10,8 @@ import { celleMeseCalendario, trascinamentoCalendario, swipeCalendario } from '.
 // Presentazione dei dati dell'app. Nessun archivio, payload o servizio di scrittura.
 export default function CalendarScreen({ anno, mese, records, impegniPersonali,
   filtroAgenda, giornoSelezionato, summary, turniRapidi, paletteHome, tuttiTurni = records,
-  onManualDay, onSelectDay, onMonthChange, onBack, nomeTipo, children, overlay, operazioniRapide = null }) {
+  onManualDay, onSelectDay, onMonthChange, onBack, nomeTipo, children, overlay, operazioniRapide = null,
+  onOpenShiftList, onAddToDay, onConfigureQuickShifts }) {
   const palette = paletteHome || PALETTE_ORIGINALE;
   const { fontScale } = useWindowDimensions();
   const [menu, setMenu] = useState(false);
@@ -199,7 +200,12 @@ export default function CalendarScreen({ anno, mese, records, impegniPersonali,
       <SafeAreaView style={styles.menuShade}>
         <Pressable accessibilityRole="button" accessibilityLabel="Chiudi menu calendario" onPress={() => setMenu(false)} style={StyleSheet.absoluteFill} />
         <View accessibilityViewIsModal style={[styles.menuBox, { backgroundColor: palette.surface, borderColor: palette.border }]}>
-          <Pressable accessibilityRole="button" accessibilityLabel="CONFIGURA TURNI RAPIDI" onPress={() => { setMenu(false); setConfigurazione(true); }} style={styles.menuRow}>
+          {[["Lista turni", onOpenShiftList], ["Aggiungi turno o impegno", onAddToDay]].map(([label, action]) => typeof action === 'function' && (
+            <Pressable key={label} accessibilityRole="button" accessibilityLabel={label} disabled={rapidState.busy} onPress={() => { setMenu(false); action(); }} style={styles.menuRow}>
+              <Text style={[styles.menuLabel, { color: palette.text }]}>{label}</Text><Ionicons name="chevron-forward" size={18} color={testoTema(palette, palette.homeAccent, 3)} />
+            </Pressable>
+          ))}
+          <Pressable accessibilityRole="button" accessibilityLabel="CONFIGURA TURNI RAPIDI" disabled={rapidState.busy} onPress={() => { setMenu(false); if (onConfigureQuickShifts) onConfigureQuickShifts(); else setConfigurazione(true); }} style={styles.menuRow}>
             <Text style={[styles.menuLabel, { color: palette.text }]}>CONFIGURA TURNI RAPIDI</Text><Ionicons name="chevron-forward" size={18} color={testoTema(palette, palette.homeAccent, 3)} />
           </Pressable>
         </View>
