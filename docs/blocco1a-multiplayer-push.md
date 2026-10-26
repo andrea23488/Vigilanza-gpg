@@ -42,6 +42,16 @@ Nel worktree è presente `supabase/config.toml`, ma non è stato confermato uno 
 
 Prima dell'integrazione servono CLI/daemon disponibili e stack locale isolato con project ID distinto, oppure schema/fixture sintetico completo. Non eseguire `supabase link`; non usare chiavi remote. Le push restano su trasporto fake. Il collaudo Android reale richiederà una successiva autorizzazione e progetto Expo/EAS, FCM e token di staging separati.
 
+## BLOCCO 1B-2 — bozza locale di migrazione
+
+`supabase/migrations/202610260001_giochi_server_protetti_v2.sql` e il relativo rollback sono bozze non applicate. Aggiungono stato privato, lease di presenza, ledger operazioni, outbox e consegne; RLS senza accesso client ai dati privati; RPC di lettura per giocatore, heartbeat/rilascio, challenge v2 e preflight delle mosse. Il cutover revoca SELECT diretto sulla tabella e le RPC client legacy.
+
+**La bozza non è un sistema multiplayer completo e non è pronta per il deploy.** `valida_mossa_partita_gioco_v2` verifica autorizzazione, stato, turno, versione, carta e selezione della presa, ma è un preflight e non applica la mossa in modo atomico. Manca il motore server-side completo per applicare le transizioni Scopa/Briscola e calcolare punteggi dalle carte; la verifica del vincitore confronta il vincitore memorizzato con i punteggi nello stato privato. La tabella operazioni non è ancora collegata a un endpoint di commit. L'outbox deduplica le righe ma non ha worker, claim, controllo presenza/preferenze o trasporto collegato. Il sender diretto esistente resta invariato; dopo il cutover va disabilitato o sostituito prima di qualsiasi invio.
+
+Il cutover è incompatibile con il client attuale: letture dirette, Realtime su `partite_gioco` e RPC legacy vengono revocati. Occorre prima implementare e testare il client/server v2 e pianificare una finestra coordinata. Partite già attive non sono importate nello stato privato e non vanno dichiarate affidabili solo perché hanno una versione. Definire un drain o una conversione verificata prima del cutover.
+
+`supabase/tests/multiplayer_server_protected_v2_fixture.sql` e `multiplayer_server_protected_v2.sql` sono prove d'integrazione proposte per un database locale usa-e-getta; non sono state eseguite. `scripts/test-multiplayer-migration-contract.cjs` verifica solo contratti statici del testo SQL: non sostituisce parsing Postgres, test RLS reali o test transazionali. Il rollback ripristina lo stato privato nella riga legacy e rifiuta outbox in attesa/incerti; richiede di fermare writer/worker e riconciliare gli invii. Il rollback elimina comunque ledger, presenze e storico outbox v2.
+
 ## Prossima integrazione isolata
 
 Solo dopo revisione: nuova migrazione non applicata con stato privato/pubblico, presenza, preferenze/eventi/outbox e policy; funzioni SQL transazionali e test SQL; poi adattamento di `giochiMultiplayerApi.js`, `games/GiocoColleghiScreen.js`, `App.js`, `pushNotifications.js` e sender/worker. Testare prima su Supabase locale/staging con utenti sintetici e EAS/FCM/APNs di staging. `betaIos` resta offline e non va usata per push reali. Nessuna credenziale di produzione.
