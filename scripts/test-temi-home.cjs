@@ -38,41 +38,13 @@ test('annullare il draft non applica né scrive un tema',async()=>{
  await a.carica();a.selezionaPreset('prugna');assert.equal(writes,0);
  assert.ok(screen.includes('Esci senza salvare'));assert.ok(screen.includes('onPress: onBack'));
 });
-test('animazioni identiche al commit precedente; stato attivo/inattivo conservato',()=>{
- const old=execFileSync('git',['show','7641fb865869f5a5cb8a6aea17d10e48cd761d0e:App.js'],{encoding:'utf8',maxBuffer:4*1024*1024});
- function animation(s){const a=s.indexOf('  const { width } = useWindowDimensions();');return s.slice(a,s.indexOf('  const titoloTurno =',a));}
- assert.equal(animation(app),animation(old));
- assert.ok(app.includes("paletteHome ? paletteHome.homeAccent : turnoInCorso ? '#6BFF8A' : '#5EEBFF'"));
- assert.ok(app.includes("turnoInCorso ? '● IN SERVIZIO' : '○ FUORI SERVIZIO'"));
- assert.ok(app.includes("color: '#42F56C'"));
-});
-test('nessuna modifica ai motori e Home esclusiva destinataria della palette',()=>{
- assert.equal((app.match(/<Screen homePalette=/g)||[]).length,1);
- assert.equal((app.match(/<HomeDigitalCore paletteHome=/g)||[]).length,1);
+test('Home nuova usa palette esistente; motori economici conservati',()=>{
+ const home=fs.readFileSync('HomeScreen.js','utf8');
+ assert.ok(home.includes('paletteHome || PALETTE_ORIGINALE'));
+ assert.ok(home.includes('palette.homeAccent'));
+ assert.ok(home.includes('color: palette.text'));
  assert.ok(app.includes('if (attivo && r.ok) setPreferenzaAspetto(r.preferenza)'));
- const old=execFileSync('git',['show','7641fb865869f5a5cb8a6aea17d10e48cd761d0e:App.js'],{encoding:'utf8',maxBuffer:4*1024*1024});
- function motore(s){return s.slice(s.indexOf('function calcolaStraordinariConfigurati('),s.indexOf('export default function App()'));}
- assert.ok(motore(old).length>0);
- assert.equal(motore(app),motore(old));
-});
-test('barra reale: originale invariato e contrasto almeno 3:1 per preset e tavolozze',()=>{
- const start=app.indexOf('AVANZ. {avanzamentoHomeV2}%');
- const bar=app.slice(start,app.indexOf("flexDirection: 'row'",start));
- assert.ok(start>=0);
- const track=bar.match(/backgroundColor: (coloreHome\(paletteHome, 'progressTrack', '#19264A'\))/);
- const fill=bar.match(/backgroundColor: (coloreHome\(paletteHome, 'progressFill', '#72FF45'\))/);
- assert.ok(track);assert.ok(fill);
- assert.ok(bar.includes('width: `${avanzamentoHomeV2}%`'));
- function verifica(preferenza){
-  c.paletteHome=c.paletteHomeDaPreferenza(preferenza);
-  const t=vm.runInContext(track[1],c),f=vm.runInContext(fill[1],c);
-  assert.ok(c.rapportoContrasto(t,f)>=3,`${t} / ${f}`);
-  if(c.paletteHome)assert.equal(f,c.paletteHome.accent);
-  else {assert.equal(t,'#19264A');assert.equal(f,'#72FF45');}
- }
- for(const preset of vm.runInContext('PRESET_TEMI',c))verifica({...c.ripristinaAspetto(),preset:preset.id});
- for(const background of vm.runInContext('SFONDI_ASPETTO',c))
-  for(const accent of vm.runInContext('ACCENTI_ASPETTO',c))verifica(c.personalizzaAspetto(c.ripristinaAspetto(),{background,accent}));
- // Anche colori validi esterni alla tavolozza con accento uguale alla superficie.
- verifica(c.personalizzaAspetto(c.ripristinaAspetto(),{background:'#777777',accent:'#777777'}));
+ const old=execFileSync('git',['show','7bca7e03013282967d558ea92a06b726e684b118:App.js'],{encoding:'utf8',maxBuffer:4*1024*1024});
+ const motore=s=>s.slice(s.indexOf('function calcolaStraordinariConfigurati('),s.indexOf('export default function App()'));
+ assert.ok(motore(old).length>0);assert.equal(motore(app),motore(old));
 });

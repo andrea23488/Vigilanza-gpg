@@ -1,0 +1,22 @@
+{
+  "cli": {
+    "version": ">= 22.0.0",
+    "appVersionSource": "local"
+  },
+  "build": {
+    "ios-beta": {
+      "distribution": "internal",
+      "developmentClient": false,
+      "environment": "preview",
+      "autoIncrement": false,
+      "env": {
+        "APP_VARIANT": "isolated-beta",
+        "EXPO_NO_DOTENV": "1"
+      },
+      "ios": {
+        "buildConfiguration": "Release",
+        "image": "sdk-54"
+      }
+    }
+  }
+}

@@ -1,0 +1,28 @@
+html, body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
+  background: #07111f;
+}
+body {
+  position: fixed;
+  inset: 0;
+}
+#root {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100vh;
+  height: 100dvh;
+  height: var(--preview-height, 100dvh);
+  min-height: 0;
+  overflow: hidden;
+}
+/* Safe-area padding is supplied once by the real SafeAreaProvider/SafeAreaView.
+   ScrollView inside dialogs remains scrollable; the main document never scrolls. */
+
+/* Only the month grid claims horizontal gestures; the quick-shift strip keeps native scrolling. */
+[data-testid="calendar-grid"] { touch-action: pan-y; }

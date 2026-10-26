@@ -12,11 +12,12 @@ if (OFFLINE_TEST) {
 }
 // Require only after the guard: App dependencies must never start online services in Test.
 const App = require('./App').default;
+const { ThemeEffectsProvider } = require('./ThemeEffects');
 
 function Root() {
   return (
     <SafeAreaProvider>
-      <App />
+      <ThemeEffectsProvider><App /></ThemeEffectsProvider>
     </SafeAreaProvider>
   );
 }

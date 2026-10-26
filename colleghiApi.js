@@ -103,7 +103,7 @@ export async function caricaColleghi() {
   });
 }
 
-export async function aggiungiCollega(testoRicerca) {
+export async function cercaColleghi(testoRicerca) {
   const user = await getCurrentUser();
   const ricerca = pulisciRicerca(testoRicerca);
 
@@ -177,6 +177,13 @@ export async function aggiungiCollega(testoRicerca) {
   profiliTrovati = profiliTrovati.filter(
     (profilo) => profilo?.user_id && profilo.user_id !== user.id
   );
+
+  return profiliTrovati;
+}
+
+export async function aggiungiCollega(testoRicerca) {
+  const user = await getCurrentUser();
+  const profiliTrovati = await cercaColleghi(testoRicerca);
 
   if (profiliTrovati.length === 0) {
     throw new Error(

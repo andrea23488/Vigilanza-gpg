@@ -1,7 +1,11 @@
+import { ThemeEffectsPreview, useThemeEffects } from './ThemeEffects';
+import { SafeAreaView as PreviewSafeAreaView } from 'react-native-safe-area-context';
+import { stiliConTema } from './temaSchermate';
+import AppearanceScreen from './AppearanceScreen';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { SafeAreaView, ScrollView, View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Alert } from 'react-native';
+import { SafeAreaView, ScrollView, View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, BackHandler, Platform, Modal, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { PRESET_TEMI, generaPalette, personalizzaAspetto, ripristinaAspetto } from './temi';
+import { PRESET_TEMI, generaPalette, personalizzaAspetto, ripristinaAspetto, paletteHomeDaPreferenza, testoTema } from './temi';
 import { creaArchivioAspetto } from './preferenzeAspetto';
 
 export const SFONDI_ASPETTO = Object.freeze(['#07111F', '#151A20', '#171426', '#082329', '#182230', '#241522', '#FFFFFF', '#E8EDF3']);
@@ -14,7 +18,7 @@ export function creaControlloreAspetto(archivio = creaArchivioAspetto()) {
   let draft = ripristinaAspetto();
   let salvata = ripristinaAspetto();
   const stato = () => ({ pronto, occupato, draft: { ...draft },
-    modificato: JSON.stringify(draft) !== JSON.stringify(salvata) });
+    salvata: { ...salvata }, modificato: JSON.stringify(draft) !== JSON.stringify(salvata) });
   return {
     stato,
     async carica() {
@@ -52,14 +56,15 @@ export function creaControlloreAspetto(archivio = creaArchivioAspetto()) {
   };
 }
 
-function Scelta({ label, selezionato, disabled, onPress, colori }) {
+function Scelta({ label, selezionato, disabled, onPress, colori, paletteAttuale = null }) {
+  const stiliScelta = useMemo(() => stiliConTema({ scelta: styles.scelta, selezionata: styles.selezionata, testo: styles.testo }, paletteAttuale, StyleSheet.flatten), [paletteAttuale]);
   return <TouchableOpacity accessibilityRole="button" accessibilityLabel={label}
     accessibilityState={{ selected: selezionato, disabled }} disabled={disabled} onPress={onPress}
-    style={[styles.scelta, selezionato && styles.selezionata, disabled && { opacity: 0.5 }]}>
+    style={[stiliScelta.scelta, selezionato && stiliScelta.selezionata, disabled && { opacity: 0.5 }]}>
     <View style={{ flexDirection: 'row', gap: 6 }}>
       {colori.map((colore, i) => <View key={i} style={{ backgroundColor: colore, width: 24, height: 24, borderRadius: 12, borderWidth: 1, borderColor: '#91A3BA' }} />)}
     </View>
-    <Text style={styles.testo}>{selezionato ? '✓ ' : ''}{label}</Text>
+    <Text style={stiliScelta.testo}>{selezionato ? '✓ ' : ''}{label}</Text>
   </TouchableOpacity>;
 }
 
@@ -147,7 +152,7 @@ function Anteprima({ palette: p }) {
           >
             <Text
               style={{
-                color: p.accent,
+                color: testoTema(p, p.accent),
                 fontSize: 9,
                 fontWeight: '900',
               }}
@@ -218,7 +223,7 @@ function Anteprima({ palette: p }) {
 
           <Text
             style={{
-              color: p.homeAccent,
+              color: testoTema(p, p.homeAccent),
               fontSize: 8.5,
               fontWeight: '900',
               letterSpacing: 1.1,
@@ -261,7 +266,7 @@ function Anteprima({ palette: p }) {
 
           <Text
             style={{
-              color: p.homeAccent,
+              color: testoTema(p, p.homeAccent),
               fontSize: 8.5,
               fontWeight: '900',
               letterSpacing: 0.8,
@@ -488,13 +493,16 @@ function Anteprima({ palette: p }) {
   );
 }
 
-export default function AspettoColoriScreen({ onBack, archivio, onSalvato, paletteAttuale = null }) {
+export default function AspettoColoriScreen({ onBack, archivio, onSalvato, paletteAttuale = null, backLabel = 'Profilo', classica = false, renderAnteprima = null }) {
   const scrollRef = useRef(null);
   const [mostraTornaSu, setMostraTornaSu] = useState(false);
   const controllore = useRef(null);
   if (!controllore.current) controllore.current = creaControlloreAspetto(archivio);
   const [stato, setStato] = useState(() => controllore.current.stato());
   const [messaggio, setMessaggio] = useState('');
+  const [anteprimaAperta, setAnteprimaAperta] = useState(false);
+  const effettiTema = useThemeEffects();
+  useEffect(() => () => effettiTema.setPreview(false), [effettiTema.setPreview]);
   const montato = useRef(true);
   const aggiorna = () => { if (montato.current) setStato(controllore.current.stato()); };
   async function carica() {
@@ -506,8 +514,9 @@ export default function AspettoColoriScreen({ onBack, archivio, onSalvato, palet
       : r.recuperata ? 'Preferenza non valida: caricati i colori originali. Nessun dato è stato riscritto.' : '');
   }
   useEffect(() => { montato.current = true; carica(); return () => { montato.current = false; }; }, []);
-  const palette = useMemo(() => generaPalette(stato.draft), [stato.draft]);
+  const palette = useMemo(() => paletteHomeDaPreferenza(stato.draft) || generaPalette(stato.draft), [stato.draft]);
   const disabled = !stato.pronto || stato.occupato;
+  const stiliClassici = useMemo(() => stiliConTema(styles, paletteAttuale, StyleSheet.flatten), [paletteAttuale]);
   function cambia(azione) { azione(); aggiorna(); setMessaggio('Modifiche in anteprima. Premi Salva colori per conservarle.'); }
   async function salva() {
     const pending = controllore.current.salva(); aggiorna();
@@ -523,7 +532,36 @@ export default function AspettoColoriScreen({ onBack, archivio, onSalvato, palet
       { text: 'Resta', style: 'cancel' }, { text: 'Esci senza salvare', onPress: onBack },
     ]); else onBack();
   }
-  return <SafeAreaView style={[styles.safe, paletteAttuale && { backgroundColor: paletteAttuale.background }]}>
+  useEffect(() => {
+    if (Platform.OS !== 'android') return undefined;
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => { if (anteprimaAperta) { effettiTema.setPreview(false); setAnteprimaAperta(false); } else indietro(); return true; });
+    return () => sub.remove();
+  }, [stato.occupato, stato.modificato, onBack, anteprimaAperta]);
+  if (!classica) return <>
+    <AppearanceScreen draft={stato.draft} saved={stato.salvata} disabled={disabled} message={messaggio} backLabel={backLabel}
+      onDraft={input => cambia(() => {
+        controllore.current.selezionaPreset(input.preset);
+        controllore.current.personalizza({ background: input.background, accent: input.accent });
+      })}
+      onSave={salva} onReset={() => cambia(() => controllore.current.ripristina())}
+      energy={effettiTema.energy} energyReady={effettiTema.ready && !effettiTema.busy}
+      onEnergy={async value => { if (!(await effettiTema.setEnergy(value)) && montato.current) setMessaggio('Impossibile salvare il risparmio energia. Riprova.'); }}
+      onPreview={() => { effettiTema.setPreview(true); setAnteprimaAperta(true); }} onBack={indietro} />
+    <Modal visible={anteprimaAperta} animationType="none" onRequestClose={() => { effettiTema.setPreview(false); setAnteprimaAperta(false); }}>
+      <ThemeEffectsPreview preference={stato.draft}>
+        <View style={{ flex: 1 }} pointerEvents="none" accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+          {anteprimaAperta && renderAnteprima ? renderAnteprima(palette, stato.draft) : null}
+        </View>
+        <PreviewSafeAreaView edges={['bottom']} style={{ backgroundColor: palette.surface }}>
+        <Pressable accessibilityRole="button" accessibilityLabel="Torna a Aspetto e colori" onPress={() => { effettiTema.setPreview(false); setAnteprimaAperta(false); }}
+          style={{ minHeight: 60, padding: 18, backgroundColor: palette.surface, borderTopWidth: 1, borderColor: palette.border }}>
+          <Text style={{ color: palette.text, textAlign: 'center', fontWeight: '800' }}>Anteprima · Torna a Aspetto e colori</Text>
+        </Pressable>
+        </PreviewSafeAreaView>
+      </ThemeEffectsPreview>
+    </Modal>
+  </>;
+  return <SafeAreaView style={[stiliClassici.safe, paletteAttuale && { backgroundColor: paletteAttuale.background }]}>
     <ScrollView
       ref={scrollRef}
       showsVerticalScrollIndicator={false}
@@ -533,34 +571,34 @@ export default function AspettoColoriScreen({ onBack, archivio, onSalvato, palet
           event.nativeEvent.contentOffset.y > 350
         );
       }}
-      contentContainerStyle={[styles.content, { paddingBottom: 90 }]}
+      contentContainerStyle={[stiliClassici.content, { paddingBottom: 90 }]}
     >
-      <TouchableOpacity accessibilityRole="button" disabled={stato.occupato} onPress={indietro} style={styles.button}>
-        <Text style={styles.testo}>‹ Torna al Profilo</Text>
+      <TouchableOpacity accessibilityRole="button" disabled={stato.occupato} onPress={indietro} style={stiliClassici.button}>
+        <Text style={stiliClassici.testo}>‹ Torna a {backLabel}</Text>
       </TouchableOpacity>
-      <Text style={[styles.title, paletteAttuale && { color: paletteAttuale.text }]}>Aspetto e colori</Text>
-      <Text style={[styles.secondario, paletteAttuale && { color: paletteAttuale.textMuted }]}>Personalizza l’anteprima. Salva per applicare i colori a tutta l’app.</Text>
+      <Text style={[stiliClassici.title, paletteAttuale && { color: paletteAttuale.text }]}>Aspetto e colori</Text>
+      <Text style={[stiliClassici.secondario, paletteAttuale && { color: paletteAttuale.textMuted }]}>Personalizza l’anteprima. Salva per applicare i colori a tutta l’app.</Text>
       {stato.occupato && <ActivityIndicator color="#55B8FF" accessibilityLabel="Operazione in corso" />}
-      {!!messaggio && <Text accessibilityLiveRegion="polite" style={styles.secondario}>{messaggio}</Text>}
-      {!stato.pronto && !stato.occupato && <TouchableOpacity onPress={carica} accessibilityRole="button" style={styles.button}><Text style={styles.testo}>Riprova caricamento</Text></TouchableOpacity>}
-      <Text style={styles.heading}>Temi preimpostati</Text>
-      <View style={styles.griglia}>{PRESET_TEMI.map(p => <Scelta key={p.id} label={p.nome} disabled={disabled}
+      {!!messaggio && <Text accessibilityLiveRegion="polite" style={stiliClassici.secondario}>{messaggio}</Text>}
+      {!stato.pronto && !stato.occupato && <TouchableOpacity onPress={carica} accessibilityRole="button" style={stiliClassici.button}><Text style={stiliClassici.testo}>Riprova caricamento</Text></TouchableOpacity>}
+      <Text style={stiliClassici.heading}>Temi preimpostati</Text>
+      <View style={stiliClassici.griglia}>{PRESET_TEMI.map(p => <Scelta paletteAttuale={paletteAttuale} key={p.id} label={p.nome} disabled={disabled}
         colori={[p.background, p.accent]} selezionato={stato.draft.preset === p.id && stato.draft.background === null && stato.draft.accent === null}
         onPress={() => cambia(() => controllore.current.selezionaPreset(p.id))} />)}</View>
-      <Text style={styles.heading}>Sfondo</Text>
-      <View style={styles.griglia}>{SFONDI_ASPETTO.map(colore => <Scelta key={colore} label={`Sfondo ${colore}`} disabled={disabled}
+      <Text style={stiliClassici.heading}>Sfondo</Text>
+      <View style={stiliClassici.griglia}>{SFONDI_ASPETTO.map(colore => <Scelta paletteAttuale={paletteAttuale} key={colore} label={`Sfondo ${colore}`} disabled={disabled}
         colori={[colore]} selezionato={palette.background === colore} onPress={() => cambia(() => controllore.current.personalizza({ background: colore }))} />)}</View>
-      <Text style={styles.heading}>Cerchio ed evidenze</Text>
-      <View style={styles.griglia}>{ACCENTI_ASPETTO.map(colore => <Scelta key={colore} label={`Accento ${colore}`} disabled={disabled}
+      <Text style={stiliClassici.heading}>Cerchio ed evidenze</Text>
+      <View style={stiliClassici.griglia}>{ACCENTI_ASPETTO.map(colore => <Scelta paletteAttuale={paletteAttuale} key={colore} label={`Accento ${colore}`} disabled={disabled}
         colori={[colore]} selezionato={palette.homeAccent === colore} onPress={() => cambia(() => controllore.current.personalizza({ accent: colore }))} />)}</View>
-      <Text style={[styles.heading, paletteAttuale && { color: paletteAttuale.text }]}>Anteprima app</Text>
+      <Text style={[stiliClassici.heading, paletteAttuale && { color: paletteAttuale.text }]}>Anteprima app</Text>
       <Anteprima palette={palette} />
-      <TouchableOpacity accessibilityRole="button" disabled={disabled} onPress={() => cambia(() => controllore.current.ripristina())} style={styles.button}>
-        <Text style={styles.testo}>Ripristina colori originali</Text>
+      <TouchableOpacity accessibilityRole="button" disabled={disabled} onPress={() => cambia(() => controllore.current.ripristina())} style={stiliClassici.button}>
+        <Text style={stiliClassici.testo}>Ripristina colori originali</Text>
       </TouchableOpacity>
-      <Text style={styles.secondario}>Il ripristino modifica l’anteprima. Premi Salva colori per confermarlo.</Text>
+      <Text style={stiliClassici.secondario}>Il ripristino modifica l’anteprima. Premi Salva colori per confermarlo.</Text>
       <TouchableOpacity accessibilityRole="button" accessibilityState={{ disabled }} disabled={disabled} onPress={salva}
-        style={[styles.button, { backgroundColor: '#168BFF', opacity: disabled ? 0.5 : 1 }]}>
+        style={[stiliClassici.button, { backgroundColor: '#168BFF', opacity: disabled ? 0.5 : 1 }]}>
         <Text style={{ color: '#07111F', fontWeight: '900' }}>Salva colori</Text>
       </TouchableOpacity>
     </ScrollView>

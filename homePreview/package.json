@@ -1,0 +1,27 @@
+{
+  "name": "vigilanza-gpg-home-preview",
+  "version": "1.0.0",
+  "private": true,
+  "main": "index.js",
+  "scripts": {
+    "start": "node start.cjs",
+    "start:tunnel": "node start.cjs",
+    "check": "node start.cjs --check",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "node --test test-preview.cjs test-web.cjs test-global-theme.cjs test-social.cjs test-settings.cjs test-calendar.cjs test-shared-shifts.cjs test-appearance.cjs test-interactive-themes.cjs",
+    "start:web": "node start.cjs --web",
+    "check:web": "node start.cjs --web --check"
+  },
+  "dependencies": {
+    "expo": "54.0.37",
+    "react": "19.1.0",
+    "react-native": "0.81.5",
+    "@expo/vector-icons": "^15.0.3",
+    "expo-font": "14.0.12",
+    "@react-native-async-storage/async-storage": "2.2.0",
+    "react-native-safe-area-context": "~5.6.0",
+    "react-native-svg": "15.12.1",
+    "react-dom": "19.1.0",
+    "react-native-web": "^0.21.0"
+  }
+}

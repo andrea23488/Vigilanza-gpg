@@ -1,0 +1,25 @@
+{
+  "expo": {
+    "name": "Vigilanza GPG · Home DEMO",
+    "slug": "vigilanza-gpg-home-preview",
+    "version": "1.0.0",
+    "sdkVersion": "54.0.0",
+    "orientation": "portrait",
+    "platforms": [
+      "ios",
+      "android",
+      "web"
+    ],
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": true
+    },
+    "extra": {
+      "homePreview": true
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "single"
+    }
+  }
+}

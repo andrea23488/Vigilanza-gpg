@@ -1,0 +1,37 @@
+{
+  "extends": "expo/tsconfig.base",
+  "compilerOptions": {
+    "noEmit": true
+  },
+  "include": [
+    "HomeDemo.tsx",
+    "demoData.ts",
+    "index.js",
+    "previewStorage.js",
+    "../HomeScreen.js",
+    "../ElectricConnections.js",
+    "../homeElectric.js",
+    "../homeModel.js",
+    "../temi.js",
+    "DemoDialog.tsx",
+    "webLayout.web.js",
+    "../HomeArtwork.js",
+    "SocialScreen.tsx",
+    "socialOptions.ts",
+    "SettingsScreen.tsx",
+    "AppearanceScreen.tsx",
+    "ThemeContext.tsx",
+    "ThemeDecorations.tsx",
+    "settingsOptions.ts",
+    "CalendarScreen.tsx",
+    "QuickShiftEditor.tsx",
+    "calendarModel.ts",
+    "AgendaDialogs.tsx",
+    "SharedShiftsScreen.tsx",
+    "sharedShiftsModel.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "../node_modules"
+  ]
+}

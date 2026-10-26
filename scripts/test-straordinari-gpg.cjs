@@ -9,7 +9,7 @@ for (const f of ['turniCalcoli.js', 'straordinariManuali.js', 'straordinariGpg.j
   vm.runInContext(fs.readFileSync(f, 'utf8').replace(/^import .*;\n/gm, '').replaceAll('export function ', 'function '), ctx);
 }
 vm.runInContext(app.slice(app.indexOf('function calcolaStraordinariConfigurati('), app.indexOf('export default function App()')), ctx);
-vm.runInContext(app.slice(app.indexOf('  function creaPayload()'), app.indexOf('  async function inserisciTurno')), ctx);
+vm.runInContext(app.slice(app.indexOf('  function creaPayload('), app.indexOf('  async function inserisciTurno')), ctx);
 const record = (id, giorno, ore = 12, override = null, mese = 10) => ({ id, giorno, mese, anno: 2026,
   tipo: 'turno', inizio: '06:00', fine: '18:00', ore, straordinario_manuale_minuti: override });
 const options = { modalita: 'giornaliero', sogliaGiornaliera: 7, sogliaSettimanale: 40 };
@@ -149,7 +149,7 @@ test('riapertura editor reale ripristina stato, modifica e automatico', async ()
   ctx.setPromemoriaTurnoMinuti = () => {};
   ctx.setPromemoriaTurnoPersonalizzato = () => {};
   ctx.console = console;
-  vm.runInContext(app.slice(app.indexOf('  async function modificaGiorno('), app.indexOf('  function creaPayload()')), ctx);
+  vm.runInContext(app.slice(app.indexOf('  async function modificaGiorno('), app.indexOf('  function creaPayload(')), ctx);
   await ctx.modificaGiorno({ ...ctx.creaPayload(), id: 1 });
   assert.equal(stato.ModalitaExtraGpg, 'manuale');
   assert.equal(stato.OreExtraGpg, '4'); assert.equal(stato.MinutiExtraGpg, '45');
@@ -199,10 +199,10 @@ test('riepiloghi automatici giornalieri/settimanali identici al commit precedent
     assert.equal(JSON.stringify(statistiche(app, env)), JSON.stringify(statistiche(old, env)));
   }
   // Le espressioni effettive dei riepiloghi mantengono i vecchi formatter
-  // se non vi sono override, compresa la home con toFixed(0).
+  // se non vi sono override; la nuova Home espone anche i decimali.
   assert.ok(app.includes('!haOverrideGpgMese ? `${statistiche.extraOre}h`'));
   assert.ok(app.includes('!haOverrideGpgMese ? `${extraStipendioMese.toFixed(1)} h`'));
-  assert.ok(app.includes('!haOverrideGpgMese ? `${Number(extraStipendioMese || 0).toFixed(0)}h`'));
+  assert.ok(app.includes('!haOverrideGpgMese ? `${Number(extraStipendioMese || 0).toFixed(1)} h`'));
   assert.ok(app.includes('manualeSchedaGpg ? t.straordinario_manuale_minuti / 60 : Number(t.extra || 0)'));
   assert.ok(app.includes('!manualeSchedaGpg ? `${extra}h` : formattaOreGpg(extra)'));
 });

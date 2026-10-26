@@ -1,309 +1,79 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import {
-  View,
-  Text,
-  ScrollView,
-  TouchableOpacity,
-  Modal,
-  Alert,
-  ActivityIndicator,
-} from 'react-native';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { View, Text, ScrollView, TouchableOpacity, Modal, Alert, ActivityIndicator, AppState } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { coloreHome } from './temi';
-
+import { coloreHome, PALETTE_ORIGINALE } from './temi';
 import { caricaTurniUtente } from './turniApi';
 import { caricaColleghi } from './colleghiApi';
+import { caricaTurniCondivisiRicevuti, condividiTurniConColleghi, rimuoviCondivisioneTurni, caricaMieCondivisioni } from './turniCondivisiApi';
+import TurniCondivisiView from './TurniCondivisiView';
+import { aggiungiGiorni, lunediDellaSettimana, dataTurno, nomeProfilo, formattaBreve, creaElementiCondivisi } from './turniCondivisiModel';
 
-import {
-  caricaTurniCondivisiRicevuti,
-  condividiTurniConColleghi,
-  rimuoviCondivisioneTurni,
-  caricaMieCondivisioni,
-} from './turniCondivisiApi';
-
-const GIORNI = [
-  'Lunedì',
-  'Martedì',
-  'Mercoledì',
-  'Giovedì',
-  'Venerdì',
-  'Sabato',
-  'Domenica',
-];
-
-const MESI = [
-  'gen',
-  'feb',
-  'mar',
-  'apr',
-  'mag',
-  'giu',
-  'lug',
-  'ago',
-  'set',
-  'ott',
-  'nov',
-  'dic',
-];
-
-function dataTurno(turno) {
-  const g = Number(turno?.giorno);
-  const m = Number(turno?.mese);
-  const a = Number(turno?.anno);
-
-  if (!g || !m || !a) return null;
-
-  return new Date(a, m - 1, g, 12, 0, 0, 0);
-}
-
-function lunediDellaSettimana(data) {
-  const d = new Date(data);
-  d.setHours(12, 0, 0, 0);
-
-  const giorno = d.getDay();
-  const differenza = giorno === 0 ? -6 : 1 - giorno;
-
-  d.setDate(d.getDate() + differenza);
-  return d;
-}
-
-function aggiungiGiorni(data, giorni) {
-  const d = new Date(data);
-  d.setDate(d.getDate() + giorni);
-  return d;
-}
-
-function stessaData(a, b) {
-  return (
-    a &&
-    b &&
-    a.getFullYear() === b.getFullYear() &&
-    a.getMonth() === b.getMonth() &&
-    a.getDate() === b.getDate()
-  );
-}
-
-function formattaBreve(data) {
-  return `${data.getDate()} ${MESI[data.getMonth()]}`;
-}
-
-function nomeProfilo(profilo) {
-  const nome = String(profilo?.nome || '').trim();
-  const cognome = String(profilo?.cognome || '').trim();
-
-  return `${nome} ${cognome}`.trim() || 'Collega';
-}
-
-function orarioTurno(turno) {
-  if (turno?.inizio && turno?.fine) {
-    return `${turno.inizio} – ${turno.fine}`;
-  }
-
-  const tipo = String(turno?.tipo || '').trim();
-
-  if (tipo && tipo !== 'turno') {
-    return tipo.toUpperCase();
-  }
-
-  return 'Orario non indicato';
-}
-
-function postazioneTurno(turno) {
-  return String(
-    turno?.indirizzo_servizio ||
-    turno?.postazione ||
-    turno?.luogo ||
-    ''
-  ).trim();
-}
-
-function turnoInCorsoAdesso(turno) {
-  if (!turno?.inizio || !turno?.fine) return false;
-
-  const data = dataTurno(turno);
-  if (!data) return false;
-
-  const [hi, mi] = String(turno.inizio).split(':').map(Number);
-  const [hf, mf] = String(turno.fine).split(':').map(Number);
-
-  if (
-    [hi, mi, hf, mf].some(v => Number.isNaN(v))
-  ) {
-    return false;
-  }
-
-  const inizio = new Date(
-    data.getFullYear(),
-    data.getMonth(),
-    data.getDate(),
-    hi,
-    mi,
-    0,
-    0
-  );
-
-  let fine = new Date(
-    data.getFullYear(),
-    data.getMonth(),
-    data.getDate(),
-    hf,
-    mf,
-    0,
-    0
-  );
-
-  // turno notturno, es. 22:00 - 06:00
-  if (fine <= inizio) {
-    fine.setDate(fine.getDate() + 1);
-  }
-
-  const adesso = new Date();
-
-  return adesso >= inizio && adesso < fine;
-}
-
-export default function CalendarioColleghiScreen({ onBack, palette = null }) {
-  const scrollRef = useRef(null);
-  const [mostraTornaSu, setMostraTornaSu] = useState(false);
-  const [inizioSettimana, setInizioSettimana] = useState(
-    lunediDellaSettimana(new Date())
-  );
-
+export default function CalendarioColleghiScreen({ onBack, onHome, onGestioneColleghi, backLabel = 'Social', palette = null, profilo = null, fotoProfilo = null }) {
+  const colors = palette || PALETTE_ORIGINALE;
+  // A single selected date opens on today and retains its weekday across week changes.
+  const [giornoSelezionato, setGiornoSelezionato] = useState(() => new Date());
+  const [adesso, setAdesso] = useState(() => new Date());
+  const inizioSettimana = useMemo(() => lunediDellaSettimana(giornoSelezionato), [giornoSelezionato]);
+  const fineSettimana = useMemo(() => aggiungiGiorni(inizioSettimana, 6), [inizioSettimana]);
   const [mieiTurni, setMieiTurni] = useState([]);
   const [ricevuti, setRicevuti] = useState([]);
   const [colleghi, setColleghi] = useState([]);
   const [mieCondivisioni, setMieCondivisioni] = useState([]);
-
   const [loading, setLoading] = useState(true);
+  const [errore, setErrore] = useState('');
   const [modalCondivisione, setModalCondivisione] = useState(false);
   const [selezionati, setSelezionati] = useState([]);
   const [livello, setLivello] = useState('orari_luogo');
   const [salvataggio, setSalvataggio] = useState(false);
+  const mounted = useRef(false), caricamento = useRef(0), salvataggioRef = useRef(false), modalRef = useRef(false);
+  modalRef.current = modalCondivisione;
 
-  const fineSettimana = useMemo(
-    () => aggiungiGiorni(inizioSettimana, 6),
-    [inizioSettimana]
-  );
-
-  const giorniSettimana = useMemo(
-    () =>
-      Array.from({ length: 7 }, (_, i) =>
-        aggiungiGiorni(inizioSettimana, i)
-      ),
-    [inizioSettimana]
-  );
-
-  const caricaTutto = async () => {
+  const caricaTutto = useCallback(async () => {
+    if (!mounted.current) return;
+    const id = ++caricamento.current;
+    setLoading(true); setErrore('');
+    // Hide the previous authorization snapshot while it is being revalidated.
+    setRicevuti([]); setColleghi([]); setMieCondivisioni([]);
     try {
-      setLoading(true);
-
-      const [
-        turni,
-        turniRicevuti,
-        relazioni,
-        condivisioni,
-      ] = await Promise.all([
-        caricaTurniUtente(),
-        caricaTurniCondivisiRicevuti(),
-        caricaColleghi(),
-        caricaMieCondivisioni(),
+      const [turni, turniRicevuti, relazioni, condivisioni] = await Promise.all([
+        caricaTurniUtente(), caricaTurniCondivisiRicevuti(), caricaColleghi(), caricaMieCondivisioni(),
       ]);
-
+      if (!mounted.current || id !== caricamento.current) return;
       setMieiTurni(Array.isArray(turni) ? turni : []);
       setRicevuti(Array.isArray(turniRicevuti) ? turniRicevuti : []);
-
-      setColleghi(
-        (Array.isArray(relazioni) ? relazioni : []).filter(
-          c => c?.stato === 'accettato'
-        )
-      );
-
-      setMieCondivisioni(
-        Array.isArray(condivisioni) ? condivisioni : []
-      );
+      setColleghi((Array.isArray(relazioni) ? relazioni : []).filter(c => c?.stato === 'accettato'));
+      setMieCondivisioni(Array.isArray(condivisioni) ? condivisioni : []);
     } catch (e) {
-      console.log('Errore Calendario Colleghi:', e);
-
-      Alert.alert(
-        'Calendario colleghi',
-        e?.message || 'Errore durante il caricamento.'
-      );
+      if (!mounted.current || id !== caricamento.current) return;
+      setMieiTurni([]); setRicevuti([]); setColleghi([]); setMieCondivisioni([]);
+      setErrore(e?.message || 'Errore durante il caricamento.');
     } finally {
-      setLoading(false);
+      if (mounted.current && id === caricamento.current) setLoading(false);
     }
-  };
-
-  useEffect(() => {
-    caricaTutto();
   }, []);
 
-  const mieiTurniSettimana = useMemo(() => {
-    return mieiTurni.filter(turno => {
-      const d = dataTurno(turno);
-
-      return (
-        d &&
-        d >= inizioSettimana &&
-        d <= fineSettimana
-      );
+  useEffect(() => {
+    mounted.current = true;
+    caricaTutto();
+    const clock = setInterval(() => { if (AppState.currentState === 'active') setAdesso(new Date()); }, 15000);
+    // Existing read APIs only: no realtime subscriptions or changes to access policies.
+    const refresh = setInterval(() => {
+      if (AppState.currentState === 'active' && !modalRef.current && !salvataggioRef.current) caricaTutto();
+    }, 60000);
+    const sub = AppState.addEventListener('change', state => {
+      if (state === 'active') { setAdesso(new Date()); caricaTutto(); }
+      else { ++caricamento.current; setRicevuti([]); setColleghi([]); setMieCondivisioni([]); setLoading(true); }
     });
-  }, [mieiTurni, inizioSettimana, fineSettimana]);
+    return () => { mounted.current = false; ++caricamento.current; clearInterval(clock); clearInterval(refresh); sub.remove(); };
+  }, [caricaTutto]);
 
-  const ricevutiSettimana = useMemo(() => {
-    return ricevuti.filter(elemento => {
-      const d = dataTurno(elemento?.turno);
-
-      return (
-        d &&
-        d >= inizioSettimana &&
-        d <= fineSettimana
-      );
-    });
-  }, [ricevuti, inizioSettimana, fineSettimana]);
-
-  const mioTurnoAttivoAdesso = useMemo(
-    () =>
-      mieiTurniSettimana.find(turno =>
-        turnoInCorsoAdesso(turno)
-      ) || null,
-    [mieiTurniSettimana]
-  );
-
-  const colleghiAttiviAdesso = useMemo(
-    () =>
-      ricevutiSettimana.filter(elemento =>
-        turnoInCorsoAdesso(elemento?.turno)
-      ),
-    [ricevutiSettimana]
-  );
-
-  const personeInServizioAdesso = useMemo(() => {
-    const lista = [];
-
-    if (mioTurnoAttivoAdesso) {
-      lista.push({
-        id: `adesso_mio_${mioTurnoAttivoAdesso.id}`,
-        nome: 'Tu',
-        azienda: '',
-        turno: mioTurnoAttivoAdesso,
-        mio: true,
-      });
-    }
-
-    colleghiAttiviAdesso.forEach(elemento => {
-      lista.push({
-        id: `adesso_${elemento.condivisione_id}`,
-        nome: nomeProfilo(elemento.profilo),
-        azienda: String(
-          elemento?.profilo?.azienda || ''
-        ).trim(),
-        turno: elemento.turno,
-        mio: false,
-      });
-    });
-
-    return lista;
-  }, [mioTurnoAttivoAdesso, colleghiAttiviAdesso]);
+  const mieiTurniSettimana = useMemo(() => mieiTurni.filter(turno => {
+    const d = dataTurno(turno);
+    return d && d >= inizioSettimana && d <= fineSettimana;
+  }), [mieiTurni, inizioSettimana, fineSettimana]);
+  const elementi = useMemo(() => creaElementiCondivisi({ mieiTurni, ricevuti, colleghi, profilo, fotoProfilo }),
+    [mieiTurni, ricevuti, colleghi, profilo, fotoProfilo]);
+  const cambiaSettimana = delta => { setGiornoSelezionato(prev => aggiungiGiorni(prev, delta * 7)); caricaTutto(); };
 
   const apriCondivisione = () => {
     const idsTurni = new Set(
@@ -360,6 +130,7 @@ export default function CalendarioColleghiScreen({ onBack, palette = null }) {
   };
 
   const salvaCondivisione = async () => {
+    if (salvataggioRef.current) return;
     const turnoIds = mieiTurniSettimana
       .map(t => t?.id)
       .filter(Boolean)
@@ -374,6 +145,7 @@ export default function CalendarioColleghiScreen({ onBack, palette = null }) {
     }
 
     try {
+      salvataggioRef.current = true;
       setSalvataggio(true);
 
       // La selezione del popup diventa la configurazione
@@ -393,6 +165,7 @@ export default function CalendarioColleghiScreen({ onBack, palette = null }) {
 
       await caricaTutto();
 
+      if (!mounted.current) return;
       setModalCondivisione(false);
 
       Alert.alert(
@@ -406,792 +179,33 @@ export default function CalendarioColleghiScreen({ onBack, palette = null }) {
             }.`
       );
     } catch (e) {
+      if (!mounted.current) return;
+      await caricaTutto();
       Alert.alert(
         'Errore',
         e?.message ||
           'Non è stato possibile aggiornare la condivisione.'
       );
     } finally {
-      setSalvataggio(false);
+      salvataggioRef.current = false;
+      if (mounted.current) setSalvataggio(false);
     }
   };
 
-  const elementiDelGiorno = giorno => {
-    const elementi = [];
 
-    mieiTurniSettimana.forEach(turno => {
-      if (stessaData(dataTurno(turno), giorno)) {
-        elementi.push({
-          id: `mio_${turno.id}`,
-          mio: true,
-          nome: 'Tu',
-          profilo: null,
-          turno,
-          livello: 'orari_luogo',
-        });
-      }
-    });
-
-    ricevutiSettimana.forEach(elemento => {
-      if (stessaData(dataTurno(elemento.turno), giorno)) {
-        elementi.push({
-          id: `collega_${elemento.condivisione_id}`,
-          mio: false,
-          nome: nomeProfilo(elemento.profilo),
-          profilo: elemento.profilo,
-          turno: elemento.turno,
-          livello: elemento.livello,
-        });
-      }
-    });
-
-    return elementi.sort((a, b) =>
-      String(a?.turno?.inizio || '99:99').localeCompare(
-        String(b?.turno?.inizio || '99:99')
-      )
-    );
-  };
-
-  const tuttiSelezionati =
-    colleghi.length > 0 &&
-    colleghi.every(c =>
-      selezionati.includes(c?.altro_user_id)
-    );
-
-  return (
-    <View
-      style={{
-        flex: 1,
-        backgroundColor: coloreHome(palette, 'background', '#07111F'),
-      }}
-    >
-      <ScrollView
-        ref={scrollRef}
-        showsVerticalScrollIndicator={false}
-        scrollEventThrottle={16}
-        onScroll={(event) => {
-          setMostraTornaSu(
-            event.nativeEvent.contentOffset.y > 350
-          );
-        }}
-        contentContainerStyle={{
-          paddingHorizontal: 17,
-          paddingTop: 56,
-          paddingBottom: 90,
-        }}
-      >
-        <View
-          style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            marginBottom: 22,
-          }}
-        >
-          <TouchableOpacity
-            onPress={onBack}
-            style={{
-              width: 42,
-              height: 42,
-              borderRadius: 21,
-              backgroundColor: coloreHome(palette, 'surface', '#101B34'),
-              alignItems: 'center',
-              justifyContent: 'center',
-              marginRight: 12,
-            }}
-          >
-            <Ionicons
-              name="chevron-back"
-              size={25}
-              color="#FFFFFF"
-            />
-          </TouchableOpacity>
-
-          <View style={{ flex: 1 }}>
-            <Text
-              style={{
-                color: coloreHome(palette, 'accent', '#8DB8FF'),
-                fontSize: 11,
-                fontWeight: '900',
-                letterSpacing: 1.2,
-              }}
-            >
-              TURNI CONDIVISI
-            </Text>
-
-            <Text
-              style={{
-                color: '#FFFFFF',
-                fontSize: 24,
-                fontWeight: '900',
-                marginTop: 3,
-              }}
-            >
-              Calendario colleghi
-            </Text>
-          </View>
-
-          <Ionicons
-            name="people"
-            size={29}
-            color={coloreHome(palette, 'accent', '#8DB8FF')}
-          />
-        </View>
-
-        <View
-          style={{
-            backgroundColor: coloreHome(palette, 'surface', '#101B34'),
-            borderRadius: 18,
-            borderWidth: 1,
-            borderColor: 'rgba(130,160,255,0.20)',
-            padding: 14,
-            marginBottom: 16,
-          }}
-        >
-          <View
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-            }}
-          >
-            <TouchableOpacity
-              onPress={() =>
-                setInizioSettimana(prev =>
-                  aggiungiGiorni(prev, -7)
-                )
-              }
-              style={{
-                width: 42,
-                height: 42,
-                borderRadius: 13,
-                backgroundColor: 'rgba(255,255,255,0.05)',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              <Ionicons
-                name="chevron-back"
-                size={22}
-                color="#FFFFFF"
-              />
-            </TouchableOpacity>
-
-            <View style={{ alignItems: 'center' }}>
-              <Text
-                style={{
-                  color: '#FFFFFF',
-                  fontSize: 16,
-                  fontWeight: '900',
-                }}
-              >
-                {formattaBreve(inizioSettimana)}
-                {'  –  '}
-                {formattaBreve(fineSettimana)}
-              </Text>
-
-              <Text
-                style={{
-                  color: coloreHome(palette, 'textMuted', '#8190AD'),
-                  fontSize: 11,
-                  marginTop: 4,
-                }}
-              >
-                Settimana condivisa
-              </Text>
-            </View>
-
-            <TouchableOpacity
-              onPress={() =>
-                setInizioSettimana(prev =>
-                  aggiungiGiorni(prev, 7)
-                )
-              }
-              style={{
-                width: 42,
-                height: 42,
-                borderRadius: 13,
-                backgroundColor: 'rgba(255,255,255,0.05)',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              <Ionicons
-                name="chevron-forward"
-                size={22}
-                color="#FFFFFF"
-              />
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        <TouchableOpacity
-          onPress={apriCondivisione}
-          activeOpacity={0.82}
-          style={{
-            backgroundColor: coloreHome(palette, 'accent', '#3158A8'),
-            borderRadius: 17,
-            minHeight: 54,
-            flexDirection: 'row',
-            alignItems: 'center',
-            justifyContent: 'center',
-            marginBottom: 22,
-          }}
-        >
-          <Ionicons
-            name="share-social-outline"
-            size={21}
-            color="#FFFFFF"
-          />
-
-          <Text
-            style={{
-              color: '#FFFFFF',
-              fontSize: 15,
-              fontWeight: '900',
-              marginLeft: 8,
-            }}
-          >
-            Condividi la mia settimana
-          </Text>
-        </TouchableOpacity>
-
-        {!loading && personeInServizioAdesso.length > 0 && (
-          <View
-            style={{
-              backgroundColor: 'rgba(84,232,120,0.07)',
-              borderRadius: 18,
-              borderWidth: 1,
-              borderColor: 'rgba(84,232,120,0.28)',
-              padding: 14,
-              marginBottom: 20,
-            }}
-          >
-            <View
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                marginBottom: 11,
-              }}
-            >
-              <View
-                style={{
-                  width: 9,
-                  height: 9,
-                  borderRadius: 5,
-                  backgroundColor: '#54E878',
-                  marginRight: 8,
-                }}
-              />
-
-              <Text
-                style={{
-                  color: '#FFFFFF',
-                  fontSize: 14,
-                  fontWeight: '900',
-                  flex: 1,
-                }}
-              >
-                IN SERVIZIO ADESSO
-              </Text>
-
-              <Text
-                style={{
-                  color: '#75D89B',
-                  fontSize: 12,
-                  fontWeight: '900',
-                }}
-              >
-                {personeInServizioAdesso.length}
-              </Text>
-            </View>
-
-            {personeInServizioAdesso.map((persona, index) => {
-              const luogoAdesso = postazioneTurno(persona?.turno);
-
-              return (
-                <View
-                  key={persona.id}
-                  style={{
-                    paddingTop: index === 0 ? 0 : 10,
-                    marginTop: index === 0 ? 0 : 10,
-                    borderTopWidth: index === 0 ? 0 : 1,
-                    borderTopColor: 'rgba(255,255,255,0.07)',
-                  }}
-                >
-                  <View
-                    style={{
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                    }}
-                  >
-                    <Text
-                      style={{
-                        color: '#FFFFFF',
-                        fontSize: 13,
-                        fontWeight: '900',
-                        flex: 1,
-                      }}
-                    >
-                      {persona.nome}
-                    </Text>
-
-                    <Text
-                      style={{
-                        color: '#B9EACB',
-                        fontSize: 12,
-                        fontWeight: '800',
-                      }}
-                    >
-                      {orarioTurno(persona.turno)}
-                    </Text>
-                  </View>
-
-                  {!!persona.azienda && (
-                    <Text
-                      style={{
-                        color: coloreHome(palette, 'textMuted', '#8190AD'),
-                        fontSize: 10.5,
-                        fontWeight: '700',
-                        marginTop: 2,
-                      }}
-                    >
-                      {persona.azienda}
-                    </Text>
-                  )}
-
-                  {!!luogoAdesso && (
-                    <Text
-                      numberOfLines={1}
-                      style={{
-                        color: coloreHome(palette, 'textMuted', '#8997B5'),
-                        fontSize: 11,
-                        marginTop: 4,
-                      }}
-                    >
-                      📍 {luogoAdesso}
-                    </Text>
-                  )}
-                </View>
-              );
-            })}
-
-            {mioTurnoAttivoAdesso &&
-              colleghiAttiviAdesso.length > 0 && (
-                <View
-                  style={{
-                    marginTop: 12,
-                    paddingTop: 11,
-                    borderTopWidth: 1,
-                    borderTopColor: 'rgba(84,232,120,0.18)',
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                  }}
-                >
-                  <Ionicons
-                    name="people-outline"
-                    size={16}
-                    color="#54E878"
-                  />
-
-                  <Text
-                    style={{
-                      color: '#75D89B',
-                      fontSize: 11,
-                      fontWeight: '900',
-                      marginLeft: 6,
-                    }}
-                  >
-                    {colleghiAttiviAdesso.length === 1
-                      ? '1 collega è in servizio insieme a te'
-                      : `${colleghiAttiviAdesso.length} colleghi sono in servizio insieme a te`}
-                  </Text>
-                </View>
-              )}
-          </View>
-        )}
-
-        {loading ? (
-          <View
-            style={{
-              paddingVertical: 60,
-              alignItems: 'center',
-            }}
-          >
-            <ActivityIndicator />
-            <Text
-              style={{
-                color: coloreHome(palette, 'textMuted', '#8190AD'),
-                marginTop: 12,
-              }}
-            >
-              Caricamento turni...
-            </Text>
-          </View>
-        ) : (
-          giorniSettimana.map((giorno, indice) => {
-            const elementi = elementiDelGiorno(giorno);
-
-            return (
-              <View
-                key={giorno.toISOString()}
-                style={{
-                  marginBottom: 18,
-                }}
-              >
-                <View
-                  style={{
-                    flexDirection: 'row',
-                    alignItems: 'baseline',
-                    marginBottom: 9,
-                  }}
-                >
-                  <Text
-                    style={{
-                      color: '#FFFFFF',
-                      fontSize: 17,
-                      fontWeight: '900',
-                    }}
-                  >
-                    {GIORNI[indice]}
-                  </Text>
-
-                  <Text
-                    style={{
-                      color: coloreHome(palette, 'accent', '#8DB8FF'),
-                      fontSize: 13,
-                      fontWeight: '800',
-                      marginLeft: 7,
-                    }}
-                  >
-                    {giorno.getDate()}{' '}
-                    {MESI[giorno.getMonth()]}
-                  </Text>
-                </View>
-
-                {elementi.length === 0 ? (
-                  <View
-                    style={{
-                      backgroundColor: coloreHome(palette, 'surfaceRaised', '#0D172B'),
-                      borderRadius: 15,
-                      padding: 14,
-                      borderWidth: 1,
-                      borderColor:
-                        'rgba(130,160,255,0.10)',
-                    }}
-                  >
-                    <Text
-                      style={{
-                        color: '#5F6D87',
-                        fontSize: 12,
-                      }}
-                    >
-                      Nessun turno condiviso
-                    </Text>
-                  </View>
-                ) : (
-                  elementi.map(elemento => {
-                    const luogo = postazioneTurno(elemento?.turno);
-
-                    const azienda =
-                      String(
-                        elemento?.profilo?.azienda || ''
-                      ).trim();
-
-                    const inServizioAdesso =
-                      turnoInCorsoAdesso(elemento.turno);
-
-                    const inServizioConTe =
-                      !elemento.mio &&
-                      inServizioAdesso &&
-                      !!mioTurnoAttivoAdesso;
-
-                    return (
-                      <View
-                        key={elemento.id}
-                        style={{
-                          backgroundColor:
-                            elemento.mio
-                              ? 'rgba(63,104,210,0.28)'
-                              : '#101B34',
-                          borderRadius: 17,
-                          padding: 14,
-                          marginBottom: 8,
-                          borderWidth: 1,
-                          borderColor:
-                            elemento.mio
-                              ? 'rgba(141,184,255,0.60)'
-                              : 'rgba(130,160,255,0.16)',
-                          shadowColor:
-                            elemento.mio ? '#8DB8FF' : '#000000',
-                          shadowOpacity:
-                            elemento.mio ? 0.16 : 0,
-                          shadowRadius:
-                            elemento.mio ? 9 : 0,
-                          shadowOffset: {
-                            width: 0,
-                            height: 3,
-                          },
-                          elevation:
-                            elemento.mio ? 3 : 0,
-                        }}
-                      >
-                        <View
-                          style={{
-                            flexDirection: 'row',
-                            alignItems: 'center',
-                          }}
-                        >
-                          <View
-                            style={{
-                              width: 39,
-                              height: 39,
-                              borderRadius: 20,
-                              backgroundColor:
-                                'rgba(141,184,255,0.13)',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              marginRight: 11,
-                            }}
-                          >
-                            <Ionicons
-                              name={
-                                elemento.mio
-                                  ? 'person'
-                                  : 'shield-outline'
-                              }
-                              size={19}
-                              color={coloreHome(palette, 'accent', '#8DB8FF')}
-                            />
-                          </View>
-
-                          <View style={{ flex: 1 }}>
-                            <View
-                              style={{
-                                flexDirection: 'row',
-                                alignItems: 'center',
-                                flexWrap: 'wrap',
-                              }}
-                            >
-                              {!elemento.mio && (
-                                <View
-                                  style={{
-                                    width: 8,
-                                    height: 8,
-                                    borderRadius: 4,
-                                    marginRight: 7,
-                                    backgroundColor:
-                                      inServizioAdesso
-                                        ? '#54E878'
-                                        : '#667590',
-                                  }}
-                                />
-                              )}
-
-                              <Text
-                                style={{
-                                  color: '#FFFFFF',
-                                  fontSize: 15,
-                                  fontWeight: '900',
-                                }}
-                              >
-                                {elemento.nome}
-                              </Text>
-                            </View>
-
-                            {!elemento.mio && !!azienda && (
-                              <Text
-                                style={{
-                                  color: coloreHome(palette, 'textMuted', '#8190AD'),
-                                  fontSize: 11,
-                                  fontWeight: '700',
-                                  marginTop: 2,
-                                }}
-                              >
-                                {azienda}
-                              </Text>
-                            )}
-
-                            <Text
-                              style={{
-                                color: '#D7E1F7',
-                                fontSize: 14,
-                                fontWeight: '800',
-                                marginTop: 3,
-                              }}
-                            >
-                              {orarioTurno(
-                                elemento.turno
-                              )}
-                            </Text>
-                          </View>
-
-                          {elemento.mio && (
-                            <View
-                              style={{
-                                paddingHorizontal: 8,
-                                paddingVertical: 4,
-                                borderRadius: 8,
-                                backgroundColor:
-                                  'rgba(141,184,255,0.13)',
-                              }}
-                            >
-                              <Text
-                                style={{
-                                  color: coloreHome(palette, 'accent', '#8DB8FF'),
-                                  fontSize: 9,
-                                  fontWeight: '900',
-                                }}
-                              >
-                                TU
-                              </Text>
-                            </View>
-                          )}
-                        </View>
-
-                        {inServizioConTe && (
-                          <View
-                            style={{
-                              alignSelf: 'flex-start',
-                              marginLeft: 50,
-                              marginTop: 10,
-                              paddingHorizontal: 9,
-                              paddingVertical: 5,
-                              borderRadius: 9,
-                              backgroundColor:
-                                'rgba(84,232,120,0.10)',
-                              borderWidth: 1,
-                              borderColor:
-                                'rgba(84,232,120,0.28)',
-                              flexDirection: 'row',
-                              alignItems: 'center',
-                            }}
-                          >
-                            <Ionicons
-                              name="people-outline"
-                              size={13}
-                              color="#54E878"
-                            />
-
-                            <Text
-                              style={{
-                                color: '#75D89B',
-                                fontSize: 10,
-                                fontWeight: '900',
-                                marginLeft: 5,
-                              }}
-                            >
-                              IN SERVIZIO CON TE
-                            </Text>
-                          </View>
-                        )}
-
-                        {luogo ? (
-                          <View
-                            style={{
-                              flexDirection: 'row',
-                              alignItems: 'center',
-                              marginTop: 11,
-                              marginLeft: 50,
-                            }}
-                          >
-                            <Ionicons
-                              name="location-outline"
-                              size={15}
-                              color="#8190AD"
-                            />
-
-                            <Text
-                              style={{
-                                color: '#AAB6CF',
-                                fontSize: 12,
-                                marginLeft: 5,
-                                flex: 1,
-                              }}
-                            >
-                              {luogo}
-                            </Text>
-                          </View>
-                        ) : !elemento.mio &&
-                          elemento.livello ===
-                            'solo_orari' ? (
-                          <View
-                            style={{
-                              flexDirection: 'row',
-                              alignItems: 'center',
-                              marginTop: 11,
-                              marginLeft: 50,
-                            }}
-                          >
-                            <Ionicons
-                              name="lock-closed-outline"
-                              size={14}
-                              color="#667590"
-                            />
-
-                            <Text
-                              style={{
-                                color: '#667590',
-                                fontSize: 11,
-                                marginLeft: 5,
-                              }}
-                            >
-                              Luogo non condiviso
-                            </Text>
-                          </View>
-                        ) : null}
-                      </View>
-                    );
-                  })
-                )}
-              </View>
-            );
-          })
-        )}
-      </ScrollView>
-
-      {mostraTornaSu && !modalCondivisione && (
-        <TouchableOpacity
-          activeOpacity={0.82}
-          onPress={() =>
-            scrollRef.current?.scrollTo({
-              y: 0,
-              animated: true,
-            })
-          }
-          style={{
-            position: 'absolute',
-            right: 18,
-            bottom: 24,
-            width: 46,
-            height: 46,
-            borderRadius: 23,
-            alignItems: 'center',
-            justifyContent: 'center',
-            backgroundColor: 'rgba(20,45,85,0.96)',
-            borderWidth: 1,
-            borderColor: 'rgba(141,184,255,0.55)',
-            zIndex: 50,
-            elevation: 8,
-            shadowColor: '#8DB8FF',
-            shadowOpacity: 0.22,
-            shadowRadius: 9,
-            shadowOffset: { width: 0, height: 4 },
-          }}
-        >
-          <Ionicons
-            name="arrow-up"
-            size={22}
-            color="#FFFFFF"
-          />
-        </TouchableOpacity>
-      )}
-
+  const tuttiSelezionati = colleghi.length > 0 && colleghi.every(c => selezionati.includes(c?.altro_user_id));
+  return <View style={{ flex: 1, backgroundColor: colors.background }}>
+    <TurniCondivisiView palette={colors} elementi={elementi} adesso={adesso}
+      giornoSelezionato={giornoSelezionato} inizioSettimana={inizioSettimana}
+      onGiorno={setGiornoSelezionato} onSettimana={cambiaSettimana}
+      backLabel={backLabel} onBack={onBack} onHome={onHome} onGestioneColleghi={onGestioneColleghi}
+      onCondividi={apriCondivisione} onRefresh={caricaTutto} loading={loading} errore={errore} />
       <Modal
         visible={modalCondivisione}
         transparent
         animationType="slide"
         onRequestClose={() =>
-          setModalCondivisione(false)
+          !salvataggioRef.current && setModalCondivisione(false)
         }
       >
         <View
@@ -1222,7 +236,7 @@ export default function CalendarioColleghiScreen({ onBack, palette = null }) {
               <View style={{ flex: 1 }}>
                 <Text
                   style={{
-                    color: '#FFFFFF',
+                    color: colors.text,
                     fontSize: 21,
                     fontWeight: '900',
                   }}
@@ -1245,7 +259,7 @@ export default function CalendarioColleghiScreen({ onBack, palette = null }) {
 
               <TouchableOpacity
                 onPress={() =>
-                  setModalCondivisione(false)
+                  !salvataggioRef.current && setModalCondivisione(false)
                 }
                 style={{
                   width: 40,
@@ -1260,7 +274,7 @@ export default function CalendarioColleghiScreen({ onBack, palette = null }) {
                 <Ionicons
                   name="close"
                   size={23}
-                  color="#FFFFFF"
+                  color={colors.text}
                 />
               </TouchableOpacity>
             </View>
@@ -1268,7 +282,7 @@ export default function CalendarioColleghiScreen({ onBack, palette = null }) {
             <ScrollView>
               <Text
                 style={{
-                  color: '#FFFFFF',
+                  color: colors.text,
                   fontSize: 14,
                   fontWeight: '900',
                   marginBottom: 10,
@@ -1294,18 +308,18 @@ export default function CalendarioColleghiScreen({ onBack, palette = null }) {
                     marginRight: 6,
                     backgroundColor:
                       livello === 'solo_orari'
-                        ? '#3158A8'
-                        : '#101B34',
+                        ? colors.accent
+                        : colors.surfaceRaised,
                     borderWidth: 1,
                     borderColor:
                       livello === 'solo_orari'
-                        ? '#8DB8FF'
+                        ? colors.homeAccent
                         : 'rgba(130,160,255,0.18)',
                   }}
                 >
                   <Text
                     style={{
-                      color: '#FFFFFF',
+                      color: livello === 'solo_orari' ? colors.onAccent : colors.text,
                       fontWeight: '900',
                       textAlign: 'center',
                     }}
@@ -1325,18 +339,18 @@ export default function CalendarioColleghiScreen({ onBack, palette = null }) {
                     marginLeft: 6,
                     backgroundColor:
                       livello === 'orari_luogo'
-                        ? '#3158A8'
-                        : '#101B34',
+                        ? colors.accent
+                        : colors.surfaceRaised,
                     borderWidth: 1,
                     borderColor:
                       livello === 'orari_luogo'
-                        ? '#8DB8FF'
+                        ? colors.homeAccent
                         : 'rgba(130,160,255,0.18)',
                   }}
                 >
                   <Text
                     style={{
-                      color: '#FFFFFF',
+                      color: livello === 'orari_luogo' ? colors.onAccent : colors.text,
                       fontWeight: '900',
                       textAlign: 'center',
                     }}
@@ -1356,7 +370,7 @@ export default function CalendarioColleghiScreen({ onBack, palette = null }) {
                 <Text
                   style={{
                     flex: 1,
-                    color: '#FFFFFF',
+                    color: colors.text,
                     fontSize: 14,
                     fontWeight: '900',
                   }}
@@ -1366,6 +380,8 @@ export default function CalendarioColleghiScreen({ onBack, palette = null }) {
 
                 {colleghi.length > 0 && (
                   <TouchableOpacity
+                    accessibilityRole="button"
+                    accessibilityLabel={tuttiSelezionati ? 'Deseleziona tutti' : 'Seleziona tutti'}
                     onPress={selezionaTutti}
                   >
                     <Text
@@ -1414,6 +430,9 @@ export default function CalendarioColleghiScreen({ onBack, palette = null }) {
                         collega.id ||
                         id
                       }
+                      accessibilityRole="checkbox"
+                      accessibilityLabel={nomeProfilo(collega.profilo)}
+                      accessibilityState={{ checked: selezionato }}
                       onPress={() =>
                         toggleCollega(id)
                       }
@@ -1426,7 +445,7 @@ export default function CalendarioColleghiScreen({ onBack, palette = null }) {
                         marginBottom: 8,
                         borderWidth: 1,
                         borderColor: selezionato
-                          ? '#8DB8FF'
+                          ? colors.homeAccent
                           : 'rgba(130,160,255,0.15)',
                       }}
                     >
@@ -1439,8 +458,8 @@ export default function CalendarioColleghiScreen({ onBack, palette = null }) {
                         size={23}
                         color={
                           selezionato
-                            ? '#8DB8FF'
-                            : '#667590'
+                            ? colors.homeAccent
+                            : colors.textMuted
                         }
                       />
 
@@ -1452,7 +471,7 @@ export default function CalendarioColleghiScreen({ onBack, palette = null }) {
                       >
                         <Text
                           style={{
-                            color: '#FFFFFF',
+                            color: colors.text,
                             fontSize: 14,
                             fontWeight: '900',
                           }}
@@ -1495,7 +514,7 @@ export default function CalendarioColleghiScreen({ onBack, palette = null }) {
               >
                 <Text
                   style={{
-                    color: '#AEB9D6',
+                    color: colors.textMuted,
                     fontSize: 11,
                     lineHeight: 17,
                   }}
@@ -1509,6 +528,8 @@ export default function CalendarioColleghiScreen({ onBack, palette = null }) {
 
             <TouchableOpacity
               disabled={salvataggio}
+              accessibilityRole="button"
+              accessibilityLabel="Salva condivisione"
               onPress={salvaCondivisione}
               style={{
                 backgroundColor: coloreHome(palette, 'accent', '#3158A8'),
@@ -1521,18 +542,18 @@ export default function CalendarioColleghiScreen({ onBack, palette = null }) {
               }}
             >
               {salvataggio ? (
-                <ActivityIndicator color="#FFFFFF" />
+                <ActivityIndicator color={colors.onAccent} />
               ) : (
                 <>
                   <Ionicons
                     name="people-outline"
                     size={21}
-                    color="#FFFFFF"
+                    color={colors.onAccent}
                   />
 
                   <Text
                     style={{
-                      color: '#FFFFFF',
+                      color: colors.onAccent,
                       fontSize: 15,
                       fontWeight: '900',
                       marginLeft: 8,
@@ -1546,6 +567,5 @@ export default function CalendarioColleghiScreen({ onBack, palette = null }) {
           </View>
         </View>
       </Modal>
-    </View>
-  );
+  </View>;
 }

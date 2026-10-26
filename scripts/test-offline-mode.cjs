@@ -139,6 +139,7 @@ async function main() {
       './runtimeMode': { OFFLINE_TEST: offline },
       './offlineTest/networkGuard': { installOfflineNetworkGuard() { order.push('guard'); } },
       './offlineTest/resolverCheck': marker, './App': appModule,
+      './ThemeEffects': { ThemeEffectsProvider: 'ThemeEffectsProvider' },
     };
     if (offline && !isolated) {
       assert.throws(() => load('index.js', mocks), /bundle non isolato/);
