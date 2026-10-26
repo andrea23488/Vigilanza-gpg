@@ -53,10 +53,13 @@ function refreshPresenceLease(previous, update, options = {}) {
   const nowMs = safeInteger(options.nowMs, 'nowMs');
   const ttlMs = safeInteger(options.ttlMs ?? DEFAULT_PRESENCE_TTL_MS, 'ttlMs', 1);
   const acknowledgedVersion = safeInteger(update.acknowledgedVersion ?? previous.acknowledgedVersion, 'acknowledgedVersion');
+  const requestedState = update.appState ?? previous.appState;
+  const appState = PRESENCE_STATES.has(requestedState) ? requestedState : 'disconnected';
+  const requestedVisibility = update.routeVisible ?? previous.routeVisible;
   return {
     ...previous,
-    appState: PRESENCE_STATES.has(update.appState) ? update.appState : 'disconnected',
-    routeVisible: update.appState === 'foreground' && update.routeVisible === true,
+    appState,
+    routeVisible: appState === 'foreground' && requestedVisibility === true,
     // Le conferme non possono tornare indietro se arrivano callback fuori ordine.
     acknowledgedVersion: Math.max(previous.acknowledgedVersion, acknowledgedVersion),
     leaseExpiresAtMs: nowMs + ttlMs,
@@ -121,11 +124,44 @@ function decideGamePush(input) {
   return { decision: 'send', reason: active.length ? 'ack_timeout' : 'not_viewing_game', eventId };
 }
 
+/**
+ * Transition guard for the legacy direct sender and a future durable outbox.
+ * When the outbox owns game notifications, direct/client paths may enqueue or
+ * observe an event but may never dispatch it themselves.
+ */
+function coordinateGamePush(input) {
+  const eventId = createGameEventId(input?.event);
+  const source = input?.source;
+  const outboxAuthoritative = input?.outboxAuthoritative === true;
+  const outboxEventIds = input?.outboxEventIds;
+
+  if (containsEvent(outboxEventIds, eventId) && source !== 'outbox_worker') {
+    return { decision: 'suppress', reason: 'already_owned_by_outbox', eventId };
+  }
+
+  if (outboxAuthoritative) {
+    if (source === 'legacy_direct') {
+      return { decision: 'suppress', reason: 'outbox_is_single_dispatcher', eventId };
+    }
+    if (source === 'client_enqueue') {
+      return { decision: 'enqueue_only', reason: 'outbox_is_single_dispatcher', eventId };
+    }
+    if (source !== 'outbox_worker') {
+      throw new TypeError('Sorgente notifica non valida');
+    }
+  } else if (source !== 'legacy_direct' && source !== 'outbox_worker') {
+    throw new TypeError('Sorgente notifica non valida');
+  }
+
+  return decideGamePush(input);
+}
+
 module.exports = {
   DEFAULT_ACK_GRACE_MS,
   DEFAULT_PRESENCE_TTL_MS,
   createGameEventId,
   createPresenceLease,
+  coordinateGamePush,
   decideGamePush,
   isLiveGamePresence,
   refreshPresenceLease,

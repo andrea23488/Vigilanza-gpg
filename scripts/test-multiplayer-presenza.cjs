@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 const {
   createGameEventId,
   createPresenceLease,
+  coordinateGamePush,
   decideGamePush,
   isLiveGamePresence,
   refreshPresenceLease,
@@ -105,4 +106,24 @@ test('background transition cannot suppress; reconnect renews lease without lowe
   }, { nowMs: 20_000, ttlMs: 45_000 });
   assert.equal(reconnected.acknowledgedVersion, 8);
   assert.equal(isLiveGamePresence(reconnected, event, 20_100), true);
+});
+
+test('legacy direct and outbox have one logical dispatcher during transition', () => {
+  const common = {
+    event,
+    nowMs: 20_000,
+    presences: [],
+    eligibleDeviceCount: 1,
+    permissionGranted: true,
+    preferenceEnabled: true,
+    outboxAuthoritative: true,
+  };
+  assert.deepEqual(coordinateGamePush({ ...common, source: 'client_enqueue' }), {
+    decision: 'enqueue_only', reason: 'outbox_is_single_dispatcher', eventId: createGameEventId(event),
+  });
+  assert.equal(coordinateGamePush({ ...common, source: 'legacy_direct' }).reason, 'outbox_is_single_dispatcher');
+  assert.equal(coordinateGamePush({
+    ...common, source: 'legacy_direct', outboxEventIds: [createGameEventId(event)],
+  }).reason, 'already_owned_by_outbox');
+  assert.equal(coordinateGamePush({ ...common, source: 'outbox_worker' }).decision, 'send');
 });
