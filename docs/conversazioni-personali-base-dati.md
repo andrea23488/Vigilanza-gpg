@@ -137,8 +137,9 @@ git diff --check
 ```
 
 Il runner usa esclusivamente `/var/run/docker.sock`, crea un container
-`postgres:17-alpine` con `--network none`, nessuna porta/volume, e lo elimina al
-termine. Può scaricare l'immagine tramite Docker; non legge configurazioni o
+`postgres:17-alpine` con `--network none`, nessuna porta o bind mount, cluster
+su tmpfs, e lo elimina al termine. L'immagine deve essere già disponibile:
+il runner usa `--pull=never` e non effettua download; non legge configurazioni o
 credenziali Supabase e non accetta URL remoti. Fixture eseguibile soltanto su un
 database usa-e-getta: crea ruoli, auth e messaggi minimi. Non applicare la fixture
 a un progetto Supabase esistente.
@@ -153,3 +154,10 @@ e un terzo estraneo per ripetere i casi tramite API/RPC reali. Verificare che
 Svuota/Elimina/Archivia non cambino alcun messaggio, che nuovo messaggio e riavvio
 mantengano lo stato server, e che i vecchi client continuino a inviare/leggere.
 Misurare anche backfill e contesa. Nessun comando remoto è eseguito dal runner.
+
+
+Estensione BLOCCO 2A: `supabase/tests/conversazioni_personali_2a.sql` aggiunge
+verifiche di isolamento A/B, archivio, ricerca, non letti e retry tardivi. Il
+runner verifica anche lo stato tra processi client nuovi. Vedere
+`docs/blocco2a-chat-personali.md` per il blocco di verifica dello schema remoto
+e i limiti: queste prove riguardano la proposta, non l’app già integrata.

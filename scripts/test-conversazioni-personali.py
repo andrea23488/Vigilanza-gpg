@@ -87,16 +87,42 @@ def concurrent_tests():
     print('PASS: concorrenza insert/svuota, elimina/insert, retry simultanei, prima coppia')
 
 
+def persistence_tests():
+    """Ogni sql avvia un nuovo processo psql: nessuna cache del client precedente."""
+    c = sql(f"SELECT id FROM public.chat_conversazioni WHERE utente_a='{A}' AND utente_b='{B}'")
+    version = sql(actor(f"SELECT versione FROM public.chat_stati_personali WHERE conversazione_id='{c}'"))
+    before_b = sql(f"SELECT to_jsonb(s) FROM public.chat_stati_personali s WHERE conversazione_id='{c}' AND user_id='{B}'")
+    before_messages = sql('SELECT jsonb_agg(to_jsonb(m) ORDER BY id) FROM public.messaggi m')
+    op = str(uuid.uuid4())
+    query = actor(f"SELECT public.chat_personale_operazione('{c}','{op}','archivia',{version})")
+    result = sql(query)
+    assert sql(actor(f"SELECT stato='archived' FROM public.chat_stati_personali WHERE conversazione_id='{c}'")) == 't'
+    assert sql(query) == result
+    assert sql(f"SELECT to_jsonb(s) FROM public.chat_stati_personali s WHERE conversazione_id='{c}' AND user_id='{B}'") == before_b
+    assert sql('SELECT jsonb_agg(to_jsonb(m) ORDER BY id) FROM public.messaggi m') == before_messages
+    # Un altro processo client invia; una successiva connessione A ritrova archivio e cursore.
+    sql(f"SET ROLE authenticated; SET request.jwt.claim.sub='{B}'; INSERT INTO public.messaggi(mittente_id,destinatario_id,testo) VALUES('{B}','{A}','persistenza sintetica')")
+    assert sql(actor(f"SELECT stato='archived' AND nascosti_fino_a=4 FROM public.chat_stati_personali WHERE conversazione_id='{c}'")) == 't'
+    assert sql(actor(f"SELECT count(*) FROM public.chat_posizioni_messaggi WHERE conversazione_id='{c}'")) == '1'
+    print('PASS: stato e cursore persistono tra nuovi processi client e riconnessione; nessuna modifica a B')
+
+
 def main():
     started = False
     try:
-        command(DOCKER + ['run', '--detach', '--name', NAME, '--network', 'none',
+        command(DOCKER + ['run', '--pull=never', '--detach', '--name', NAME, '--network', 'none',
+                         '--tmpfs', '/var/lib/postgresql/data:rw,nosuid,noexec,size=256m',
                          '--label', 'vigilanza.test=conversazioni-personali',
                          '-e', 'POSTGRES_PASSWORD=local-disposable-test', 'postgres:17-alpine'])
         started = True
         deadline = time.monotonic() + 45
         while True:
             try:
+                # L'entrypoint avvia prima un server temporaneo per initdb.
+                # Aspettare il processo definitivo evita di perdere la socket
+                # tra il controllo di readiness e il caricamento della fixture.
+                if command(DOCKER + ['exec', NAME, 'cat', '/proc/1/comm']) != 'postgres':
+                    raise RuntimeError('Inizializzazione PostgreSQL ancora in corso')
                 sql('SELECT 1')
                 break
             except RuntimeError:
@@ -105,12 +131,14 @@ def main():
                 time.sleep(0.2)
         for path in ['supabase/tests/conversazioni_personali_fixture.sql',
                      'supabase/migrations/202610180001_conversazioni_personali.sql',
-                     'supabase/tests/conversazioni_personali.sql']:
+                     'supabase/tests/conversazioni_personali.sql',
+                     'supabase/tests/conversazioni_personali_2a.sql']:
             output = sql((ROOT / path).read_text())
             print(path + ': OK')
             if 'PASS:' in output:
                 print(output[output.index('PASS:'):])
         concurrent_tests()
+        persistence_tests()
         # Lo snapshot include anche letto_at: i test non devono modificarlo.
         assert sql("""SELECT NOT EXISTS (
           SELECT 1 FROM public.fixture_snapshot f LEFT JOIN public.messaggi m USING(id)
@@ -118,7 +146,7 @@ def main():
         print('PASS: integrita messaggi dopo concorrenza')
     finally:
         if started:
-            command(DOCKER + ['rm', '-f', NAME])
+            command(DOCKER + ['rm', '-f', '-v', NAME])
 
 
 if __name__ == '__main__':
