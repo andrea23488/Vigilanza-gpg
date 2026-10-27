@@ -241,34 +241,11 @@ export async function eliminaMessaggio(messaggioId) {
   return true;
 }
 
+// Compatibilità del nome export, senza più cancellazioni dei messaggi condivisi.
 export async function eliminaConversazione(altroUserId) {
-  const user = await getCurrentUser();
-
-  const { data: deleted1, error: error1 } = await supabase
-    .from('messaggi')
-    .delete()
-    .eq('mittente_id', user.id)
-    .eq('destinatario_id', altroUserId)
-    .select();
-
-  if (error1) throw error1;
-
-  const { data: deleted2, error: error2 } = await supabase
-    .from('messaggi')
-    .delete()
-    .eq('mittente_id', altroUserId)
-    .eq('destinatario_id', user.id)
-    .select();
-
-  if (error2) throw error2;
-
-  console.log('DELETE CONVERSAZIONE:', {
-    altroUserId,
-    mieiEliminati: deleted1,
-    suoiEliminati: deleted2
-  });
-
-  return true;
+  const error = new Error('Eliminazione personale non disponibile: supporto backend non verificato. Nessun messaggio è stato cancellato.');
+  error.code = 'CHAT_PERSONALI_NON_DISPONIBILI';
+  throw error;
 }
 
 export async function colleghiConConversazione() {

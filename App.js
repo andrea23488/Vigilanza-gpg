@@ -1,3 +1,5 @@
+import ChatConversationActions, { ChatArchivedContent } from './ChatConversationActions';
+import { conversazioniUniche, chiaveConversazionePersonale } from './chatPersonaliUiModel';
 import ThemeScenery from './ThemeScenery';
 import { useThemeDecorationPage } from './ThemeEffects';
 import { coloreStileTema, stiliConTema } from './temaSchermate';
@@ -35,7 +37,6 @@ import {
   segnaConsegnaComeLetta,
   mioUserId,
   eliminaMessaggio,
-  eliminaConversazione,
   colleghiConConversazione,
   caricaRiepilogoConversazioni,
   segnaMessaggiComeLetti,
@@ -531,7 +532,7 @@ export default function App() {
         !biometriaInizializzata || (biometriaAbilitata && !biometriaSbloccata)) return undefined;
     const destinazioni = {
       calendar: 'home', turni: ritornoListaTurni, strumenti: 'home', stipendio: 'home',
-      listaChat: origineSocial ? 'social' : 'home', calendarioColleghi: origineSocial ? 'social' : 'home', colleghi: origineSocial ? 'social' : 'home',
+      chatArchiviate: 'listaChat', listaChat: origineSocial ? 'social' : 'home', calendarioColleghi: origineSocial ? 'social' : 'home', colleghi: origineSocial ? 'social' : 'home',
       social: 'home', profiliSocial: 'social', cercaCollegaSocial: 'social',
       ...(origineSocial ? { profiloCollega: 'profiliSocial' } : {}),
       centroNotifiche: 'home', profile: 'home',
@@ -13612,6 +13613,13 @@ if (screen === 'configuraStipendio') {
     );
   }
 
+  if (screen === 'chatArchiviate') {
+    return <Screen homePalette={paletteHome}>
+      <Back paletteHome={paletteHome} onPress={() => setScreen('listaChat')} />
+      <ChatArchivedContent paletteHome={paletteHome} />
+    </Screen>;
+  }
+
   if (screen === 'listaChat') {
     return (
       <Screen homePalette={paletteHome}>
@@ -13634,45 +13642,25 @@ if (screen === 'configuraStipendio') {
           Messaggi con i tuoi colleghi
         </Text>
 
-        {colleghi.length === 0 ? (
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Apri Archiviate" onPress={() => setScreen('chatArchiviate')}
+          style={{ minHeight: 48, padding: 12, marginBottom: 16, borderRadius: 14, backgroundColor: coloreHome(paletteHome, 'surface', '#101C2D') }}>
+          <Text style={{ color: coloreHome(paletteHome, 'text', '#FFFFFF') }}>Archiviate · non disponibili in questa versione</Text>
+        </TouchableOpacity>
+
+        {conversazioniUniche(colleghi, utenteAutenticato?.id).length === 0 ? (
           <Text style={{ color: coloreStileTema(paletteHome, '#9fb2d9', 'color'), fontSize: 16 }}>
             Nessun collega disponibile
           </Text>
         ) : (
-          colleghi.map((c) => (
-            <TouchableOpacity
-              key={c.id}
-              onPress={() => {
+          conversazioniUniche(colleghi, utenteAutenticato?.id).map((c) => (
+            <ChatConversationActions
+              key={chiaveConversazionePersonale(utenteAutenticato?.id, c.altro_user_id)}
+              identity={chiaveConversazionePersonale(utenteAutenticato?.id, c.altro_user_id)}
+              paletteHome={paletteHome}
+              onOpen={() => {
                 setCollegaSelezionato(c);
                 setChatMessaggio('');
                 setScreen('chatCollega');
-              }}
-              onLongPress={() => {
-                Alert.alert(
-                  'Elimina conversazione',
-                  'Vuoi eliminare definitivamente tutti i messaggi di questa conversazione?',
-                  [
-                    { text: 'Annulla', style: 'cancel' },
-                    {
-                      text: 'Elimina',
-                      style: 'destructive',
-                      onPress: async () => {
-                        try {
-                          await eliminaConversazione(c.altro_user_id);
-                          setChatColleghiIds(prev => prev.filter(id => id !== c.altro_user_id));
-                          setChatMessaggi([]);
-                          Alert.alert('Conversazione eliminata');
-                        } catch (e) {
-                          Alert.alert(
-                            'Errore',
-                            e?.message || 'Non è stato possibile eliminare la conversazione.'
-                          );
-                        }
-                      },
-                    },
-                  ]
-                );
-
               }}
               style={{
           backgroundColor: coloreStileTema(paletteHome, '#1B2058', 'backgroundColor'),
@@ -13872,398 +13860,13 @@ if (screen === 'configuraStipendio') {
           ) : null}
         </View>
 
-      </TouchableOpacity>
+      </ChatConversationActions>
           ))
         )}
       </Screen>
     );
   }
 
-
-  if (screen === 'listaChat') {
-    return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: coloreStileTema(paletteHome, '#080D22', 'backgroundColor', 'background') }}>
-        <ScrollView
-          contentContainerStyle={{
-            padding: 22,
-            paddingBottom: 50
-          }}
-        >
-          <TouchableOpacity
-            onPress={() => setScreen(origineSocial ? 'social' : 'home')}
-            style={{ marginBottom: 20 }}
-          >
-            <Text style={{ color: coloreStileTema(paletteHome, 'white', 'color'), fontSize: 28 }}>‹</Text>
-          </TouchableOpacity>
-
-          <Text
-            style={{
-              color: coloreStileTema(paletteHome, 'white', 'color'),
-              fontSize: 30,
-              fontWeight: '800',
-              marginBottom: 4
-            }}
-          >
-            💬 Chat
-          </Text>
-
-          <View
-        style={{
-        backgroundColor: coloreStileTema(paletteHome, 'rgba(44,38,108,0.72)', 'backgroundColor'),
-        borderRadius: 30,
-        paddingHorizontal: 21,
-        paddingVertical: 20,
-        marginBottom: 22,
-
-        borderWidth: 1.2,
-        borderColor: coloreStileTema(paletteHome, 'rgba(133,119,255,0.90)', 'borderColor'),
-
-        shadowColor: coloreStileTema(paletteHome, '#776BFF', 'shadowColor'),
-        shadowOpacity: 0.62,
-        shadowRadius: 28,
-        shadowOffset: { width: 0, height: 7 },
-
-        elevation: 12,
-      }}
-      >
-        <Text
-          style={{
-            color: coloreStileTema(paletteHome, '#84DFFF', 'color'),
-            fontSize: 10,
-            fontWeight: '900',
-            letterSpacing: 1.5,
-            marginBottom: 5,
-          }}
-        >
-          MESSAGGI
-        </Text>
-
-        <Text
-          style={{
-              color: coloreStileTema(paletteHome, '#FFFFFF', 'color'),
-              fontSize: 27,
-              fontWeight: '900',
-              letterSpacing: -0.8,
-
-              textShadowColor: '#5DE8FF',
-              textShadowOffset: { width: 0, height: 0 },
-              textShadowRadius: 16,
-            }}
-        >
-          Le tue conversazioni
-        </Text>
-
-            {/* STATISTICHE HEADER CHAT */}
-            <Text
-              style={{
-                color: coloreStileTema(paletteHome, '#AEEAFF', 'color'),
-                fontSize: 11.5,
-                fontWeight: '800',
-                marginTop: 7,
-                letterSpacing: 0.35,
-
-                textShadowColor: 'rgba(83,216,255,0.22)',
-                textShadowOffset: { width: 0, height: 0 },
-                textShadowRadius: 7,
-              }}
-            >
-              {`${chatColleghiIds.length} ${
-                chatColleghiIds.length === 1
-                  ? 'conversazione'
-                  : 'conversazioni'
-              } · ${Object.values(riepilogoChat || {}).reduce(
-                (tot, chat) => tot + (chat?.nonLetti || 0),
-                0
-              )} non ${
-                Object.values(riepilogoChat || {}).reduce(
-                  (tot, chat) => tot + (chat?.nonLetti || 0),
-                  0
-                ) === 1
-                  ? 'letto'
-                  : 'letti'
-              }`}
-            </Text>
-
-
-        <Text
-          style={{
-              color: coloreStileTema(paletteHome, '#8192A6', 'color'),
-              fontSize: 12,
-              fontWeight: '500',
-              marginTop: 5,
-            }}
-        >
-          Conversazioni con i tuoi colleghi
-        </Text>
-      </View>
-
-          {colleghi.length === 0 ? (
-            <Text style={{ color: coloreStileTema(paletteHome, '#9fb2d9', 'color'), fontSize: 16 }}>
-              Nessun collega disponibile.
-            </Text>
-          ) : (
-            colleghi
-              .filter((c) => chatColleghiIds.includes(c.altro_user_id))
-    .sort((a, b) => {
-      const dataA = riepilogoChat[a.altro_user_id]?.created_at
-        ? new Date(riepilogoChat[a.altro_user_id].created_at).getTime()
-        : 0;
-
-      const dataB = riepilogoChat[b.altro_user_id]?.created_at
-        ? new Date(riepilogoChat[b.altro_user_id].created_at).getTime()
-        : 0;
-
-      return dataB - dataA;
-    })
-              .map((c) => (
-              <TouchableOpacity
-                key={c.id}
-                onPress={() => {
-                  setCollegaSelezionato(c);
-                  setChatMessaggio('');
-                  setScreen('chatCollega');
-                }}
-                style={{
-          backgroundColor: coloreStileTema(paletteHome, '#FF00AA', 'backgroundColor'),
-          borderRadius: 34,
-          paddingHorizontal: 20,
-          paddingVertical: 20,
-          marginBottom: 18,
-          borderWidth: 4,
-          borderColor: coloreStileTema(paletteHome, '#00FFFF', 'borderColor'),
-          shadowColor: coloreStileTema(paletteHome, '#00FFFF', 'shadowColor'),
-          shadowOpacity: 1,
-          shadowRadius: 25,
-          shadowOffset: { width: 0, height: 0 },
-          elevation: 15,
-        }}
-              >
-                {/* AVATAR CONVERSAZIONE */}
-        <View
-          style={{
-              width: 50,
-              height: 50,
-              borderRadius: 25,
-
-              backgroundColor:
-                coloreStileTema(paletteHome, (riepilogoChat[c.altro_user_id]?.nonLetti || 0) > 0
-                  ? 'rgba(37,112,154,0.90)'
-                  : 'rgba(69,60,142,0.86)', 'backgroundColor'),
-
-              borderWidth: 1.4,
-
-              borderColor:
-                coloreStileTema(paletteHome, (riepilogoChat[c.altro_user_id]?.nonLetti || 0) > 0
-                  ? '#82F3FF'
-                  : '#A296FF', 'borderColor'),
-
-              alignItems: 'center',
-              justifyContent: 'center',
-              marginRight: 11,
-
-              shadowColor:
-                coloreStileTema(paletteHome, (riepilogoChat[c.altro_user_id]?.nonLetti || 0) > 0
-                  ? '#5DEBFF'
-                  : '#8C7CFF', 'shadowColor'),
-
-              shadowOpacity: 0.78,
-              shadowRadius: 15,
-              shadowOffset: { width: 0, height: 4 },
-
-              elevation: 10,
-            }}
-        >
-          <View
-            style={{
-              width: 38,
-              height: 38,
-              borderRadius: 19,
-              backgroundColor: coloreStileTema(paletteHome, '#102A46', 'backgroundColor'),
-              borderWidth: 1,
-              borderColor: coloreStileTema(paletteHome, '#2A6C91', 'borderColor'),
-              alignItems: 'center',
-              justifyContent: 'center',
-              marginRight: 10,
-            }}
-          >
-            <Text
-              style={{
-                color: coloreStileTema(paletteHome, '#FFFFFF', 'color'),
-                fontSize: 18,
-                fontWeight: '900',
-                letterSpacing: -0.35,
-
-                textShadowColor:
-                  (riepilogoChat[c.altro_user_id]?.nonLetti || 0) > 0
-                    ? 'rgba(93,235,255,0.40)'
-                    : 'rgba(140,124,255,0.24)',
-
-                textShadowOffset: { width: 0, height: 0 },
-                textShadowRadius: 10,
-              }}
-            >
-              {`${c.profilo?.nome?.charAt(0) || ''}${c.profilo?.cognome?.charAt(0) || ''}`.toUpperCase() || 'GPG'}
-            </Text>
-          </View>
-
-          <View style={{ flex: 1 }}>
-            <Text
-              numberOfLines={1}
-              style={{
-                color: coloreStileTema(paletteHome, '#FFFFFF', 'color'),
-                fontSize: 16.5,
-                fontWeight: '900',
-                letterSpacing: -0.25,
-              }}
-            >
-              {c.profilo?.nome || 'Collega'} {c.profilo?.cognome || ''}
-            </Text>
-          </View>
-        </View>
-
-                <Text
-                  style={{
-            color: coloreStileTema(paletteHome, '#9CCDE9', 'color'),
-            fontSize: 10.5,
-            fontWeight: '600',
-            marginTop: 4,
-            letterSpacing: 0.2,
-          }}
-                >
-                  {[c.profilo?.azienda, c.profilo?.codice_gpg]
-                    .filter(Boolean)
-                    .join(' · ')}
-                </Text>
-
-            {(() => {
-              const r = riepilogoChat[c.altro_user_id];
-
-              if (!r) {
-                return (
-                  <Text
-                    style={{
-                      color: coloreStileTema(paletteHome, '#6F89A9', 'color'),
-                      fontSize: 12,
-                      marginTop: 9,
-                    }}
-                  >
-                    Nessun messaggio recente
-                  </Text>
-                );
-              }
-
-              const ora = r.created_at
-                ? new Date(r.created_at).toLocaleTimeString('it-IT', {
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  })
-                : '';
-
-              return (
-                <View
-                  style={{
-                    marginTop: 8,
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                  }}
-                >
-                  <Text
-                    numberOfLines={1}
-                    style={{
-                      flex: 1,
-                      color:
-                        coloreStileTema(paletteHome, r.nonLetti > 0
-                          ? '#F4FDFF'
-                          : '#A4B7C9', 'color'),
-
-                      fontSize: 13,
-
-                      fontWeight:
-                        r.nonLetti > 0
-                          ? '700'
-                          : '500',
-
-                      marginRight: 8,
-                      marginTop: 3,
-                    }}
-                  >
-                    {r.ultimoMessaggio || 'Messaggio'}
-                  </Text>
-
-                  <View
-                    style={{
-                      alignItems: 'flex-end',
-                      gap: 5,
-                    }}
-                  >
-                    
-
-                    {r.nonLetti > 0 ? (
-                      <View
-                        style={{
-                          minWidth: 22,
-                          height: 22,
-                          borderRadius: 11,
-                          paddingHorizontal: 6,
-                          backgroundColor: coloreStileTema(paletteHome, '#5CEAFF', 'backgroundColor'),
-                          borderWidth: 1,
-                          borderColor: coloreStileTema(paletteHome, '#C6FAFF', 'borderColor'),
-                          alignItems: 'center',
-                          justifyContent: 'center',
-
-                          shadowColor: coloreStileTema(paletteHome, '#5CEAFF', 'shadowColor'),
-                          shadowOpacity: 0.70,
-                          shadowRadius: 9,
-                        }}
-                      >
-                        <Text
-                          style={{
-                            color: coloreStileTema(paletteHome, '#062033', 'color'),
-                            fontSize: 10,
-                            fontWeight: '900',
-                          }}
-                        >
-                          {r.nonLetti}
-                        </Text>
-                      </View>
-                    ) : null}
-                  </View>
-                </View>
-              );
-            })()}
-
-
-                {c.profilo?.sede ? (
-                  <Text
-                    style={{
-                      color: coloreStileTema(paletteHome, '#9fb2d9', 'color'),
-                      marginTop: 3,
-                      fontSize: 12.5
-                    }}
-                  >
-                    📍 {c.profilo.sede}
-                  </Text>
-                ) : null}
-              
-
-        {/* SEPARATORE CONVERSAZIONE */}
-        <View
-          style={{
-            height: 1,
-            backgroundColor: coloreStileTema(paletteHome, '#315378', 'backgroundColor'),
-            marginLeft: 54,
-            marginRight: 4,
-            opacity: 0.35,
-          }}
-        />
-</TouchableOpacity>
-            ))
-          )}
-        </ScrollView>
-      </SafeAreaView>
-    );
-  }
 
   if (screen === 'chatCollega') {
     const mioFallback = false;
