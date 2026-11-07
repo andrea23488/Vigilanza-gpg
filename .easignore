@@ -1,0 +1,66 @@
+# Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
+
+# dependencies
+node_modules/
+
+# Expo
+.expo/
+dist/
+web-build/
+expo-env.d.ts
+
+# Native
+.kotlin/
+*.orig.*
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+
+# Metro
+.metro-health-check*
+
+# debug
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+
+# macOS
+.DS_Store
+*.pem
+
+# local env files
+.env*.local
+
+# typescript
+*.tsbuildinfo
+
+# generated native folders
+/ios
+/android
+.env
+
+# Backup locali creati durante lo sviluppo
+App_BACKUP_*.js
+games/*_BACKUP_*.js
+*_BACKUP_*.js
+
+# File temporanei locali
+output.txt
+output2.txt
+
+# File locali di appoggio
+blocco_notifiche.txt
+
+# Impostazioni locali VS Code
+.vscode/extensions.json
+
+# Distribuzione: solo sorgenti della app ufficiale
+.git/
+App.js.*
+*.apk
+*.aab
+*.ipa
+*.zip
+*.log

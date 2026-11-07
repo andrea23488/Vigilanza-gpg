@@ -1,3 +1,4 @@
+import BriscolaPlayLayout from './BriscolaPlayLayout';
 import React from 'react';
 import {
   View,
@@ -513,6 +514,9 @@ export default function BriscolaGame({ onBack }) {
     return 'PAREGGIO';
   };
 
+
+  if (fase !== 'fine') return <BriscolaPlayLayout onBack={onBack} onRestart={nuovaPartita}
+    {...{ briscola, mazzo, manoCpu, manoGiocatore, cartaCpu, cartaGiocatore, puntiCpu, puntiGiocatore, messaggio, fase }} onPlay={giocaCartaGiocatore} />;
 
   return (
     <SafeAreaView
