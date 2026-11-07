@@ -1,0 +1,36 @@
+{
+  "reviewedOn": "2026-11-07",
+  "scope": "Calcolo sperimentale ordinario 2025-2026; non costituisce validazione del netto GPG reale",
+  "sources": [
+    {
+      "id": "TUIR_ART13",
+      "url": "https://www.normattiva.it/atto/caricaDettaglioAtto?atto.articolo.numero=13&atto.codiceRedazionale=086U0917&atto.dataPubblicazioneGazzetta=1986-12-31&vigenza=2026-01-01",
+      "use": "Detrazioni lavoro dipendente, formule annuali e incremento 65 euro"
+    },
+    {
+      "id": "IRPEF_2026",
+      "url": "https://temi.camera.it/temi/19_tl18_irpef.html",
+      "use": "Aliquote ordinarie 23/33/43 dal 2026, 23/35/43 nel 2025"
+    },
+    {
+      "id": "L207_2024",
+      "url": "https://www.normattiva.it/atto/caricaDettaglioAtto?atto.codiceRedazionale=24G00229&atto.dataPubblicazioneGazzetta=2024-12-31&classica=true&dataVigenza=15%2F11%2F2025&tipoDettaglio=singolavigenza",
+      "use": "Art.1 commi 4-9: somma esente e ulteriore detrazione, mai incluse due volte"
+    },
+    {
+      "id": "L199_2025",
+      "url": "https://www.normattiva.it/atto/caricaDettaglioAtto?atto.codiceRedazionale=25G00212&atto.dataPubblicazioneGazzetta=2025-12-30&classica=true&dataVigenza=05%2F01%2F2026&tipoDettaglio=singolavigenza",
+      "use": "Art.1 commi 7 e 10-11: regimi speciali da verificare; non applicati automaticamente né sostituiti con ordinario"
+    },
+    {
+      "id": "INPS_CONTRIBUTI",
+      "url": "https://www.inps.it/it/it/inps-comunica/diritti-e-obblighi-in-materia-di-sicurezza-sociale-nell-unione-e/per-le-imprese/aliquote-contributive.html",
+      "use": "Nessuna aliquota lavoratore universale: serve profilo azienda/lavoratore documentato"
+    },
+    {
+      "id": "ADE_4E_2022",
+      "url": "https://www.difesa.it/assets/allegati/29488/ade_circolare_n.4_del_18_febbraio_2022_tassazione_irpef.pdf",
+      "use": "Incremento 65 euro non ragguagliato: quota periodo esplicita separata, non confusa con la detrazione per giorni"
+    }
+  ]
+}

@@ -42,7 +42,8 @@
     "test:fiduciari-economia": "node scripts/test-fiduciari-economia.cjs",
     "postinstall": "patch-package",
     "preflight:ios:official": "node scripts/preflight-ios-official.cjs",
-    "test:release": "node --test scripts/test-release-operations.cjs"
+    "test:release": "node --test scripts/test-release-operations.cjs",
+    "test:gpg2": "node scripts/test-gpg2.cjs"
   },
   "private": true,
   "devDependencies": {

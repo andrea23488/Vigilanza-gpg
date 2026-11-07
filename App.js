@@ -45,6 +45,7 @@ import {
 } from './turniCalcoli';
 import {
   calcolaVociGpg,
+  stimaNettoGpgLegacy,
   numeroEconomico,
   tariffaStraordinario30DaBase,
 } from './stipendioCalcoli';
@@ -5877,7 +5878,7 @@ const quotaTempoMese = Math.min(
           maturatoFiduciarioImponibileAdOggi *
           coefficienteNettoFiduciarioSemplificato
         ) + maturatoFiduciarioEsenteAdOggi - trattenuteFiduciarioAdOggi
-      : Number(maturatoGpgAdOggi || 0) * coefficienteNettoGpgAdOggi;
+      : stimaNettoGpgLegacy({ competenze: maturatoGpgAdOggi, esenti: indennita20724Numero * quotaTempoMese, coefficiente: coefficienteNettoGpgAdOggi });
 
 
   const numeroTurniFuturi =
@@ -5917,7 +5918,7 @@ const coefficienteNettoStimato = 1992.00 / 2577.16;
           economiaFiduciario.competenzeImponibili *
           coefficienteNettoFiduciarioSemplificato
         ) + economiaFiduciario.competenzeEsenti - economiaFiduciario.trattenute
-      : maturatoMese * coefficienteNettoStimato;
+      : stimaNettoGpgLegacy({ competenze: maturatoMese, esenti: vociCompetenzeGpg.sommeEsenti, coefficiente: coefficienteNettoStimato });
   const mediaNettaGiornata =
     giornateStipendioMese.length > 0
       ? maturatoMese / giornateStipendioMese.length
@@ -5968,7 +5969,7 @@ const coefficienteNettoStimato = 1992.00 / 2577.16;
   const nettoPrevistoFineMese =
     stipendioTipoOperatore === 'fiduciario'
       ? nettoStimatoMese
-      : Number(previsioneFineMese || 0) * (1860.00 / 2273.30);
+      : stimaNettoGpgLegacy({ competenze: previsioneFineMese, esenti: vociCompetenzeGpg.sommeEsenti, coefficiente: coefficienteNettoGpgAdOggi });
 
 
   const turnoOggi = turniMese.find(
@@ -9071,9 +9072,15 @@ if (screen === 'colleghi') {
     return (
       <Screen>
         <Back onPress={() => setScreen('home')} />
+        {!isFiduciario && <Text style={{color:'#FFD891', marginBottom:10}}>Stima precedente: GPG 2.0 non attivo. Il netto usa ancora un coefficiente indicativo, non la fiscalità personale.</Text>}
         {!isFiduciario && <TouchableOpacity style={styles.syncButton} onPress={() => setScreen('gpgComparison')}>
-          <Text style={styles.syncText}>Confronto GPG 2.0 · sperimentale</Text>
+          <Text style={styles.syncText}>GPG 2.0 · non attivo — dati mancanti</Text>
         </TouchableOpacity>}
+        {!isFiduciario && <View style={{padding:12, marginBottom:12, backgroundColor:'#10213B', borderRadius:12}}>
+          <Text style={{color:'#FFF'}}>Competenze lorde stimate: € {vociCompetenzeGpg.competenzeLorde.toFixed(2)}</Text>
+          <Text style={{color:'#CEDBEC'}}>Somme esenti configurate: € {vociCompetenzeGpg.sommeEsenti.toFixed(2)}</Text>
+          <Text style={{color:'#FFD891', marginTop:6}}>Imponibili e netto fiscale non verificati. Le indennità dedotte dagli orari richiedono conferma della spettanza; arretrati e Control Room non sono ricavabili dal solo calendario.</Text>
+        </View>}
 
 
         <Text
@@ -9336,8 +9343,8 @@ if (screen === 'colleghi') {
                 )
               : (
                   stipendioProfiloCalcolo === 'personalizzato'
-                    ? 'GPG · PERSONALIZZATO'
-                    : 'GPG · AUTOMATICO'
+                    ? 'GPG · STIMA PRECEDENTE PERSONALIZZATA'
+                    : 'GPG · STIMA PRECEDENTE AUTOMATICA'
                 )}
           </Text>
         </View>

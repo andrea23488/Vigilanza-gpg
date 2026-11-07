@@ -41,13 +41,28 @@ export function calcolaVociGpg({
     decurtazioni: numeroEconomico(decurtazioni),
   };
 
-  return {
-    ...voci,
-    totale:
-      voci.base + voci.straordinario + voci.domenicale +
-      voci.piantonamentoDiurno + voci.compensativa +
-      voci.piantonamentoNotturno + voci.riposoLavorato +
-      voci.festivitaNonGoduta + voci.antirapina +
-      voci.indennita20724 - voci.decurtazioni,
+  // Arrotondamento di ciascuna voce prima della somma, come nel nucleo 2.0.
+  for (const key of Object.keys(voci)) voci[key] = Math.round((voci[key] + Number.EPSILON) * 100) / 100;
+  const competenzeLorde = Math.round((
+    voci.base + voci.straordinario + voci.domenicale + voci.piantonamentoDiurno +
+    voci.compensativa + voci.piantonamentoNotturno + voci.riposoLavorato +
+    voci.festivitaNonGoduta + voci.antirapina - voci.decurtazioni
+  ) * 100) / 100;
+  // La somma L.207/2024 già configurata è esente: non è una maggiorazione lorda.
+  // Questo non certifica gli imponibili previdenziale/fiscale delle altre voci.
+  const sommeEsenti = voci.indennita20724;
+  return { ...voci, competenzeLorde, sommeEsenti,
+    imponibilePrevidenziale: null, imponibileFiscale: null,
+    totale: Math.round((competenzeLorde + sommeEsenti) * 100) / 100,
   };
+}
+
+// Mantiene il metodo precedente fino alla validazione del nuovo netto.
+// L'esente viene accreditato integralmente, una sola volta, senza applicare il coefficiente.
+export function stimaNettoGpgLegacy({ competenze, esenti = 0, coefficiente }) {
+  const totale = numeroEconomico(competenze);
+  const quotaEsente = Math.min(totale, numeroEconomico(esenti));
+  const fattore = Number(coefficiente);
+  if (!Number.isFinite(fattore) || fattore < 0 || fattore > 1) return null;
+  return Math.round(((totale - quotaEsente) * fattore + quotaEsente + Number.EPSILON) * 100) / 100;
 }

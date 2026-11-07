@@ -16,6 +16,6 @@ module.exports = ({ config }) => {
     if (!/^sb_publishable_[A-Za-z0-9_-]+$/.test(process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY || '')) throw new Error('Build bloccata: manca la chiave pubblica Supabase verificata.');
   }
   const hash = createHash('sha256');
-  for (const file of ['App.js', 'OfficialCalendar.js', 'turniApi.js', 'turniRapidiOperazioni.js', 'games/SpacePatrolGame.js', 'games/BriscolaPlayLayout.js', 'games/ScopaPlayLayout.js', 'FeedbackScreen.js']) hash.update(readFileSync(join(__dirname, file)));
+  for (const file of ['App.js', 'OfficialCalendar.js', 'turniApi.js', 'turniRapidiOperazioni.js', 'games/SpacePatrolGame.js', 'games/BriscolaPlayLayout.js', 'games/ScopaPlayLayout.js', 'FeedbackScreen.js', 'stipendioCalcoli.js', 'experimental/gpg-v2/core/fiscalita.cjs', 'experimental/gpg-v2/core/retribuzione.cjs', 'experimental/gpg-v2/officialComparison.cjs']) hash.update(readFileSync(join(__dirname, file)));
   return { ...config, extra: { ...config.extra, releaseRevision: 'gpg-coordinato-20261107', sourceHash: hash.digest('hex').slice(0,16), salaryEngine: 'legacy', gpg2Status: 'experimental-unvalidated' } };
 };
