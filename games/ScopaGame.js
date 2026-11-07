@@ -1,3 +1,4 @@
+import ScopaPlayLayout from './ScopaPlayLayout';
 import React, { useMemo, useRef, useState } from 'react';
 import {
   View,
@@ -769,7 +770,7 @@ export default function ScopaGame({ onBack }) {
 
   return (
     <SafeAreaView
-      edges={['top', 'left', 'right']}
+      edges={['top', 'bottom', 'left', 'right']}
       style={{
         flex: 1,
         backgroundColor: '#071A12',
@@ -908,6 +909,10 @@ export default function ScopaGame({ onBack }) {
         </View>
       )}
 
+      {!fine ? <ScopaPlayLayout onBack={onBack}
+        {...{ manoCpu, manoGiocatore, tavolo, messaggio, bloccato, scopeGiocatore, scopeCpu }}
+        puntiGiocatore={puntiPartitaGiocatore} puntiCpu={puntiPartitaCpu} preseGiocatore={preseGiocatore.length} preseCpu={preseCpu.length} onPlay={giocaCartaGiocatore} fine={false}
+        action={<TouchableOpacity onPress={() => Alert.alert('Nuova partita', 'Ricominciare la partita?', [{text:'Annulla',style:'cancel'},{text:'Ricomincia',onPress:nuovaPartita}])} style={{minHeight:44,justifyContent:'center',alignItems:'center'}}><Text style={{color:'#FFF'}}>Nuova partita</Text></TouchableOpacity>} /> : (
       <ScrollView
         contentContainerStyle={{
           paddingHorizontal: 14,
@@ -1480,7 +1485,7 @@ export default function ScopaGame({ onBack }) {
         </TouchableOpacity>
 
 
-      </ScrollView>
+      </ScrollView>)}
     </SafeAreaView>
   );
 }

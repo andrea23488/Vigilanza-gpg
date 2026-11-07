@@ -1,3 +1,8 @@
+import SpacePatrolGame from './games/SpacePatrolGame';
+import OfficialCalendar from './OfficialCalendar';
+import FeedbackScreen from './FeedbackScreen';
+import GpgComparisonScreen from './GpgComparisonScreen';
+import { creaCoordinatoreTurniRapidi } from './turniRapidiOperazioni';
 import {
   Ionicons } from '@expo/vector-icons';
 import * as DocumentPicker from 'expo-document-picker';
@@ -1216,7 +1221,7 @@ export default function App() {
 
   useEffect(() => {
     if (
-      screen !== 'spacePatrolGame' ||
+      screen !== 'spacePatrolLegacy' ||
       !spaceGame.running ||
       spaceGame.gameOver
     ) {
@@ -4434,6 +4439,21 @@ const cambiaStatoDotazione = (id, stato) => {
   const [saving, setSaving] =
     useState(false);
 
+  const rapidContext = useRef(null);
+  rapidContext.current = { userId: utenteAutenticato?.id, offline: false, saving,
+    configKey: JSON.stringify([stipendioTipoOperatore, stipendioOreGiornaliere]) };
+  const rapidCoordinator = useRef(null);
+  if (!rapidCoordinator.current) rapidCoordinator.current = creaCoordinatoreTurniRapidi({
+    context: () => rapidContext.current,
+    read: caricaTurniUtente,
+    onBusy: setSaving,
+    create: creaTurnoUtente,
+    build: dati => rapidContext.current.build(dati),
+    publish: (rows, userId) => { if (utenteIdSessioneRef.current === userId) setTurni(rows); },
+    removeIfUnchanged: (id, expected, expectedUserId) => eliminaTurnoUtente(id, { expected, expectedUserId }),
+  });
+  rapidContext.current.build = creaPayload;
+
   const [editingId, setEditingId] =
     useState(null);
 
@@ -6964,7 +6984,8 @@ console.log("🕒 ORA REALE:", new Date().toString());
     setScreen('edit');
   }
 
-  function creaPayload() {
+  function creaPayload(dati = { tipo, inizio, fine, minutiAggiuntiviRetribuiti, extra, giorno, mese, anno, luogo, indirizzoServizio, localitaMeteoTurno, riposoLavorato }) {
+    const { tipo, inizio, fine, minutiAggiuntiviRetribuiti, extra, giorno, mese, anno, luogo, indirizzoServizio, localitaMeteoTurno, riposoLavorato } = dati;
     const ore =
       tipo === 'turno'
         ? calcolaOreIntervallo(inizio, fine)
@@ -7148,12 +7169,7 @@ console.log("🕒 ORA REALE:", new Date().toString());
           const senza =
             precedenti.filter(
               (t) =>
-                Number(
-                  t.id
-                ) !==
-                Number(
-                  salvato.id
-                )
+                String(t.id) !== String(salvato.id)
             );
 
           return [
@@ -7225,8 +7241,8 @@ console.log("🕒 ORA REALE:", new Date().toString());
     }
 
     Alert.alert(
-      'Elimina giornata',
-      'Vuoi davvero eliminare questa giornata?',
+      'Elimina solo questo servizio',
+      'Confermi? Gli altri servizi della giornata rimangono invariati.',
       [
         {
           text:
@@ -7251,7 +7267,7 @@ console.log("🕒 ORA REALE:", new Date().toString());
   }
 
   async function eliminaGiornata() {
-    if (editingId === null || editingId === undefined) {
+    if (editingId === null || editingId === undefined || saving) {
       return;
     }
 
@@ -7263,7 +7279,7 @@ console.log("🕒 ORA REALE:", new Date().toString());
 
       setTurni((precedenti) =>
         precedenti.filter(
-          (t) => Number(t.id) !== Number(idDaEliminare)
+          (t) => String(t.id) !== String(idDaEliminare)
         )
       );
 
@@ -9055,6 +9071,10 @@ if (screen === 'colleghi') {
     return (
       <Screen>
         <Back onPress={() => setScreen('home')} />
+        {!isFiduciario && <TouchableOpacity style={styles.syncButton} onPress={() => setScreen('gpgComparison')}>
+          <Text style={styles.syncText}>Confronto GPG 2.0 · sperimentale</Text>
+        </TouchableOpacity>}
+
 
         <Text
           style={{
@@ -13402,751 +13422,7 @@ if (screen === 'configuraStipendio') {
     );
   }
 
-  if (screen === 'spacePatrolGame') {
-    const shipY =
-      SPACE_HEIGHT -
-      SPACE_SHIP_H -
-      10;
-
-    return (
-      <Screen>
-
-        <Back
-          onPress={() => {
-            setSpaceGame(
-              (prev) => ({
-                ...prev,
-                running: false,
-              })
-            );
-
-            setScreen(
-              'passatempo'
-            );
-          }}
-        />
-
-        <ScrollView
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={{
-            paddingHorizontal: 18,
-            paddingBottom: 35,
-          }}
-        >
-
-          {/* HEADER */}
-          <View
-            style={{
-              marginTop: 8,
-
-              padding: 17,
-
-              borderRadius: 23,
-
-              backgroundColor:
-                'rgba(26,20,75,0.97)',
-
-              borderWidth: 1,
-
-              borderColor:
-                'rgba(169,151,255,0.58)',
-
-              shadowColor:
-                '#A997FF',
-
-              shadowOpacity: 0.17,
-
-              shadowRadius: 15,
-
-              shadowOffset: {
-                width: 0,
-                height: 6,
-              },
-            }}
-          >
-
-            <Text
-              style={{
-                color: '#A997FF',
-                fontSize: 10,
-                fontWeight: '900',
-                letterSpacing: 1.3,
-              }}
-            >
-              ARCADE BREAK
-            </Text>
-
-            <Text
-              style={{
-                color: '#FFFFFF',
-                fontSize: 27,
-                fontWeight: '900',
-                marginTop: 4,
-              }}
-            >
-              Space Patrol
-            </Text>
-
-            <Text
-              style={{
-                color: '#AEB9D6',
-                fontSize: 12,
-                fontWeight: '700',
-                marginTop: 3,
-              }}
-            >
-              Difendi il settore e abbatti gli intrusi.
-            </Text>
-
-          </View>
-
-
-          {/* SCORE + VITE */}
-          <View
-            style={{
-              flexDirection: 'row',
-              gap: 10,
-              marginTop: 12,
-              marginBottom: 12,
-            }}
-          >
-
-            <View
-              style={{
-                flex: 1,
-
-                paddingVertical: 9,
-
-                borderRadius: 15,
-
-                backgroundColor:
-                  '#0B1930',
-
-                borderWidth: 1,
-
-                borderColor:
-                  'rgba(169,151,255,0.32)',
-
-                alignItems:
-                  'center',
-              }}
-            >
-
-              <Text
-                style={{
-                  color: '#8FA5CC',
-                  fontSize: 9,
-                  fontWeight: '900',
-                }}
-              >
-                PUNTI
-              </Text>
-
-              <Text
-                style={{
-                  color: '#FFFFFF',
-                  fontSize: 22,
-                  fontWeight: '900',
-                  marginTop: 1,
-                }}
-              >
-                {spaceGame.score}
-              </Text>
-
-            </View>
-
-
-            <View
-              style={{
-                flex: 1,
-
-                paddingVertical: 9,
-
-                borderRadius: 15,
-
-                backgroundColor:
-                  '#0B1930',
-
-                borderWidth: 1,
-
-                borderColor:
-                  'rgba(255,111,153,0.32)',
-
-                alignItems:
-                  'center',
-              }}
-            >
-
-              <Text
-                style={{
-                  color: '#8FA5CC',
-                  fontSize: 9,
-                  fontWeight: '900',
-                }}
-              >
-                VITE
-              </Text>
-
-              <Text
-                style={{
-                  color: '#FF7AA5',
-                  fontSize: 19,
-                  fontWeight: '900',
-                  marginTop: 3,
-                }}
-              >
-                {'♥'.repeat(
-                  spaceGame.lives
-                )}
-              </Text>
-
-            </View>
-
-          </View>
-
-
-          {/* CAMPO */}
-          <View
-            onTouchStart={(e) => {
-              muoviNavicellaSpace(
-                e.nativeEvent.locationX
-              );
-            }}
-            onTouchMove={(e) => {
-              muoviNavicellaSpace(
-                e.nativeEvent.locationX
-              );
-            }}
-            style={{
-              width:
-                SPACE_WIDTH,
-
-              height:
-                SPACE_HEIGHT,
-
-              alignSelf:
-                'center',
-
-              position:
-                'relative',
-
-              overflow:
-                'hidden',
-
-              borderRadius:
-                18,
-
-              backgroundColor:
-                '#020719',
-
-              borderWidth:
-                1.5,
-
-              borderColor:
-                'rgba(169,151,255,0.48)',
-
-              shadowColor:
-                '#A997FF',
-
-              shadowOpacity:
-                0.13,
-
-              shadowRadius:
-                13,
-            }}
-          >
-
-            {/* STELLE */}
-            {[
-              [26, 36],
-              [230, 72],
-              [92, 113],
-              [268, 149],
-              [50, 189],
-              [181, 215],
-              [112, 267],
-              [252, 299],
-              [38, 336],
-              [211, 375],
-              [144, 55],
-              [281, 242],
-            ].map(
-              ([x, y], i) => (
-                <View
-                  key={`star-${i}`}
-                  style={{
-                    position:
-                      'absolute',
-
-                    left: x,
-                    top: y,
-
-                    width:
-                      i % 3 === 0
-                        ? 3
-                        : 2,
-
-                    height:
-                      i % 3 === 0
-                        ? 3
-                        : 2,
-
-                    borderRadius:
-                      3,
-
-                    backgroundColor:
-                      'rgba(255,255,255,0.65)',
-                  }}
-                />
-              )
-            )}
-
-
-            {/* NEMICI */}
-            {spaceGame.enemies.map(
-              (enemy) => (
-                <View
-                  key={enemy.id}
-                  style={{
-                    position:
-                      'absolute',
-
-                    left:
-                      enemy.x,
-
-                    top:
-                      enemy.y,
-
-                    width:
-                      SPACE_ENEMY_W,
-
-                    height:
-                      SPACE_ENEMY_H,
-
-                    borderRadius:
-                      9,
-
-                    alignItems:
-                      'center',
-
-                    justifyContent:
-                      'center',
-
-                    backgroundColor:
-                      'rgba(255,87,132,0.16)',
-
-                    borderWidth:
-                      1,
-
-                    borderColor:
-                      '#FF5784',
-
-                    shadowColor:
-                      '#FF5784',
-
-                    shadowOpacity:
-                      0.45,
-
-                    shadowRadius:
-                      6,
-                  }}
-                >
-                  <Ionicons
-                    name="warning-outline"
-                    size={18}
-                    color="#FF789C"
-                  />
-                </View>
-              )
-            )}
-
-
-            {/* PROIETTILI */}
-            {spaceGame.bullets.map(
-              (bullet) => (
-                <View
-                  key={bullet.id}
-                  style={{
-                    position:
-                      'absolute',
-
-                    left:
-                      bullet.x,
-
-                    top:
-                      bullet.y,
-
-                    width:
-                      SPACE_BULLET_W,
-
-                    height:
-                      SPACE_BULLET_H,
-
-                    borderRadius:
-                      4,
-
-                    backgroundColor:
-                      '#77F8FF',
-
-                    shadowColor:
-                      '#77F8FF',
-
-                    shadowOpacity:
-                      0.85,
-
-                    shadowRadius:
-                      6,
-                  }}
-                />
-              )
-            )}
-
-
-            {/* NAVICELLA */}
-            <View
-              style={{
-                position:
-                  'absolute',
-
-                left:
-                  spaceGame.shipX,
-
-                top:
-                  shipY,
-
-                width:
-                  SPACE_SHIP_W,
-
-                height:
-                  SPACE_SHIP_H,
-
-                alignItems:
-                  'center',
-
-                justifyContent:
-                  'center',
-
-                borderRadius:
-                  12,
-
-                backgroundColor:
-                  'rgba(109,234,255,0.13)',
-
-                borderWidth:
-                  1,
-
-                borderColor:
-                  '#6FEAFF',
-
-                shadowColor:
-                  '#6FEAFF',
-
-                shadowOpacity:
-                  0.55,
-
-                shadowRadius:
-                  7,
-              }}
-            >
-              <Ionicons
-                name="rocket"
-                size={24}
-                color="#8EF4FF"
-              />
-            </View>
-
-
-            {/* GAME OVER */}
-            {spaceGame.gameOver ? (
-              <View
-                style={{
-                  position:
-                    'absolute',
-
-                  left: 0,
-                  right: 0,
-                  top: 0,
-                  bottom: 0,
-
-                  backgroundColor:
-                    'rgba(2,7,25,0.86)',
-
-                  alignItems:
-                    'center',
-
-                  justifyContent:
-                    'center',
-                }}
-              >
-
-                <Text
-                  style={{
-                    color:
-                      '#FF789C',
-
-                    fontSize:
-                      28,
-
-                    fontWeight:
-                      '900',
-                  }}
-                >
-                  MISSIONE FALLITA
-                </Text>
-
-                <Text
-                  style={{
-                    color:
-                      '#FFFFFF',
-
-                    fontSize:
-                      13,
-
-                    fontWeight:
-                      '800',
-
-                    marginTop:
-                      7,
-                  }}
-                >
-                  Punteggio {spaceGame.score}
-                </Text>
-
-              </View>
-            ) : null}
-
-          </View>
-
-
-          {/* TESTO GUIDA */}
-          <Text
-            style={{
-              color:
-                '#AEB9D6',
-
-              fontSize:
-                11,
-
-              fontWeight:
-                '700',
-
-              textAlign:
-                'center',
-
-              marginTop:
-                11,
-            }}
-          >
-            ↔ Trascina il dito sul campo per muovere la navicella
-          </Text>
-
-
-          {/* PULSANTI */}
-          <View
-            style={{
-              flexDirection:
-                'row',
-
-              gap:
-                9,
-
-              marginTop:
-                12,
-            }}
-          >
-
-            {/* FUOCO */}
-            <TouchableOpacity
-              activeOpacity={0.78}
-
-              disabled={
-                spaceGame.gameOver ||
-                !spaceGame.running
-              }
-
-              onPress={
-                sparaSpace
-              }
-
-              style={{
-                flex: 1,
-
-                minHeight: 52,
-
-                borderRadius: 17,
-
-                alignItems:
-                  'center',
-
-                justifyContent:
-                  'center',
-
-                backgroundColor:
-                  'rgba(255,87,132,0.12)',
-
-                borderWidth:
-                  1,
-
-                borderColor:
-                  'rgba(255,87,132,0.48)',
-
-                opacity:
-                  spaceGame.gameOver ||
-                  !spaceGame.running
-                    ? 0.4
-                    : 1,
-              }}
-            >
-
-              <Text
-                style={{
-                  color:
-                    '#FF789C',
-
-                  fontSize:
-                    12,
-
-                  fontWeight:
-                    '900',
-                }}
-              >
-                🔥 FUOCO
-              </Text>
-
-            </TouchableOpacity>
-
-
-            {/* PAUSA */}
-            <TouchableOpacity
-              activeOpacity={0.78}
-
-              disabled={
-                spaceGame.gameOver
-              }
-
-              onPress={() =>
-                setSpaceGame(
-                  (prev) => ({
-                    ...prev,
-                    running:
-                      !prev.running,
-                  })
-                )
-              }
-
-              style={{
-                flex: 1,
-
-                minHeight: 52,
-
-                borderRadius: 17,
-
-                alignItems:
-                  'center',
-
-                justifyContent:
-                  'center',
-
-                backgroundColor:
-                  'rgba(169,151,255,0.11)',
-
-                borderWidth:
-                  1,
-
-                borderColor:
-                  'rgba(169,151,255,0.45)',
-
-                opacity:
-                  spaceGame.gameOver
-                    ? 0.4
-                    : 1,
-              }}
-            >
-
-              <Text
-                style={{
-                  color:
-                    '#A997FF',
-
-                  fontSize:
-                    11,
-
-                  fontWeight:
-                    '900',
-                }}
-              >
-                {spaceGame.running
-                  ? 'Ⅱ PAUSA'
-                  : '▶ RIPRENDI'}
-              </Text>
-
-            </TouchableOpacity>
-
-          </View>
-
-
-          {/* NUOVA PARTITA */}
-          <TouchableOpacity
-            activeOpacity={0.82}
-
-            onPress={
-              nuovaPartitaSpace
-            }
-
-            style={{
-              marginTop:
-                9,
-
-              minHeight:
-                48,
-
-              borderRadius:
-                16,
-
-              alignItems:
-                'center',
-
-              justifyContent:
-                'center',
-
-              backgroundColor:
-                'rgba(111,234,255,0.10)',
-
-              borderWidth:
-                1,
-
-              borderColor:
-                'rgba(111,234,255,0.40)',
-            }}
-          >
-
-            <Text
-              style={{
-                color:
-                  '#6FEAFF',
-
-                fontSize:
-                  11,
-
-                fontWeight:
-                  '900',
-              }}
-            >
-              ↻ NUOVA PARTITA
-            </Text>
-
-          </TouchableOpacity>
-
-        </ScrollView>
-      </Screen>
-    );
-  }
-
-
-  
-  /* =========================================================
-     CAMPO MINATO
-     ========================================================= */
+  if (screen === 'spacePatrolGame') return <SpacePatrolGame onBack={() => setScreen('passatempo')} />;
 
   if (screen === 'campoMinatoGame') {
     const mineCellSize = 31;
@@ -24357,6 +23633,9 @@ if (screen === 'profiloCollega') {
           }
         />
 
+        <TouchableOpacity style={styles.syncButton} onPress={() => setScreen('feedbackOfficial')}>
+          <Text style={styles.syncText}>Aiutaci a migliorare · Invia email</Text>
+        </TouchableOpacity>
         <Text
           style={
             styles.title
@@ -25168,224 +24447,15 @@ if (screen === 'profiloCollega') {
     );
   }
 
-  if (
-    screen ===
-    'calendar'
-  ) {
-    return (
-      <Screen>
-        <Back
-          onPress={
-            tornaHome
-          }
-        />
-
-        <Text
-          style={
-            styles.title
-          }
-        >
-          Calendario
-        </Text>
-
-        <Text
-          style={
-            styles.subtitle
-          }
-        >
-          Tocca un giorno per inserire il servizio
-        </Text>
-
-        <View
-          style={
-            styles.monthBox
-          }
-        >
-          <TouchableOpacity
-            onPress={
-              mesePrecedente
-            }
-          >
-            <Text
-              style={
-                styles.arrow
-              }
-            >
-              ‹
-            </Text>
-          </TouchableOpacity>
-
-          <View>
-            <Text
-              style={
-                styles.month
-              }
-            >
-              {MESI[mese]}
-            </Text>
-
-            <Text
-              style={
-                styles.year
-              }
-            >
-              {anno}
-            </Text>
-          </View>
-
-          <TouchableOpacity
-            onPress={
-              meseSuccessivo
-            }
-          >
-            <Text
-              style={
-                styles.arrow
-              }
-            >
-              ›
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        <Calendar
-          anno={
-            anno
-          }
-          mese={
-            mese
-          }
-          records={
-            turniMese
-          }
-          onPress={(
-            g,
-            recordsGiorno
-          ) => {
-            apriGiornoCalendario(g, recordsGiorno);
-          }}
-        />
-
-      <View
-        style={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          backgroundColor: '#09172A',
-          borderWidth: 1,
-          borderColor: '#1D3558',
-          borderRadius: 18,
-          paddingVertical: 10,
-          paddingHorizontal: 10,
-          marginTop: 10,
-          marginBottom: 14,
-        }}
-      >
-        <View style={{ alignItems: 'center', flex: 1 }}>
-          <Ionicons name="sunny" size={16} color="#20EDF2" />
-          <Text style={{
-            color: '#AFC0D7',
-            fontSize: 8,
-            fontWeight: '800',
-            marginTop: 3
-          }}>
-            Mattina
-          </Text>
-        </View>
-
-        <View style={{ alignItems: 'center', flex: 1 }}>
-          <Ionicons name="sunny-outline" size={16} color="#FF9D3D" />
-          <Text style={{
-            color: '#AFC0D7',
-            fontSize: 8,
-            fontWeight: '800',
-            marginTop: 3
-          }}>
-            Serale
-          </Text>
-        </View>
-
-        <View style={{ alignItems: 'center', flex: 1 }}>
-          <Ionicons name="moon" size={15} color="#A77CFF" />
-          <Text style={{
-            color: '#AFC0D7',
-            fontSize: 8,
-            fontWeight: '800',
-            marginTop: 3
-          }}>
-            Notturno
-          </Text>
-        </View>
-
-        <View style={{ alignItems: 'center', flex: 1 }}>
-          <View style={{
-            backgroundColor: '#2B3B57',
-            borderRadius: 8,
-            paddingHorizontal: 5,
-            paddingVertical: 2,
-          }}>
-            <Text style={{
-              color: '#D0DCF0',
-              fontSize: 8,
-              fontWeight: '900'
-            }}>
-              RIP
-            </Text>
-          </View>
-
-          <Text style={{
-            color: '#AFC0D7',
-            fontSize: 8,
-            fontWeight: '800',
-            marginTop: 3
-          }}>
-            Riposo
-          </Text>
-        </View>
-      </View>
-
-
-
-        <View
-          style={
-            styles.stats
-          }
-        >
-          <Stat
-            label="ORE"
-            value={`${statistiche.ore}h`}
-          />
-
-          <Stat
-            label="EXTRA"
-            value={`${statistiche.extraOre}h`}
-          />
-
-          <Stat
-            label="NOTTI"
-            value={`${statistiche.notti}`}
-          />
-        </View>
-
-        <TouchableOpacity
-          style={
-            styles.syncButton
-          }
-          onPress={() =>
-            caricaTurni()
-          }
-        >
-          <Text
-            style={
-              styles.syncText
-            }
-          >
-            ↻ Aggiorna calendario
-          </Text>
-        </TouchableOpacity>
-      </Screen>
-    );
-  }
+  if (screen === 'feedbackOfficial') return <FeedbackScreen onBack={tornaHome} />;
+  if (screen === 'gpgComparison') return <GpgComparisonScreen records={turni}
+    accountId={utenteAutenticato?.id} year={anno} monthIndex={mese} grossEuro={totaleCompetenzeStimate} netEstimateEuro={nettoStimatoMese}
+    onBack={() => setScreen('stipendio')} />;
+  if (screen === 'calendar') return <OfficialCalendar anno={anno} mese={mese} records={turni}
+    coordinator={rapidCoordinator.current} onBack={tornaHome} summary={{ore: oreStipendioMese, extra: extraStipendioMese, notti: statistiche.notti}}
+    onPrevious={mesePrecedente} onNext={meseSuccessivo}
+    onDay={g => apriGiornoCalendario(g, turniMese.filter(t => Number(t.giorno) === g))}
+    onRefresh={() => caricaTurni()} />;
 
   if (screen === 'giornoTurni') {
     const recordsGiorno = turniMese

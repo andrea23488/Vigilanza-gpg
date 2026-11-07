@@ -40,7 +40,9 @@
     "test:stipendio": "node scripts/test-stipendio-calcoli.cjs",
     "test:fiduciari": "node scripts/test-fiduciari-ore.cjs",
     "test:fiduciari-economia": "node scripts/test-fiduciari-economia.cjs",
-    "postinstall": "patch-package"
+    "postinstall": "patch-package",
+    "preflight:ios:official": "node scripts/preflight-ios-official.cjs",
+    "test:release": "node --test scripts/test-release-operations.cjs"
   },
   "private": true,
   "devDependencies": {

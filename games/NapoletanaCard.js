@@ -974,6 +974,9 @@ export default function NapoletanaCard({
 
   return (
     <TouchableOpacity
+      accessibilityRole="button"
+      accessibilityLabel={`${carta.nome || carta.valore} di ${carta.semeNome || carta.seme}`}
+      accessibilityState={{ disabled }}
       activeOpacity={0.76}
       disabled={disabled}
       onPress={onPress}
